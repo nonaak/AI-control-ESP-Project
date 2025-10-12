@@ -1,0 +1,522 @@
+===============================================================================
+ESP-NOW COMMUNICATIE SPECIFICATIE - HOOFDESP (E4:65:B8:7A:85:E4)
+KANAAL: 4
+===============================================================================
+
+HUIDIGE STATUS:
+🔶 MOET NOG GEÏMPLEMENTEERD WORDEN
+🔶 ESP-NOW initialisatie nodig
+🔶 Bidirectionele communicatie setup vereist
+
+COMMUNICATIE PARTNERS:
+- Body ESP (08:D1:F9:DC:C3:A4) - Kanaal 1 [PRIMAIR - AI FEEDBACK]
+- Pomp Unit (60:01:94:59:18:86) - Kanaal 4 [PRIMAIR - MACHINE CONTROL]
+- M5Atom (50:02:91:87:23:F8) - Kanaal 2 [MONITORING/LOGGING]
+
+FUNCTIE: Centrale coordinatie, machine control, safety management
+
+===============================================================================
+ONTVANGEN BERICHTEN (INKOMEND)
+===============================================================================
+
+1. VAN BODY ESP - AI Overrule Commands ⚠️ KRITIEK
+   Frequentie: Bij AI detectie (variabel)
+   Structuur: 
+   {
+     float newTrust;         // AI berekende trust override (0.0-1.0)
+     float newSleeve;        // AI berekende sleeve override (0.0-1.0)
+     bool overruleActive;    // AI overrule status
+     char command[32];       // "AI_OVERRIDE", "EMERGENCY_STOP", "HEARTBEAT"
+   }
+   
+   Acties bij ontvangst:
+   - Controleer command type
+   - Bij "AI_OVERRIDE": 
+     * Pas trust/sleeve snelheden aan met AI factors
+     * finalTrust = baseTrust * newTrust
+     * finalSleeve = baseSleeve * newSleeve
+     * Update machine parameters
+     * Stuur commando naar Pomp Unit
+   - Bij "EMERGENCY_STOP":
+     * ONMIDDELLIJK stop alle bewegingen
+     * Zet safety locks actief
+     * Log incident
+     * Toon alarm op display
+   - Bij "HEARTBEAT":
+     * Update body ESP connection status
+     * Reset timeout counter
+
+2. VAN POMP UNIT - Vacuum System Telemetry ⚠️ NIEUW - GEÏMPLEMENTEERD!
+   Frequentie: Elke 250ms / 4Hz (PumpStatusMsg)
+   Structuur:
+   {
+     uint8_t  version;              // Message versie (1)
+     float    current_vacuum_cmHg;  // 🎯 HX711 vacuum waarde (real-time!)
+     uint8_t  vacuum_pump_on;       // Vacuum pomp status (0/1)
+     uint8_t  lube_pump_on;         // Lube pomp status (0/1)
+     uint8_t  servo_open;           // Servo valve positie (0/1)
+     uint8_t  air_relay_open;       // Air relay status (0/1)
+     float    lube_remaining_sec;   // Resterende lube tijd
+     char     system_status[8];     // "OK"/"TARE"/"ERROR"
+     uint8_t  force_pump_state;     // Huidige force state (0=AUTO,1=OFF,2=ON)
+     uint32_t uptime_sec;           // System uptime
+   }
+   
+   🔶 IMPLEMENTATIE VEREIST - Acties:
+   - Update vacuum display met real-time HX711 data
+   - Toon pump status indicators (vacuum/lube/servo/air)
+   - "Zuigen" modus: gebruik current_vacuum_cmHg voor feedback control
+   - System health monitoring ("TARE"/"ERROR" states)
+   - Forward vacuum data naar Body ESP (voor AI/logging)
+   - Bij system_status="ERROR": Activeer safety protocols
+
+3. VAN M5ATOM - Remote Commands (OPTIONEEL)
+   Frequentie: Op verzoek
+   Structuur:
+   {
+     char command[32];       // "START", "STOP", "PAUSE", "EMERGENCY"
+     float trustSpeed;       // Gewenste trust speed
+     float sleeveSpeed;      // Gewenste sleeve speed
+     int duration;          // Session duur (minuten)
+   }
+   
+   Acties:
+   - Verwerk remote commando's
+   - Valideer veiligheidsparameters
+   - Update lokale instellingen
+   - Stuur bevestiging terug
+
+===============================================================================
+VERZENDEN BERICHTEN (UITGAAND)
+===============================================================================
+
+1. NAAR BODY ESP - Machine Status Update
+   Frequentie: Elke 500ms (2Hz) - VERSNELD voor betere AI response
+   Structuur:
+   {
+     float trust;        // Huidige trust speed (0.0-2.0)
+     float sleeve;       // Huidige sleeve speed (0.0-2.0)  
+     float suction;      // Suction level (0.0-100.0)
+     float pause;        // Pause tijd tussen cycles (0.0-10.0)
+     char command[32];   // "STATUS_UPDATE"
+   }
+   
+   Data bronnen:
+   - trust/sleeve: Lokale instellingen * AI override factors
+   - suction: Pomp unit feedback
+   - pause: Actuele pause timing
+   
+   Doel: Body ESP kan machine data tonen en loggen
+
+2. NAAR POMP UNIT - Vacuum Control Commands ⚠️ KRITIEK
+   Frequentie: Bij parameter wijzigingen
+   Gebruikt: MainMsgV3 (backwards compatible met V1/V2)
+   
+   Structuur (MainMsgV3):
+   {
+     uint8_t  version;           // Bericht versie (3)
+     uint8_t  arrow_full;        // Pijl vol status (0/1)
+     uint8_t  session_started;   // Sessie start trigger
+     uint32_t punch_count;       // Huidige punch teller
+     uint32_t punch_goal;        // Punch doel voor lube trigger
+     int16_t  vacuum_set_x10;    // Vacuum setpoint (tienden cmHg)
+     uint8_t  force_pump_state;  // 0=AUTO, 1=FORCE_OFF, 2=FORCE_ON
+     uint8_t  cmd_lube_prime_now;// Pulse commando: lube prime
+     uint8_t  cmd_lube_shot_now; // Pulse commando: lube shot
+   }
+   
+   🔶 NIEUWE "ZUIGEN" MODUS met real-time feedback:
+   ```cpp
+   // Gebruik current_vacuum_cmHg van PumpStatusMsg voor closed-loop control
+   if (zuigMode && pumpTelemetryReceived) {
+     float targetVacuum = userVacuumSetpoint;  // bijv. -20.0 cmHg
+     float actualVacuum = pumpStatus.current_vacuum_cmHg;
+     
+     // PID control of feedback loop
+     if (actualVacuum < targetVacuum - 1.0) {
+       // Te weinig vacuum - zet pump aan
+       msg.force_pump_state = 2; // FORCE_ON
+     } else if (actualVacuum > targetVacuum + 1.0) {
+       // Te veel vacuum - zet pump uit
+       msg.force_pump_state = 1; // FORCE_OFF
+     } else {
+       // Target bereikt - auto mode
+       msg.force_pump_state = 0; // AUTO
+     }
+   }
+   ```
+
+3. NAAR M5ATOM - Status & Data Streaming
+   Frequentie: Elke 250ms (4Hz) - REAL-TIME monitoring
+   Structuur:
+   {
+     float trustSpeed;       // Huidige speeds
+     float sleeveSpeed;      
+     bool aiOverruleActive; // AI status van Body ESP
+     float sessionTime;     // Lopende sessie tijd
+     char status[32];       // "ACTIVE", "PAUSED", "EMERGENCY"
+   }
+
+===============================================================================
+MACHINE CONTROL LOGICA
+===============================================================================
+
+SAFETY OVERRIDES (Prioriteit: HOOG naar LAAG):
+1. Hardware Emergency Stops (fysieke knoppen)
+2. Body ESP Emergency Stop ("EMERGENCY_STOP")  
+3. Communication Timeout (Body ESP > 10 sec)
+4. Pomp Unit Safety Errors
+5. AI Overrule Reductie
+6. Gebruiker Input
+7. M5Atom Remote Commands
+
+AI INTEGRATION:
+```cpp
+// Base speeds van gebruiker/M5Atom
+float baseTrustSpeed = getUserTrustSpeed();
+float baseSleeveSpeed = getUserSleeveSpeed();
+
+// AI overrides van Body ESP (0.0 - 1.0)
+float aiTrustFactor = bodyESP_trustOverride;
+float aiSleeveFactor = bodyESP_sleeveOverride;
+
+// Finale commando's naar Pomp Unit
+float finalTrust = baseTrustSpeed * aiTrustFactor;
+float finalSleeve = baseSleeveSpeed * aiSleeveFactor;
+
+// Safety limits
+finalTrust = constrain(finalTrust, 0.0, MAX_TRUST_SPEED);
+finalSleeve = constrain(finalSleeve, 0.0, MAX_SLEEVE_SPEED);
+```
+
+TIMEOUT HANDLING:
+- Body ESP timeout (>10s): Gradueel verlagen speeds naar 0
+- Pomp Unit timeout (>5s): Emergency stop
+- M5Atom timeout: Geen impact (optioneel device)
+
+===============================================================================
+CODE IMPLEMENTATIE VEREIST
+===============================================================================
+
+NIEUWE INCLUDES:
+```cpp
+#include <esp_now.h>
+#include <WiFi.h>
+```
+
+MESSAGE STRUCTURES:
+```cpp
+// Ontvangen van Body ESP (unchanged)
+typedef struct {
+  float newTrust;
+  float newSleeve;
+  bool overruleActive;
+  char command[32];
+} bodyESP_message_t;
+
+// Verzenden naar Pomp Unit (ACTUELE V3 STRUCTUUR)
+struct __attribute__((packed)) MainMsgV3 {
+  uint8_t  version;           // Bericht versie (3)
+  uint8_t  arrow_full;        // Pijl vol status (0/1)
+  uint8_t  session_started;   // Sessie start trigger
+  uint32_t punch_count;       // Huidige punch teller
+  uint32_t punch_goal;        // Punch doel voor lube trigger
+  int16_t  vacuum_set_x10;    // Vacuum setpoint (tienden cmHg)
+  uint8_t  force_pump_state;  // 0=AUTO, 1=FORCE_OFF, 2=FORCE_ON
+  uint8_t  cmd_lube_prime_now;// Pulse commando: lube prime
+  uint8_t  cmd_lube_shot_now; // Pulse commando: lube shot
+};
+
+// Ontvangen van Pomp Unit (NIEUWE TELEMETRIE STRUCTUUR)
+struct __attribute__((packed)) PumpStatusMsg {
+  uint8_t  version;              // Message versie (1)
+  float    current_vacuum_cmHg;  // 🎯 HX711 vacuum waarde!
+  uint8_t  vacuum_pump_on;       // Vacuum pomp status (0/1)
+  uint8_t  lube_pump_on;         // Lube pomp status (0/1)
+  uint8_t  servo_open;           // Servo valve positie (0/1)
+  uint8_t  air_relay_open;       // Air relay status (0/1)
+  float    lube_remaining_sec;   // Resterende lube tijd
+  char     system_status[8];     // "OK"/"TARE"/"ERROR"
+  uint8_t  force_pump_state;     // Huidige force state
+  uint32_t uptime_sec;           // System uptime
+};
+```
+
+ESP-NOW SETUP:
+```cpp
+void initESPNow() {
+  WiFi.mode(WIFI_STA);
+  WiFi.setChannel(4);  // HoofdESP op kanaal 4
+  
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("ESP-NOW init failed");
+    return;
+  }
+  
+  esp_now_register_recv_cb(onESPNowReceive);
+  
+  // Add Body ESP peer (kanaal 1)
+  esp_now_peer_info_t bodyPeer;
+  memset(&bodyPeer, 0, sizeof(bodyPeer));
+  uint8_t bodyMAC[] = {0x08, 0xD1, 0xF9, 0xDC, 0xC3, 0xA4};
+  memcpy(bodyPeer.peer_addr, bodyMAC, 6);
+  bodyPeer.channel = 1;
+  bodyPeer.encrypt = false;
+  esp_now_add_peer(&bodyPeer);
+  
+  // Add Pomp Unit peer (kanaal 4)
+  esp_now_peer_info_t pumpPeer;
+  memset(&pumpPeer, 0, sizeof(pumpPeer));
+  uint8_t pumpMAC[] = {0x60, 0x01, 0x94, 0x59, 0x18, 0x86};
+  memcpy(pumpPeer.peer_addr, pumpMAC, 6);
+  pumpPeer.channel = 4;
+  pumpPeer.encrypt = false;
+  esp_now_add_peer(&pumpPeer);
+  
+  // Add M5Atom peer (kanaal 2) - optioneel
+  esp_now_peer_info_t atomPeer;
+  memset(&atomPeer, 0, sizeof(atomPeer));
+  uint8_t atomMAC[] = {0x50, 0x02, 0x91, 0x87, 0x23, 0xF8};
+  memcpy(atomPeer.peer_addr, atomMAC, 6);
+  atomPeer.channel = 2;
+  atomPeer.encrypt = false;
+  esp_now_add_peer(&atomPeer);
+}
+```
+
+RECEIVE CALLBACK:
+```cpp
+void onESPNowReceive(const esp_now_recv_info *info, const uint8_t *data, int len) {
+  // Check sender MAC address
+  if (memcmp(info->src_addr, bodyESP_MAC, 6) == 0) {
+    // Message from Body ESP
+    bodyESP_message_t msg;
+    memcpy(&msg, data, sizeof(msg));
+    handleBodyESPMessage(msg);
+  }
+  else if (memcmp(info->src_addr, pumpUnit_MAC, 6) == 0) {
+    // Message from Pump Unit - NIEUWE TELEMETRIE!
+    if (len == sizeof(PumpStatusMsg)) {
+      PumpStatusMsg status;
+      memcpy(&status, data, sizeof(status));
+      
+      if (status.version == 1) {
+        // 🎯 Update vacuum display met real-time HX711 data
+        currentVacuumReading = status.current_vacuum_cmHg;
+        vacuumPumpStatus = status.vacuum_pump_on;
+        lubePumpStatus = status.lube_pump_on;
+        
+        // System health monitoring
+        if (strcmp(status.system_status, "ERROR") == 0) {
+          handlePumpError();
+        }
+        
+        // Update connection status
+        pumpUnit_lastContact = millis();
+        pumpUnit_connected = true;
+        
+        // Debug output
+        Serial.printf("[RX] Vacuum: %.1f cmHg, VacPump:%d, Status:%s\n",
+                      status.current_vacuum_cmHg, status.vacuum_pump_on, status.system_status);
+        
+        // Forward naar Body ESP voor AI/logging
+        forwardVacuumDataToBodyESP(status);
+      }
+    }
+  }
+  else if (memcmp(info->src_addr, m5atom_MAC, 6) == 0) {
+    // Message from M5Atom
+    // Handle remote commands
+  }
+}
+```
+
+GLOBAL VARIABLES:
+```cpp
+// Machine state - AANGEPAST VOOR VACUUM SYSTEEM
+float currentVacuumSetpoint = -20.0;  // cmHg (user setting)
+float currentVacuumReading = 0.0;     // cmHg (from PumpStatusMsg)
+bool vacuumPumpStatus = false;        // From telemetry
+bool lubePumpStatus = false;          // From telemetry
+bool aiOverruleActive = false;        // From Body ESP
+bool emergencyStop = false;
+
+// Session control
+uint32_t punchCount = 0;
+uint32_t punchGoal = 25;
+bool arrowFull = false;
+bool sessionActive = false;
+
+// "ZUIGEN" mode variables - NIEUW!
+bool zuigModeEnabled = false;         // Enable closed-loop vacuum control
+float zuigTargetVacuum = -18.0;       // Target vacuum for zuig mode
+uint32_t lastZuigUpdate = 0;
+const uint32_t ZUIG_UPDATE_INTERVAL = 500; // Update elke 500ms
+const uint32_t BODY_ESP_UPDATE_INTERVAL = 500; // Status naar Body ESP elke 500ms
+const uint32_t M5ATOM_UPDATE_INTERVAL = 250;   // Status naar M5Atom elke 250ms (4Hz)
+
+// Communication status
+uint32_t bodyESP_lastContact = 0;
+uint32_t pumpUnit_lastContact = 0;
+bool bodyESP_connected = false;
+bool pumpUnit_connected = false;
+
+// Safety timeouts
+const uint32_t BODY_ESP_TIMEOUT = 10000;  // 10 seconds
+const uint32_t PUMP_UNIT_TIMEOUT = 5000;  // 5 seconds
+```
+
+MAIN LOOP ADDITIONS:
+```cpp
+void loop() {
+  // Existing code...
+  
+  // Check communication timeouts
+  checkCommunicationTimeouts();
+  
+  // Update vacuum control (including "Zuigen" mode)
+  updateVacuumControl();
+  
+  // Send control commands to Pomp Unit
+  sendPumpControlMessages();
+  
+  // Send status updates to Body ESP
+  sendStatusUpdates();
+  
+  // Handle safety checks
+  performSafetyChecks();
+}
+
+// NIEUWE FUNCTIE: "ZUIGEN" MODE MET REAL-TIME FEEDBACK
+void updateVacuumControl() {
+  uint32_t now = millis();
+  
+  if (zuigModeEnabled && pumpUnit_connected && (now - lastZuigUpdate >= ZUIG_UPDATE_INTERVAL)) {
+    lastZuigUpdate = now;
+    
+    // Closed-loop vacuum control met real-time HX711 feedback
+    float error = currentVacuumReading - zuigTargetVacuum;
+    
+    static uint8_t lastForceState = 0;
+    uint8_t newForceState = 0;
+    
+    if (error > 1.0) {  // Te veel vacuum
+      newForceState = 1;  // FORCE_OFF
+    } else if (error < -1.0) {  // Te weinig vacuum
+      newForceState = 2;  // FORCE_ON
+    } else {  // Target bereikt
+      newForceState = 0;  // AUTO
+    }
+    
+    // Alleen versturen bij verandering
+    if (newForceState != lastForceState) {
+      sendVacuumControlUpdate(newForceState);
+      lastForceState = newForceState;
+      
+      Serial.printf("[ZUIG] Target:%.1f Actual:%.1f Error:%.1f Force:%d\n",
+                    zuigTargetVacuum, currentVacuumReading, error, newForceState);
+    }
+  }
+}
+```
+
+===============================================================================
+TESTING & VALIDATION
+===============================================================================
+
+TEST SCENARIO'S:
+1. 🔶 Normal operation - AI overrides should modify vacuum parameters
+2. 🔶 Emergency stop from Body ESP - Immediate vacuum system stop
+3. 🔶 Body ESP timeout - Gradual system shutdown
+4. 🔶 Pump Unit communication loss - Emergency stop
+5. 🔶 "ZUIGEN" mode test - Closed-loop vacuum control with real-time feedback
+6. 🔶 HX711 telemetrie - Real-time vacuum display en logging
+7. 🔶 Pomp status monitoring - Vacuum/lube pump status updates
+8. 🔶 System health - "TARE"/"ERROR" state handling
+
+DEBUGGING:
+- Serial output voor alle ESP-NOW events
+- Display status van alle connected devices
+- Log AI override events met timestamps
+- Monitor communication latency
+
+PERFORMANCE TARGETS (VERSNELD):
+- Body ESP → HoofdESP latency: <100ms
+- HoofdESP → Pump Unit latency: <50ms  
+- AI override response time: <200ms total
+- Vacuum telemetrie: 250ms (4Hz) van Pump Unit
+- Status updates: 500ms (2Hz) naar Body ESP
+- Monitoring data: 250ms (4Hz) naar M5Atom
+- Communication reliability: >99%
+
+===============================================================================
+SAFETY REQUIREMENTS
+===============================================================================
+
+MANDATORY FEATURES:
+✅ Hardware emergency stops (independent of software)
+✅ Communication timeout detection
+✅ AI override bounds checking (0.0-1.0 range)
+✅ Gradual speed changes (no sudden stops except emergency)
+✅ Machine status monitoring
+✅ Error logging and display
+
+OPTIONAL ENHANCEMENTS:
+🔶 Redundant communication paths
+🔶 AI system health monitoring
+🔶 Predictive maintenance alerts
+🔶 Remote monitoring via M5Atom
+🔶 Data logging for analysis
+
+===============================================================================
+IMPLEMENTATIE PRIORITEITEN - GEBASEERD OP POMP UNIT TELEMETRIE
+===============================================================================
+
+🎯 PRIORITEIT 1 - TELEMETRIE ONTVANGST (KRITIEK):
+- PumpStatusMsg receive callback implementeren
+- Real-time vacuum display (current_vacuum_cmHg)
+- Pump status indicators (vacuum_pump_on, lube_pump_on)
+- System health monitoring (system_status)
+- Connection status tracking
+
+🎯 PRIORITEIT 2 - "ZUIGEN" MODUS:
+- Closed-loop vacuum control met HX711 feedback
+- force_pump_state updates (AUTO/FORCE_OFF/FORCE_ON)
+- Target vacuum instelbaar via UI
+- Real-time error monitoring en debug output
+
+🎯 PRIORITEIT 3 - BIDIRECTIONELE INTEGRATIE:
+- Forward vacuum data naar Body ESP (voor AI)
+- MainMsgV3 payload versturen naar Pomp Unit
+- Session control (punch_count, punch_goal)
+- Lube pulse commands (cmd_lube_prime_now, cmd_lube_shot_now)
+
+🔶 OPTIONEEL - GEAVANCEERDE FEATURES:
+- PID controller voor "Zuigen" mode
+- Vacuum curve logging
+- AI-gestuurde vacuum optimalisatie
+- Predictive maintenance op basis van pump performance
+
+===============================================================================
+SAMENVATTING VERANDERINGEN
+===============================================================================
+
+✅ POMP UNIT STATUS:
+- Telemetrie volledig geïmplementeerd en werkend!
+- HX711 vacuum waarden worden elke 250ms (4Hz) verstuurd
+- Volledige system status (pumps, servo, air relay, uptime)
+- Debug output via Serial Monitor
+
+🔶 HOOFDESP STATUS:
+- Moet PumpStatusMsg ontvangst implementeren
+- "Zuigen" functionaliteit kan nu real-time HX711 feedback gebruiken!
+- Bidirectionele communicatie bijna compleet
+
+🎯 RESULTAAT:
+Zodra HoofdESP de telemetrie ontvangst implementeert, heb je:
+- Real-time vacuum monitoring
+- Gesloten regelkring vacuum control
+- Complete pump system status
+- Basis voor geavanceerde AI-integratie
+
+===============================================================================

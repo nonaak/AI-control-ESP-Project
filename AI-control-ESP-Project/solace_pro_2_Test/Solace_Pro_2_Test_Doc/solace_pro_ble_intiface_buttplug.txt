@@ -1,0 +1,124 @@
+Lovense Solace Pro (aka “Solace Pro 2”) — Native BLE Control via Intiface/Buttplug
+Generated: 2025-09-16 19:54 (Europe/Amsterdam)
+
+SCOPE
+This document aggregates everything practically useful to control the Lovense Solace Pro over native BLE using the Buttplug/Intiface stack. It includes: capabilities, required Intiface versions, Buttplug message types to use, example code (JS/C#), and troubleshooting. For low-level Lovense BLE details, Buttplug implements the protocol internally; you usually do NOT speak BLE yourself.
+
+— WHAT ‘NATIVE BLE VIA BUTTPLUG’ MEANS
+- You run Intiface Central (desktop/mobile). It scans/ensures a BLE connection to the toy and exposes a local Buttplug server (WebSocket).
+- Your app uses a Buttplug client library (JS/C#/Rust) to send standard messages (ScalarCmd / LinearCmd) to the server, which translates those to the Lovense BLE protocol and drives the device.
+
+KEY FACTS SPECIFIC TO SOLACE PRO
+- As of Intiface Central v2.6.4+ (Buttplug v9.0.4+), Solace Pro exposes LINEAR movement support (i.e., funscript/position control) in addition to generic oscillation speed control. Earlier versions might expose only ScalarCmd (oscillation speed). Update if you only see speed.  
+- In practice you’ll either:
+  (A) Send LinearCmd for explicit position/time moves (funscript-like); or
+  (B) Send ScalarCmd with ActuatorType=Oscillate (i.e., speed only).
+
+BUTTPLUG MESSAGE PRIMER (FOR SOLACE PRO)
+- ScalarCmd: generic “set level 0..1” on an actuator type (e.g., Vibrate, Oscillate). Useful for speed-based control.
+- LinearCmd: “move to Position (0..1) over Duration (ms)”. Useful for scripted position control. Multiple vectors allowed (for devices with >1 linear actuator); Solace Pro typically has a single linear axis.
+- StopDeviceCmd: stop actions for that device.
+- Ping: client must send at server-defined intervals; else server will stop devices.
+- DeviceAdded/DeviceList: enumerate capabilities incl. MessageAttributes (actuator counts, types, ranges).
+
+DEVICE DISCOVERY / ENUMERATION (DCF HINTS)
+- Buttplug uses a Device Configuration File (DCF) to map BLE names/services/characteristics to internal device profiles. For Lovense devices, identifiers include LVS-xxxx names and Lovense service UUIDs; the profile handles building the right BLE packets for Scalar/Linear semantics. You don’t usually need to modify this—unless you are contributing protocol/dev support.
+
+INTIFACE CENTRAL SETUP (DESKTOP)
+1) Install Intiface Central (Windows/macOS/Linux). Start the app.
+2) In Settings, ensure Bluetooth Device Manager enabled. Make sure your OS is NOT already paired to the toy (unpair if necessary).
+3) Power on Solace Pro (LED blinking = ready). From Intiface, Start Server → Start Scanning → connect when it appears.
+4) Once connected, press “Open Client” (Localhost Websocket) or let your own app connect to ws://127.0.0.1:12345 (default) or whatever port Intiface shows.
+
+INTIFACE CENTRAL (MOBILE)
+- Android/iOS versions of Intiface Central can scan/connect over BLE and host a server the same way. Your app (on the same device or via network if enabled) can talk to the server’s websocket URL.
+
+NODE.JS EXAMPLE (LINEAR POSITION)
+- Install: npm i buttplug
+- Minimal client that sends a quick linear move:
+----------------------------------------
+const { ButtplugClient, ButtplugWebsocketClientConnector, LinearCmd } = require("buttplug");
+
+(async () => {
+  const client = new ButtplugClient("SolacePro Controller");
+  await client.connect(new ButtplugWebsocketClientConnector("ws://127.0.0.1:12345"));
+  await client.startScanning();
+  client.addListener("deviceadded", async (d) => {
+    console.log("Found:", d.name);
+    // Check if the device supports LinearCmd:
+    if (d.messageAttributes.LinearCmd && d.messageAttributes.LinearCmd.featureCount > 0) {
+      // Move to 80% over 300ms, then to 20% over 300ms:
+      await d.linear(0, 0.80, 300);
+      setTimeout(async () => { await d.linear(0, 0.20, 300); }, 400);
+    } else if (d.messageAttributes.ScalarCmd) {
+      // Fallback: set oscillation speed 0.5 (if actuator type exists)
+      await d.scalar(0.5, "Oscillate");
+    }
+  });
+})().catch(console.error);
+----------------------------------------
+
+C# EXAMPLE (OSCILLATION SPEED + LINEAR)
+- NuGet: Buttplug.Client
+----------------------------------------
+using Buttplug;
+using Buttplug.Client;
+using Buttplug.Core.Messages;
+using System;
+using System.Threading.Tasks;
+
+class Program {
+  static async Task Main() {
+    var client = new ButtplugClient("SolacePro Controller");
+    await client.ConnectAsync(new ButtplugWebsocketConnector(new Uri("ws://127.0.0.1:12345")));
+    client.DeviceAdded += async (sender, dev) => {
+      Console.WriteLine($"Found: {dev.Name}");
+      if (dev.AllowedMessages.ContainsKey(typeof(LinearCmd))) {
+        // Move to 0.8 over 300ms
+        await dev.SendDeviceMessageAsync(new LinearCmd(dev.Index, new[] {
+          new LinearCmd.VectorSubcommand(0, 300, 0.8)
+        }));
+      } else if (dev.AllowedMessages.ContainsKey(typeof(ScalarCmd))) {
+        // Speed to 0.5 (ActuatorType=Oscillate may be present in attributes)
+        await dev.SendDeviceMessageAsync(new ScalarCmd(dev.Index, new[] {
+          new ScalarCmd.ScalarSubcommand(0, 0.5, ActuatorType.Oscillate)
+        }));
+      }
+    };
+    await client.StartScanningAsync();
+    Console.ReadLine();
+  }
+}
+----------------------------------------
+
+COMMON WORKFLOWS
+- Funscript Playback: Convert actions to a sequence of LinearCmd moves where Position = value/100 and Duration = delta-time between points (ms). Use small durations (50–100ms) for smooth motion, but be mindful of CPU and BLE bandwidth.
+- Manual Control: UI slider maps to Position; send LinearCmd with short Duration (e.g., 150–300ms). For speed-only, map slider to ScalarCmd level 0..1.
+
+TUNING / BEHAVIOR NOTES
+- If only ScalarCmd is available, Solace Pro will behave as an oscillator with speed control but no absolute positioning. Update Intiface to expose LinearCmd for Solace Pro if supported by your build.
+- Some firmwares/features may continue motion briefly after a command (“coasting”). When scripting, schedule next LinearCmd after the previous duration + a small margin.
+- Ping: Ensure your Buttplug client handles pings (the library usually does). If ping lapses, server halts devices for safety.
+
+TROUBLESHOOTING CHECKLIST
+- Device not appearing with Linear? Update to Intiface Central >= v2.6.4 (Buttplug >= 9.0.4). Disconnect/restart server; forget device; rescan.
+- Not connecting on Windows? Make sure the toy is NOT paired in Windows Bluetooth settings (Buttplug needs to manage BLE itself).
+- “Found but no connect” on mobile? Kill other apps (Lovense Remote, etc.) that may have claimed the BLE connection; power cycle the toy.
+- Funscript seems wrong speed? Ensure you’re using LINEAR, not oscillation/“auto” mode. When testing, disable built‑in oscillation features and drive only via LinearCmd.
+- Still no luck? Temporarily try ScalarCmd to verify basic control path; then check DeviceList/DeviceAdded attributes for LinearCmd capabilities.
+
+GOING LOWER-LEVEL (ADVANCED)
+- Buttplug’s Lovense protocol implementation is internal; if you need raw BLE, consult the Lovense protocol notes and STPIHKAL pages, then use Raw Device Commands in Buttplug to experiment. This is NOT recommended for production and may break across firmware updates.
+- Developers have observed that Solace Pro’s control semantics are similar to “The Handy” style position scripts, but carried over BLE; treat this as an informal pointer, not an official spec.
+
+KEY REFS (for deeper reading)
+- Buttplug Generic Messages (ScalarCmd, etc.)
+- Buttplug Messages overview and flow
+- LinearCmd (C# API docs)
+- Device enumeration & attributes
+- Device Configuration File (DCF) concept
+- Intiface “Lovense” brand page (pairing pitfalls)
+- Intiface 2.6.4 release notes mentioning “Solace Pro Linear Movement Support”
+- Community notes on Solace Pro funscript/Linear usage
+
+END OF FILE

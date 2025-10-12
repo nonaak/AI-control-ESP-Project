@@ -1,0 +1,147 @@
+Top! Ik heb alles wat nu publiek beschikbaar is over het aansturen van de Lovense Solace Pro (vaak “Solace Pro 2” genoemd) verzameld en in één tekstbestand gezet—incl. de officiële LAN/HTTP API (Standard API), de Solace-specifieke Position en PatternV2 commando’s, voorbeeld-JSON/cURL, Game Mode, Server API, en opties via Intiface/Buttplug (BLE-route). Ook staan er praktische notities (timing, stroke-range regels) en links naar handleiding & pairing.
+
+Download: solace_pro_2_api_notes.txt
+
+Kernbronnen die ik heb gebruikt/geverifieerd:
+
+Officiële Lovense Standard API met Solace Pro Position en PatternV2 (met parameter-ranges, timingtips). 
+developer.lovense.com
+
+Officiële “Getting Started / Pairing” pagina voor Solace Pro. 
+Lovense
+
+Officiële gebruikershandleiding (PDF) voor knoppen, niveaus en montage. 
+cdn.lovense.com
+
+Intiface/Buttplug documentatie en community posts m.b.t. Solace Pro (BLE-ondersteuning, linear/funscript support, troubleshoot). 
+Buttplug.io and Intiface® Support
++3
+docs.intiface.com
++3
+EroScripts
++3
+
+Let op: de directe BLE-protocolspecificatie van Lovense is niet publiek; de twee gangbare routes zijn (a) LAN/HTTP via Lovense Remote (makkelijkste/gedocumenteerd), of (b) Intiface/Buttplug voor native BLE-aansturing met bestaande device-profielen. 
+developer.lovense.com
++1
+
+Wil je dat ik er ook meteen een mini-client (bijv. Python of Arduino-ESP32 die via LAN/HTTP stuurt) bij lever?
+
+Je zei:
+zoek verder in Intiface/Buttplug voor native BLE-aansturing en lever alles aan in een text bestand
+ChatGPT zei:
+Nagedacht gedurende 34s
+
+Ik heb alles voor native BLE-aansturing via Intiface/Buttplug voor de Solace Pro (aka “Solace Pro 2”) verzameld in één tekstbestand—met capabilities, benodigde Intiface-versies, welke Buttplug-messages je moet sturen (LinearCmd voor positie / ScalarCmd voor oscillatiesnelheid), JS/C# voorbeelden, enumeratie/DCF-uitleg en een stevige troubleshooter.
+
+Download: solace_pro_ble_intiface_buttplug.txt
+
+Belangrijkste punten (gebaseerd op de docs/notes hieronder):
+
+Vanaf Intiface Central v2.6.4 (Buttplug v9.0.4) heeft Solace Pro “Linear movement support” (funscript/positie), naast speed-only via ScalarCmd. Updaten als je alleen snelheid ziet. 
+GitHub
++1
+
+Gebruik LinearCmd (positie 0..1 + duur in ms) voor scripts of slider-posities; ScalarCmd(ActuatorType=Oscillate) voor pure snelheid. Zie Buttplug message-spec. 
+metafetish.gitbooks.io
++1
+
+Laat Intiface de BLE-koppeling doen (niet via OS-Bluetooth pairen). 
+docs.intiface.com
+
+Voor ontwikkelaars: device-capabilities komen via DeviceAdded/DeviceList + MessageAttributes; DCF beschrijft herkenning/identifiers. 
+docs.buttplug.io
++2
+docs.buttplug.io
++2
+
+Community-notities over funscript/linear vs oscillation en fixes bij detectie: nuttig bij troubleshooten. 
+EroScripts
++1
+
+Er is een dev-observatie dat Solace Pro qua script-semantiek lijkt op The Handy (maar over BLE). Handig als hint, niet als officiële spec. 
+GitHub
+
+Wil je dat ik ook meteen een kleine JS-cli of Python-tool maak die een .funscript omzet naar LinearCmd calls (werkt met Intiface websocket)?
+
+Je zei:
+zoek alles daar over in github en eroscripts in een text bestand
+ChatGPT zei:
+
+Ik heb GitHub en EroScripts doorzocht op alles wat ik kon vinden m.b.t. Solace Pro / Solace + Intiface / BLE / Funscript support. Hieronder vind je alles samengevoegd in één tekstbestand met citaten & links. (LET OP: publieke info alleen.)
+
+Downloadbestand: solace_pro_github_eroscripts_notes.txt
+
+INHOUD “solace_pro_github_eroscripts_notes.txt”
+
+GitHub & EroScripts — Lovense Solace Pro / Intiface / Funscript Info
+Generated: <vandaag> (Europe/Amsterdam)
+
+────────────────────────────
+1) Intiface Central / GitHub – Releases & Features
+────────────────────────────
+
+- Intiface Central v2.6.4 release note includes: **“Solace Pro Linear Movement Support”**. :contentReference[oaicite:0]{index=0}  
+  Dus vanaf v2.6.4 is er ondersteuning voor lineaire beweging (“position / funscript” style) toegevoegd. :contentReference[oaicite:1]{index=1}
+
+- In v2.6.5 en latere releases: updates naar Buttplug v9.0.6 etc., maar kernfeature “solace pro linear movement” blijft aanwezig sinds 2.6.4. :contentReference[oaicite:2]{index=2}
+
+- GitHub repo “buttplugio/buttplug”, issue #606: discussie waarin men zegt:
+  > “The Solace Pro implements exactly what The Handy's WiFi API does, except over bluetooth. You can load funscripts to the device, and control them …” :contentReference[oaicite:3]{index=3}
+
+────────────────────────────
+2) EroScripts Community Threads
+────────────────────────────
+
+- Thread “Intiface Central v2.6.4 out w/ Lovense Solace Pro Linear (Funscript) support” — meldt dat in v2.6.4 Solace Pro nu linear/funscript ondersteuning heeft. Gebruikers die het al gebruikten op v2.6.3 of ouder moeten het device “Forget Device” doen in Intiface, opnieuw starten, weer koppelen, etc., zodat het apparaat met position/oscillation capabiliteiten verschijnt. :contentReference[oaicite:4]{index=4}
+
+- “Solace Pro Funscript Problems” — klachten over traagheid of onnauwkeurigheid bij kleine bewegingen. Bijvoorbeeld gebruikers zeggen dat oscillatie-functie of automatische oscillatie interfereren met fijnere position control door funscript. In één post:
+  > “You need to disable oscillation and only use the linear/position actuator.” :contentReference[oaicite:5]{index=5}
+
+- Threads over “Linux Scripts Player for Solace Pro” – iemand bouwt zelf funscript player op Linux; gebruikt Intiface + buttplug + “monsieursoFunscriptPlayer”. Problemen: rauwe bewegingen aan begin (“shakes for ~3 seconds”) etc. :contentReference[oaicite:6]{index=6}
+
+- Thread “Help with setting up Solace Pro for OSF+MultiFunPlayer” – gebruiker verbonden met Intiface; testcontrols werken; funscript geladen in MFP; maar ondanks alles beweegt het apparaat niet (geen daadwerkelijke lineaire beweging), alleen oscilleren. Suggesties om mapping, axes, of instellingen te checken. :contentReference[oaicite:7]{index=7}
+
+────────────────────────────
+3) Technische (beperkende) details & bugs
+────────────────────────────
+
+- In issue “Lovense Solace is not working with Scriptplayer” (Buttplug forum): verbinding met device, script geladen, heatmap ok, maar apparaat reageert niet op scriptbeweging—alleen op snelheid. Gebruikers melden dat Solace Pro **geen position commands** leek te accepteren vóór de update; alleen snelheid (“ScalarCmd”). :contentReference[oaicite:8]{index=8}
+
+- Vanuit “Solace Pro Funscript Problems”: kleine bewegingen zijn vaak niet merkbaar; snelheid van updates (“upload rate”) en update-modus (“FixedUpdate” vs “PolledUpdate”) hebben effect op responsiviteit. Met name “PolledUpdate” + hoge upload rate helpt. :contentReference[oaicite:9]{index=9}
+
+- Mapping issues: in MultiFunPlayer / VAM / ScriptPlayer moeten axis mapping, auto-home etc. correct ingesteld zijn. Soms heeft “oscillation” aan/uit invloed. :contentReference[oaicite:10]{index=10}
+
+────────────────────────────
+4) Samenvatting / Conclusies uit de gebruikersdata
+────────────────────────────
+
+- Sinds Intiface Central v2.6.4 werkt Solace Pro met **lineaire beweging / funscript** (position control), als correct verbonden en geconfigureerd.  
+- Voor gebruikers: indien Solace Pro al gekoppeld was vóór v2.6.4, dan “Forget Device” + herstart nodig om de nieuwe capabiliteit te zien. :contentReference[oaicite:11]{index=11}  
+- Voor fijnere script-bewegingen: oscillation uitzetten, update-modus aanpassen, mapping controleren. Sommige bewegingen worden genegeerd of nauwelijks merkbaar als snelheid/oscillatie laag is. :contentReference[oaicite:12]{index=12}  
+- Bepaalde software (ScriptPlayer, MultiFunPlayer, VAMSync, etc.) hebben variërende mate van compatibiliteit; in veel gevallen is de integratie niet perfect (snelheidsveranderingen werken beter dan absolute position veranderingen).  
+
+────────────────────────────
+5) Open issues / wat nog niet (goed) werkt
+────────────────────────────
+
+- Sommige scripts reageren nog steeds niet met beweging, alleen op snelheid. Mogelijk omdat de client software (ScriptPlayer e.d.) de juiste Buttplug-V3 / LinearCmd ondersteuning niet volledig heeft geïmplementeerd. :contentReference[oaicite:13]{index=13}  
+- Lag / vertraging / onnauwkeurige kleine bewegingen blijven een klacht. Mogelijk Bluetooth latency, update rate, of hardware limieten.  
+- Oscillation (automatisch heen/weer pumpen) interfereert soms met position control; moet uit of correct gemapped worden.  
+- In Linux-implementaties: minder ondersteuning / tools klaar voor funscript met Solace Pro; gebruikers bouwen zelf oplossingen. :contentReference[oaicite:14]{index=14}  
+
+────────────────────────────
+6) Belangrijke links / referenties
+────────────────────────────
+
+- GitHub: Intiface Central v2.6.4 release notes (“Solace Pro Linear Movement Support”) :contentReference[oaicite:15]{index=15}  
+- GitHub: Issue #606 in buttplugio/buttplug (“Solace Pro implements The Handy’s WiFi API except over ble …”) :contentReference[oaicite:16]{index=16}  
+- EroScripts: “Intiface Central … Linear (Funscript) support” thread :contentReference[oaicite:17]{index=17}  
+- EroScripts: “Solace Pro Funscript Problems” :contentReference[oaicite:18]{index=18}  
+- EroScripts: “Help with setting up Solace Pro for OSF + MultiFunPlayer” :contentReference[oaicite:19]{index=19}
+
+────────────────────────────
+END OF FILE
+
+
+Als je wil, kan ik dit uitbreiden met specifieke code-snippets van GitHub (zoals de BLE packet-structuren of mapping van Buttplug reply messages) als we in GitHub zelf in de bronbestanden kijken. Wil je dat ik dat ook ga doen?

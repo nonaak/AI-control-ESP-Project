@@ -1,0 +1,158 @@
+KIIROO KEON – BLUETOOTH CONTROL / API NOTES
+Last updated: 2025-09-16 19:51 UTC
+
+Scope
+-----
+This file aggregates publicly available, developer-facing information relevant to controlling the Kiiroo Keon (automatic stroker) over Bluetooth LE (direct GATT) and via the Buttplug/Intiface stack. It compiles reverse‑engineered protocol info from the Buttplug STPIHKAL docs and Intiface docs, which cover the Kiiroo protocol family (Fleshlight Launch, Onyx 2) that Keon follows. Kiiroo does not publish an official open BLE API for Keon; the reliable route is to control it through the open‑source Buttplug protocol.
+
+Primary sources
+---------------
+1) Fleshlight Launch protocol (Kiiroo) – service/characteristics and command format:
+   https://buttplug-spec.docs.buttplug.io/docs/stpihkal/protocols/fleshlight-launch/
+
+2) Kiiroo Onyx 2 – notes that it uses the same protocol as Fleshlight Launch (Kiiroo v2 family):
+   https://buttplug-spec.docs.buttplug.io/docs/stpihkal/protocols/kiiroo-onyx-2/
+
+3) Kiiroo Bootloader & firmware control (characteristics & commands used for DFU / versioning):
+   https://buttplug-spec.docs.buttplug.io/docs/stpihkal/protocols/kiiroo-bootloader/
+
+4) Intiface Central brand notes for Kiiroo (pairing/reset quirks):
+   https://docs.intiface.com/docs/intiface-central/brands/kiiroo/
+
+5) Buttplug project docs (protocol + device info/messages; Keon is a positional linear actuator):
+   https://docs.buttplug.io/documentation/
+   https://beta.docs.buttplug.io/docs/spec/device_information/
+   https://iostindex.com/devices/kiiroo/keon/
+
+High‑level options
+------------------
+A) Direct BLE control (GATT) – for advanced users
+   • Kiiroo protocol devices use a small set of custom services/characteristics for control and status.
+   • The actual movement control is a 2‑byte command: [position, speed], both 0‑99 (decimal), written to a writable characteristic (see “Fleshlight Launch protocol” below). 
+   • Button/gesture/status values are delivered via notifications on a status characteristic.
+   • Bootloader/firmware commands use a separate “command/control” characteristic (see Bootloader section).
+
+B) Through Buttplug/Intiface (RECOMMENDED)
+   • Intiface Central handles discovery, pairing quirks, and maps device internals to a stable API.
+   • You control the Keon with the Buttplug protocol (e.g., Position / PositionWithDuration messages).
+   • Multi‑language clients exist (Rust, C#, JS/TS).
+
+BLE details (by closest documented relatives)
+---------------------------------------------
+Fleshlight Launch (same Kiiroo v2 protocol family):
+   Service UUID:              88f80580-0000-01e6-aace-0002a5d5c51b
+   Write Characteristic:      88f80581-0000-01e6-aace-0002a5d5c51b
+   Status Notify Character.:  88f80582-0000-01e6-aace-0002a5d5c51b
+   Command/Bootloader Char.:  88f80583-0000-01e6-aace-0002a5d5c51b
+   (Ref: Fleshlight Launch docs)
+
+Kiiroo Onyx 2 (uses same protocol as Launch; different UUIDs on this model):
+   Service UUID:              f60402a6-0294-4bdb-9f20-6758133f7090
+   Data Characteristic:       02962ac9-e86f-4094-989d-231d69995fc2
+   Sensor Notify Character.:  d44d0393-0731-43b3-a373-8fc70b1f3323
+   Command/Firmware Char.:    c7b7a04b-2cc4-40ff-8b10-5d531d1161db
+   (Ref: Kiiroo Onyx 2 docs)
+
+Note: Keon uses the Kiiroo v2 family protocol. Exact UUIDs can vary between Kiiroo devices; if in doubt, scan the GATT table with a BLE explorer (nRF Connect, btmon/hcitool, etc.) to identify the writable “data” characteristic and notification endpoint. The command framing and semantics (2‑byte [position,speed]) remain the same per Kiiroo v2 docs.
+
+Launch/Keon movement command format
+-----------------------------------
+• After initialization, send two bytes to the data/write characteristic:
+    YY ZZ
+  where:
+    YY = position in 0..99 (decimal; 0 = bottom/low, 99 = top/high)
+    ZZ = speed    in 0..99 (decimal; 0 = stop/slowest, 99 = fastest)
+• Invalid inputs are ignored by the device firmware.
+• Older FW 1.0/1.1 used BCD encoding; 1.2/1.3+ uses decimal (most modern units are decimal).
+(Ref: Fleshlight Launch protocol docs)
+
+Initialization (user mode)
+--------------------------
+• On connection/boot, write a single byte 0x00 to the “Command”/bootloader characteristic to enter user mode (enables normal control + reading buttons). (Ref: Fleshlight Launch docs)
+
+Buttons / sensor notifications
+------------------------------
+• Status notifications arrive as an array of 14 bytes representing 7 big‑endian 16‑bit values (one per capacitive “button”/pad).
+• Values drop under pressure (press) and return to baseline on release; thresholding is needed to detect edges. (Ref: Fleshlight Launch docs)
+
+Bootloader / firmware (shared Kiiroo bootloader)
+------------------------------------------------
+Characteristics:
+  • CTL (control/commands)
+  • DATA (data)
+  • SENSOR (sensor)
+Command flow:
+  • Write 1 byte to CTL (command index), then 1 byte to DATA (command data).
+  • Read CTL for 0x02 (success). If the op returns data, read DATA.
+Commands (subset):
+  • Get Execution Mode:   idx=0x03, data=0x00 → returns bitmask (bootloader vs application mode)
+  • Set Execution Mode:   idx=0x06, data=0x00 → switch to bootloader mode (device will reset)
+  • Get Software Version: idx=0x05, data=0x00 → returns version bytes (see docs for layouts)
+  • Erase / Verify / Get CRC / Push Block / Write Block for DFU
+(Ref: Kiiroo Bootloader docs)
+
+Pairing / connection tips (Kiiroo via Intiface/OS)
+--------------------------------------------------
+• Some Kiiroo devices (Onyx+/Realm Rey and related) require pairing with the OS first, then power‑cycle, then connect via Intiface. If you only scan with Intiface, the device may appear but not respond. Steps:
+  1) Hold power 15s to reset pairing (LED rapid flash)
+  2) Power on; pair in OS Bluetooth settings
+  3) Power off, then on again; scan/connect via Intiface
+(Ref: Intiface docs “Kiiroo” brand page)
+
+Buttplug control (abstract API)
+-------------------------------
+• Buttplug exposes Keon as a device with a positional linear actuator feature:
+  – Output types: Position (and PositionWithDuration depending on server config)
+  – Inputs: Battery, RSSI, and (for some devices) Button sensor reads
+• This abstracts BLE specifics. You can send a Position command (0..1.0 normalized or step‑count mapped) and the server translates it to the device’s [YY,ZZ] writes.
+(Refs: Buttplug Device Information and Protocol docs; IOSTIndex device page for Keon)
+
+Quick start routes
+------------------
+• No‑code/app route:
+  – Install Intiface Central → scan → connect Keon → drive via any Buttplug‑compatible app (ScriptPlayer, Syncydink, xtoys, etc.).
+• Code route (examples):
+  – buttplug-js (Node/TS): connect to Intiface Websocket; send DeviceList → Position/Linear messages.
+  – buttplug-csharp: same via .NET.
+  – Direct BLE (ESP32, Python Bleak, etc.): connect to service/characteristic; init (0x00 to Command), then write [YY, ZZ] to data/write characteristic at ~20–50 ms intervals (respect timing gaps if needed).
+
+ESP32/NimBLE sketch notes (direct BLE)
+--------------------------------------
+• Scan for the Kiiroo service/characteristics as per the “BLE details” above. Device names can vary (“Launch”, “Keon”, etc.).
+• After connect:
+  1) Write 0x00 to the Command/bootloader characteristic
+  2) Enable notifications on the status characteristic (optional)
+  3) To move: write two bytes (YY, ZZ) to the data/write characteristic
+• Timing: Don’t spam >50 Hz; coalesce updates or only send on change to avoid buffer overruns.
+
+Safety & caveats
+----------------
+• Keon’s vendor app (FeelConnect) is closed‑source. This file only covers open community knowledge (Buttplug docs).
+• Firmware variations exist; GATT UUIDs can differ between models/firmware. Always enumerate services on your unit.
+• Battery and Device Information standard services (0x180F / 0x180A) may be present depending on FW.
+• Use secure distances and avoid unattended operation. Always test with low speeds first.
+
+Helpful tooling
+---------------
+• Intiface Central (GUI for Buttplug server + BLE scanning)
+• nRF Connect (Android/iOS) or LightBlue (iOS/macOS) for GATT exploration
+• btmon/bluez (Linux), bluetoothctl (Linux) for low‑level BLE logs
+• Python Bleak / Node noble / ESP32 NimBLE‑Arduino for coding central clients
+
+Reference links (clickable)
+---------------------------
+• Fleshlight Launch protocol (Kiiroo v2 details incl. control bytes): 
+  https://buttplug-spec.docs.buttplug.io/docs/stpihkal/protocols/fleshlight-launch/
+• Kiiroo Onyx 2 BLE UUIDs (same protocol family as Launch):
+  https://buttplug-spec.docs.buttplug.io/docs/stpihkal/protocols/kiiroo-onyx-2/
+• Kiiroo Bootloader (DFU/commands layout shared across Kiiroo toys):
+  https://buttplug-spec.docs.buttplug.io/docs/stpihkal/protocols/kiiroo-bootloader/
+• Intiface Central brand notes for Kiiroo (pairing/reset steps):
+  https://docs.intiface.com/docs/intiface-central/brands/kiiroo/
+• Buttplug protocol & device info:
+  https://docs.buttplug.io/documentation/
+  https://beta.docs.buttplug.io/docs/spec/device_information/
+• IOSTIndex – Keon device page (feature mapping):
+  https://iostindex.com/devices/kiiroo/keon/
+
+— End of file —

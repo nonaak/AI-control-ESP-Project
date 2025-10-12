@@ -1,0 +1,73 @@
+Top! Ik heb alles wat publiekelijk gedocumenteerd is over het (onofficiële) Bluetooth-/API-gedeelte van de Kiiroo-Keon familie samengevoegd in één tekstbestand, inclusief concrete UUID’s/commandobytes van de Kiiroo-/Fleshlight-protocolfamilie, bootloader/firmware-commando’s en de aanbevolen Buttplug/Intiface-route.
+
+Download het tekstbestand
+
+Kernbronnen die ik heb verwerkt en waar je alle details terugvindt:
+
+Fleshlight Launch protocol – service/characteristics + de 2-byte besturingscommando’s (positie 0–99, snelheid 0–99) en init (0x00 naar command-characteristic). 
+buttplug-spec.docs.buttplug.io
+
+Kiiroo Onyx 2 – gebruikt hetzelfde protocol (Kiiroo v2) en toont een set alternatieve UUID’s voor service/data/sensor/command. 
+buttplug-spec.docs.buttplug.io
+
+Kiiroo bootloader/firmwarecommando’s (CTL/DATA/SENSOR flow, versielezen, DFU-commando’s). 
+buttplug-spec.docs.buttplug.io
++1
+
+Intiface/Buttplug documentatie voor Kiiroo (pairing-reset stappen, en dat Keon als lineaire actuator via Position/PositionWithDuration wordt aangestuurd). 
+docs.intiface.com
++2
+beta.docs.buttplug.io
++2
+
+IOSTIndex – Keon devicepagina (bevestigt het type “Linear Actuator (Positional)”). 
+iostindex.com
+
+Opmerkingen:
+
+Kiiroo publiceert geen officiële BLE-API voor Keon; de community-gedocumenteerde route is via Buttplug/Intiface (aan te raden), of direct BLE met het Kiiroo v2/Launch-frame van twee bytes (positie, snelheid). Zie het bestand voor exacte UUID’s/bytes en workflow. 
+buttplug-spec.docs.buttplug.io
++1
+
+Sommige Kiiroo-modellen vereisen OS-pairing + power-cycle vóór Intiface werkt; de stappen staan in het bestand. 
+faq.docs.buttplug.io
+
+Wil je dat ik er meteen een kleine ESP32/NimBLE voorbeeld-sketch bij zet die de juiste characteristic vindt, init (0x00) stuurt en dan [YY,ZZ]-writes doet op een timer?
+
+Je zei:
+zoek verder in over alles van de besturing 
+ChatGPT zei:
+Nagedacht gedurende 20s
+
+Heb verder uitgezocht en alles over de besturing samengebracht (BLE én via Buttplug/Intiface). Ik heb een uitgebreid technisch dossier gemaakt met concrete GATT-UUID’s (verwante Kiiroo/Launch/Onyx modellen), de 2-byte bewegingscommando’s (positie/snelheid 0–99), init-stappen, bootloader/DFU-notities, pairing-quirks en een praktische ESP32/NimBLE checklist.
+
+Download: Kiiroo_Keon_Control_DeepDive.txt
+
+Belangrijkste bronnen die dit onderbouwen:
+
+Fleshlight Launch (Kiiroo v2) protocol – exacte 2-byte packetstructuur (YY=positie 0–99, ZZ=snelheid 0–99), init, en opmerkingen over FW-versies. 
+buttplug-spec.docs.buttplug.io
+
+Kiiroo Onyx/Pearl 1 BLE UUID’s (Nordic-UART-achtige set; nuttig voor scanners/varianten). 
+buttplug-spec.docs.buttplug.io
+
+Intiface Central quickstart & Bluetooth-hulp – hoe Keon via Intiface/Buttplug wordt ontdekt en bestuurd, inclusief pairing-tips. 
+docs.intiface.com
++1
+
+IoSTIndex devicepagina (Keon) – bevestigt dat Keon als Linear Actuator (Positional) wordt gemapt. 
+iostindex.com
+
+Keon handleidingen – LED/pairing modi en gebruikersstand; handig bij connectieproblemen. 
+feelme.com
++1
+
+go-buttplug – voorbeeld van device-specifieke commands (FleshlightLaunchFW12Cmd) in een client-SDK. 
+pkg.go.dev
+
+(Troubleshooting) Voorbeelden van community-issues rond Keon-connectiviteit met Intiface. 
+Buttplug.io and Intiface® Support
+
+Wil je dat ik er meteen een mini-voorbeeld bij zet (Node/TS via buttplug-js en/of ESP32/NimBLE skeleton) dat:
+
+het device vindt, 2) init (0x00) stuurt waar nodig, en 3) periodiek [YY, ZZ] schrijft of via Intiface een LinearCmd (0..1) verstuurt?
