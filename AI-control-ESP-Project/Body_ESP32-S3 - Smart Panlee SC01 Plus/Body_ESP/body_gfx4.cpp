@@ -8,7 +8,7 @@ void drawChannel(uint8_t ch);
 // Channel data
 struct Channel {
   char label[16];
-  float samples[160];  // Full screen width samples
+  float samples[240];  // Increased for wider screen
   int writeIndex;
   float minVal, maxVal;
   bool hasData;
@@ -23,21 +23,33 @@ static uint32_t mainScreenCooldownMs = 2000;  // 2 second cooldown for main scre
 static uint32_t menuCooldownMs = 500;         // 0.5 second cooldown for menu
 static uint32_t lastTouchTime = 0;            // Unified touch time
 
-// Volledig scherm layout voor CYD (320x240) - VOOR 8 SENSOREN
-static const int GRAPH_Y = 5;
-static const int GRAPH_H = 190;   // Nog meer ruimte voor grafieken
-static const int GRAPH_W = 310;   // Volledige breedte
-static const int GRAPH_X = 5;
-static const int CHANNEL_H = 23;  // Voor 8 channels (190/8 ≈ 23)
+// Dynamic layout - scales with SCR_W and SCR_H
+// For SC01 Plus: SCR_W=480, SCR_H=320
+static int GRAPH_Y = 5;
+static int GRAPH_H;      // Calculated from SCR_H
+static int GRAPH_W;      // Calculated from SCR_W
+static int GRAPH_X = 5;
+static int CHANNEL_H;    // Calculated from GRAPH_H
 
-// Button layout - helemaal onderaan
-static const int BUTTON_Y = 200;  // Onderaan (was 165)
-static const int BUTTON_W = 75;   // Groter
-static const int BUTTON_H = 35;   // Groter voor touch
-static const int BUTTON_SPACING = 80;  // Meer ruimte tussen buttons
-static const int BUTTON_START_X = 5;   // Start vanaf links
+// Button layout - scales with screen size
+static int BUTTON_Y;     // Calculated from SCR_H
+static int BUTTON_W;     // Calculated from SCR_W
+static int BUTTON_H = 35;
+static int BUTTON_SPACING;  // Calculated from SCR_W
+static int BUTTON_START_X = 5;
 
 void body_gfx4_begin() {
+  // Calculate dynamic layout based on screen size
+  GRAPH_W = SCR_W - 10;                 // 470 voor SC01 Plus (480-10)
+  GRAPH_H = SCR_H - 50;                 // 270 voor SC01 Plus (320-50)
+  CHANNEL_H = GRAPH_H / G4_NUM;         // 33 voor SC01 Plus (270/8)
+  BUTTON_Y = SCR_H - 40;                // 280 voor SC01 Plus
+  BUTTON_W = (SCR_W - 30) / 4;          // 112 voor SC01 Plus ((480-30)/4)
+  BUTTON_SPACING = (SCR_W - 10) / 4;    // 117 voor SC01 Plus
+  
+  Serial.printf("[BODY_GFX4] Layout: SCR=%dx%d, GRAPH=%dx%d, BUTTON_Y=%d, BUTTON_W=%d\n", 
+                SCR_W, SCR_H, GRAPH_W, GRAPH_H, BUTTON_Y, BUTTON_W);
+  
   // Initialize channels with HoofdESP colors
   for (int i = 0; i < G4_NUM; i++) {
     channels[i].writeIndex = 0;
@@ -46,7 +58,7 @@ void body_gfx4_begin() {
     channels[i].hasData = false;
     strcpy(channels[i].label, "---");
     
-    for (int j = 0; j < 160; j++) {
+    for (int j = 0; j < 240; j++) {
       channels[i].samples[j] = 0;
     }
   }
@@ -71,9 +83,9 @@ void body_gfx4_begin() {
 void body_gfx4_clear() {
   body_gfx->fillScreen(BODY_CFG.COL_BG);
   
-  // Draw HoofdESP-style frame
-  body_gfx->drawRoundRect(2, 2, 316, 236, 12, BODY_CFG.COL_FRAME2);
-  body_gfx->drawRoundRect(4, 4, 312, 232, 10, BODY_CFG.COL_FRAME);
+  // Draw HoofdESP-style frame - scales with screen size
+  body_gfx->drawRoundRect(2, 2, SCR_W-4, SCR_H-4, 12, BODY_CFG.COL_FRAME2);
+  body_gfx->drawRoundRect(4, 4, SCR_W-8, SCR_H-8, 10, BODY_CFG.COL_FRAME);
   
   Serial.println("[BODY] Screen cleared and frame drawn");
 }
@@ -89,7 +101,7 @@ void body_gfx4_pushSample(uint8_t ch, float value, bool mark) {
   
   Channel& c = channels[ch];
   c.samples[c.writeIndex] = value;
-  c.writeIndex = (c.writeIndex + 1) % 160;
+  c.writeIndex = (c.writeIndex + 1) % 240;
   c.hasData = true;
   
   // Auto-scale
@@ -126,28 +138,29 @@ void drawChannel(uint8_t ch) {
 #endif
   body_gfx->setTextColor(c.color, BODY_CFG.COL_BG);  // Eigen kleur per sensor
 #if USE_ADAFRUIT_FONTS
-  body_gfx->setCursor(GRAPH_X + 2, y + 12);  // Hoger voor Adafruit fonts
+  body_gfx->setCursor(GRAPH_X + 2, y + 15);  // Aangepast voor grotere channel height
 #else
-  body_gfx->setCursor(GRAPH_X + 2, y + 2);   // Originele positie voor standaard fonts
+  body_gfx->setCursor(GRAPH_X + 2, y + 4);   // Aangepast voor grotere channel height
 #endif
   body_gfx->print(c.label);
   
   // Numeric values removed - only show label and graph
   
   // Draw mini graph line - adjusted for labels only (no numeric values)
-  int graphStartX = GRAPH_X + 100;  // Alleen ruimte voor labels
-  int graphW = GRAPH_W - 100 - 10;
-  int graphH = CHANNEL_H - 6;
-  int graphY = y + 3;
+  int graphStartX = GRAPH_X + 120;  // Meer ruimte voor labels op groter scherm
+  int graphW = GRAPH_W - 120 - 10;
+  int graphH = CHANNEL_H - 8;
+  int graphY = y + 4;
   
   // Draw graph background with light purple border
   uint16_t lightPurple = 0xC618;  // Licht paars
   body_gfx->drawRect(graphStartX, graphY, graphW, graphH, lightPurple);
   
-  // Draw samples
-  for (int i = 1; i < graphW && i < 160; i++) {
-    int idx1 = (c.writeIndex + 160 - graphW + i - 1) % 160;
-    int idx2 = (c.writeIndex + 160 - graphW + i) % 160;
+  // Draw samples - use more samples for wider screen
+  int maxSamples = min(graphW, 240);
+  for (int i = 1; i < maxSamples; i++) {
+    int idx1 = (c.writeIndex + 240 - maxSamples + i - 1) % 240;
+    int idx2 = (c.writeIndex + 240 - maxSamples + i) % 240;
     
     float val1 = c.samples[idx1];
     float val2 = c.samples[idx2];
@@ -248,10 +261,10 @@ bool body_gfx4_canTouch(bool isMainScreen) {
 
 void body_gfx4_registerTouch(bool isMainScreen) {
   lastTouchTime = millis();
-  // Visual feedback - kort flash effect
+  // Visual feedback - kort flash effect (scales with screen)
   if (isMainScreen) {
     // Flash hoofdscherm buttons area voor duidelijke bevestiging
-    body_gfx->fillRect(0, 195, 320, 45, 0x4208);  // Grijs overlay
+    body_gfx->fillRect(0, SCR_H - 45, SCR_W, 45, 0x4208);  // Grijs overlay
     delay(25);  // Korter om flikkeren te voorkomen
     Serial.println("[BODY] Touch registered - cooldown active");
   } else {
@@ -259,4 +272,3 @@ void body_gfx4_registerTouch(bool isMainScreen) {
     Serial.println("[BODY] Menu touch registered");
   }
 }
-
