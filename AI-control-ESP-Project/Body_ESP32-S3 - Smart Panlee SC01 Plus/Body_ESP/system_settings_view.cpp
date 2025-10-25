@@ -1,6 +1,7 @@
 #include "system_settings_view.h"
 #include <Arduino_GFX_Library.h>
 #include "input_touch.h"
+#include "body_display.h"
 
 static Arduino_GFX* g = nullptr;
 
@@ -11,7 +12,7 @@ static const uint16_t COL_BTN_COLORS=0x07FF;     // Cyaan voor kleuren
 static const uint16_t COL_BTN_FORMAT=0xF800;     // Rood voor format
 static const uint16_t COL_BTN_BACK=0x001F;       // Blauw voor terug
 
-static int16_t SCR_W = 320, SCR_H = 240;
+//static int16_t SCR_W = 320, SCR_H = 240;
 static uint32_t lastTouchMs = 0;
 static const uint16_t SYSTEM_COOLDOWN_MS = 800;  // Consistente cooldown
 
@@ -51,8 +52,8 @@ static void drawButton(int16_t x,int16_t y,int16_t w,int16_t h,const char* txt, 
 
 void systemSettings_begin(Arduino_GFX* gfx) {
     g = gfx;
-    SCR_W = g->width();
-    SCR_H = g->height();
+    //SCR_W = g->width();
+    //SCR_H = g->height();
     
     // Eenvoudige achtergrond zoals andere menus
     g->fillScreen(COL_BG);

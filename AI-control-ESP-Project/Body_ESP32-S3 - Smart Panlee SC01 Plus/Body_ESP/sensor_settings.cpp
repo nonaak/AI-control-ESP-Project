@@ -225,8 +225,8 @@ void resetSensorConfig() {
 
 void sensorSettings_begin(Arduino_GFX* gfx) {
   g = gfx;
-  SCR_W = g->width();
-  SCR_H = g->height();
+  //SCR_W = g->width();
+  //SCR_H = g->height();
   
   // Eenvoudige achtergrond
   g->fillScreen(COL_BG);

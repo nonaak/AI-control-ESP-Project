@@ -665,8 +665,8 @@ static String generateEventDescription(const TrainingPoint& dataPoint) {
 
 void aiTraining_begin(Arduino_GFX* gfx, const String& filename) {
   g = gfx;
-  SCR_W = g->width();
-  SCR_H = g->height();
+  //SCR_W = g->width();
+  //SCR_H = g->height();
   
   currentFile = filename;
   currentSampleIndex = 0;

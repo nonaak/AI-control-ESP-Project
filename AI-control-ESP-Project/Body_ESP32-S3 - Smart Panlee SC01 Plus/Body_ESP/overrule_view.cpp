@@ -176,8 +176,8 @@ static bool handleValueTouch(int16_t x, int16_t y) {
 
 void overrule_begin(Arduino_GFX* gfx) {
   g = gfx;
-  SCR_W = g->width();
-  SCR_H = g->height();
+  //SCR_W = g->width();
+  //SCR_H = g->height();
   
   // Eenvoudige achtergrond zoals andere menus
   g->fillScreen(COL_BG);

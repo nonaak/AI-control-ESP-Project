@@ -1,8 +1,9 @@
 #pragma once
 
 // Fonts & keuzes (gelijk aan HoofdESP)
-#define USE_ADAFRUIT_FONTS 1
-#define USE_EXOTIC_FONT    1
+#define USE_ADAFRUIT_FONTS 0
+//#define USE_ADAFRUIT_FONTS 1
+#define USE_EXOTIC_FONT    0    // ← DEZE OP 0 ZETTEN!
 
 #if USE_ADAFRUIT_FONTS
   #if USE_EXOTIC_FONT

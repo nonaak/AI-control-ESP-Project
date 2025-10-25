@@ -9,6 +9,7 @@
 #include "input_touch.h"
 #include <SD.h>
 #include "body_config.h"
+#include "body_display.h"
 
 // External function declarations (defined in Body_ESP.ino)
 extern void startRecording();
@@ -347,8 +348,8 @@ void mlTraining_drawMainMenu() {
   const uint16_t COL_TX = WHITE;
   
   // Zelfde layout als andere menu's
-  int16_t SCR_W = g->width();
-  int16_t SCR_H = g->height();
+  //int16_t SCR_W = g->width();
+  //int16_t SCR_H = g->height();
   
   g->fillScreen(COL_BG);
   
@@ -415,8 +416,8 @@ void mlTraining_drawImportScreen() {
   const uint16_t COL_TX = WHITE;
   const uint16_t COL_SELECT = 0x07E0; // Groen voor selectie
   
-  int16_t SCR_W = g->width();
-  int16_t SCR_H = g->height();
+  //int16_t SCR_W = g->width();
+  //int16_t SCR_H = g->height();
   
   g->fillScreen(COL_BG);
   
@@ -516,8 +517,8 @@ void mlTraining_drawTrainingScreen() {
   const uint16_t COL_SUCCESS = 0x07E0;  // Groen voor succes
   const uint16_t COL_ERROR = 0xF800;    // Rood voor stop/error
   
-  int16_t SCR_W = g->width();
-  int16_t SCR_H = g->height();
+  //int16_t SCR_W = g->width();
+  //int16_t SCR_H = g->height();
   
   g->fillScreen(COL_BG);
   
@@ -646,8 +647,8 @@ void mlTraining_drawModelManager() {
   const uint16_t COL_SELECT = 0x07E0;  // Groen voor selectie
   const uint16_t COL_ACTIVE = 0x07E0;  // Groen voor actief model
   
-  int16_t SCR_W = g->width();
-  int16_t SCR_H = g->height();
+  //int16_t SCR_W = g->width();
+  //int16_t SCR_H = g->height();
   
   g->fillScreen(COL_BG);
   
@@ -752,8 +753,8 @@ void mlTraining_drawPreviewScreen() {
   const uint16_t COL_BG = BLACK;
   const uint16_t COL_TX = WHITE;
   
-  int16_t SCR_W = g->width();
-  int16_t SCR_H = g->height();
+  //int16_t SCR_W = g->width();
+  //int16_t SCR_H = g->height();
   
   g->fillScreen(COL_BG);
   
@@ -785,8 +786,8 @@ void mlTraining_drawModelInfo() {
   const uint16_t COL_BG = BLACK;
   const uint16_t COL_TX = WHITE;
   
-  int16_t SCR_W = g->width();
-  int16_t SCR_H = g->height();
+  //int16_t SCR_W = g->width();
+  //int16_t SCR_H = g->height();
   
   g->fillScreen(COL_BG);
   

@@ -611,8 +611,8 @@ void aiAnalyze_begin(Arduino_GFX* gfx) {
   
   Serial.println("[AI] Setting up graphics...");
   g = gfx;
-  SCR_W = g->width();
-  SCR_H = g->height();
+  //SCR_W = g->width();
+  //SCR_H = g->height();
   
   Serial.println("[AI] Initializing variables...");
   currentPage = 0;

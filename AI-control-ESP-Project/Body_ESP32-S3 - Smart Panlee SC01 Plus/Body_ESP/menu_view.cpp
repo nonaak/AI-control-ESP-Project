@@ -57,8 +57,8 @@ static void drawButton(int16_t x,int16_t y,int16_t w,int16_t h,const char* txt, 
 
 void menu_begin(Arduino_GFX* gfx){
   g = gfx;
-  SCR_W = g->width();
-  SCR_H = g->height();
+  //SCR_W = g->width();
+  //SCR_H = g->height();
   
   // Eenvoudige achtergrond zoals playlist
   g->fillScreen(COL_BG);

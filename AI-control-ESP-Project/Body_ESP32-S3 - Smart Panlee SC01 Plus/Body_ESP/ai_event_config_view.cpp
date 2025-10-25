@@ -121,8 +121,8 @@ const char* aiEventConfig_getName(uint8_t eventType) {
 
 void aiEventConfig_begin(Arduino_GFX* gfx) {
   g = gfx;
-  SCR_W = g->width();
-  SCR_H = g->height();
+  //SCR_W = g->width();
+  //SCR_H = g->height();
   currentPage = 0;
   editingEvent = -1;
   

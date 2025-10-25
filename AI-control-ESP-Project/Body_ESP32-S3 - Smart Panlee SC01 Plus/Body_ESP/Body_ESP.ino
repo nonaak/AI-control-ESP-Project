@@ -1,6 +1,14 @@
 /*  
-  Body ESP CYD V2 – 4-band + Menu + Touch-kalibratie (touch fix)
-  - DISPLAY_ROTATION = 2 (matcht jouw werkende code patroon)
+  Body ESP SC01 Plus V3 – ADS1115 Sensor Migration
+  COMPLETE VERSION - Display + UI intact
+  
+  Sensor Changes:
+  - Vervangen: MAX30105 → Pulse sensor op ADS1115 A2
+  - Vervangen: MCP9808 → NTC temperatuur op ADS1115 A3  
+  - Vervangen: GPIO 34 GSR → GSR sensor op ADS1115 A0
+  - NIEUW: Flex sensor (ademhaling) op ADS1115 A1
+  - VERWIJDERD: RGB LED code (CYD specific)
+  - I2C: Wire1 op GPIO 10 (SDA) + 11 (SCL) voor sensoren
 */
 
 #include <Arduino.h>
@@ -11,12 +19,32 @@
 #include <Arduino_GFX_Library.h>
 #include <esp_now.h>
 #include <WiFi.h>
-#include "MAX30105.h"
-#include "heartRate.h"
 
-// ===== Screen dimensions voor CYD (Cheap Yellow Display) =====
-const int SCR_W = 320;
-const int SCR_H = 240;
+// ===== ADS1115 Sensor System (NIEUW!) =====
+#include <Adafruit_ADS1X15.h>
+Adafruit_ADS1115 ads;
+
+#define SENSOR_SDA 10          // GPIO 10 = SDA voor sensoren
+#define SENSOR_SCL 11          // GPIO 11 = SCL voor sensoren
+
+// ADS1115 sensor calibratie variabelen
+static int gsr_threshold = 0;
+static float flex_baseline = 0.0f;
+static int pulse_baseline = 0;
+static int pulse_max = 0;
+static int pulse_min = 32767;
+static bool beat_detected = false;
+static unsigned long lastBeat = 0;
+
+// NTC Temperature constanten (10kΩ @ 25°C, B=3950K)
+#define R_TOP 33000.0          // 33kΩ serie weerstand
+#define NTC_NOMINAL 10000.0
+#define TEMP_NOMINAL 25.0
+#define B_COEFFICIENT 3950.0
+
+// ===== Screen dimensions voor SC01 Plus =====
+//const int SCR_W = 480;
+//const int SCR_H = 320;
 
 // Math constanten
 #ifndef PI
@@ -34,8 +62,7 @@ static uint8_t currentRotation = DISPLAY_ROTATION;  // Huidige rotatie (0=0°, 1
 #include "body_display.h"
 #include "body_gfx4.h"
 #include "input_touch.h"
-#include "rgb_off.h"
-#include "mcp9808.h"
+#include "body_menu.h"
 #include "menu_view.h"
 #include "ai_overrule.h"
 #include "sensor_settings.h"
@@ -49,15 +76,13 @@ static uint8_t currentRotation = DISPLAY_ROTATION;  // Huidige rotatie (0=0°, 1
 #include "ml_training_view.h"
 #include "ai_training_view.h"
 #include "ml_stress_analyzer.h"
-// TIJDELIJK UITGESCHAKELD - S3 upgrade
-// #include "multifunplayer_client.h"
 
 // Display wordt nu gedefinieerd in body_display.cpp
 // Extern reference naar de body display
 extern Arduino_GFX *body_gfx;
 
 // ===== SD Card =====
-#define SD_CS_PIN 5  // CYD SD card CS pin
+#define SD_CS_PIN 41  // SC01 Plus SD card CS pin
 static bool sdCardAvailable = false;
 static int nextFileNumber = 1;
 
@@ -70,17 +95,13 @@ static uint32_t samplesRecorded = 0;
 static File eventLogFile;
 static bool eventLoggingActive = false;
 
-// ===== MAX30102 =====
-#define PIN_SDA 21
-#define PIN_SCL 22
-#define MAX_I2C_ADDR 0x57
-MAX30105 max30;
+// ===== Sensor waarden =====
+static uint16_t BPM = 0;
+static uint32_t lastBeatMs = 0;
 
 // Filters
 static float hp_y_prev = 0, x_prev = 0, bp_y_prev = 0;
 static float envAbs = 1000, acDiv = 600.0f;
-static uint16_t BPM = 0;
-static uint32_t lastBeatMs = 0;
 
 const float FS_HZ = 50.0f;
 const float DT = 1.0f/FS_HZ;
@@ -89,6 +110,11 @@ const float LP_FC = 5.0f, LP_TAU = 1.0f/(2*PI*LP_FC), LP_A = DT/(LP_TAU+DT);
 
 // Dummy
 static float dummyPhase = 0;
+
+// Sensor variabelen
+static float tempValue = 0.0f;
+static float gsrValue = 0.0f;
+static float gsrSmooth = 0.0f;
 
 // UI states
 bool isRecording=false;
@@ -108,15 +134,6 @@ static uint32_t nextSampleTime = 0;
 enum ConfirmType { CONFIRM_DELETE_FILE, CONFIRM_FORMAT_SD };
 static ConfirmType confirmType;
 static String confirmData;  // Extra data (filename, etc.)
-
-// ===== GSR Sensor (GPIO34) =====
-#define GSR_PIN 34
-static float gsrValue = 0.0f;
-static float gsrSmooth = 0.0f;
-
-// ===== MCP9808 Temperature =====
-static float tempValue = 0.0f;
-static bool mcpInitialized = false;
 
 // ===== ESP-NOW Communicatie =====
 // MAC adressen van het netwerk
@@ -397,37 +414,6 @@ void stopAIStressManagement() {
   sendESPNowMessage(1.0f, 1.0f, false, "MANUAL_CONTROL");
 }
 
-// Stress Test - Automatische stress level simulatie (UITGESCHAKELD - gebruik seriële interface)
-/*
-void stressTest() {
-  uint32_t elapsed = millis() - stressSimTimer;
-  
-  // Stress scenario simulatie (zoals beschreven)
-  if (elapsed < 30000) {          // 0-30s: Stress 3 -> 2
-    currentStressLevel = 2;
-  } else if (elapsed < 90000) {   // 30s-90s: Stress 2 (AI verhoogt speed)
-    currentStressLevel = 2;
-  } else if (elapsed < 150000) {  // 90s-150s: Stress 2 -> 3 (AI verhoogt weer)
-    currentStressLevel = 3;
-  } else if (elapsed < 180000) {  // 150s-180s: Stress 3 (AI doet niks)
-    currentStressLevel = 3;
-  } else if (elapsed < 200000) {  // 180s-200s: Stress SPIKE naar 6!
-    currentStressLevel = 6;
-  } else if (elapsed < 230000) {  // 200s-230s: Stress blijft 6 (AI verlaagt naar 0)
-    currentStressLevel = 6;
-  } else if (elapsed < 260000) {  // 230s-260s: Stress daalt naar 5
-    currentStressLevel = 5;
-  } else if (elapsed < 290000) {  // 260s-290s: Stress daalt naar 3
-    currentStressLevel = 3;
-  } else if (elapsed < 310000) {  // 290s-310s: STRESS EMERGENCY niveau 7!
-    currentStressLevel = 7;
-  } else {                        // 310s+: Scenario reset
-    stressSimTimer = millis();
-    currentStressLevel = 3;
-  }
-}
-*/
-
 // AI Overrule logica
 static void updateAIOverrule(float heartRate, float temperature, float gsrLevel) {
   if (!aiConfig.enabled) {
@@ -461,24 +447,18 @@ static void updateAIOverrule(float heartRate, float temperature, float gsrLevel)
     riskDetected = true;
   }
   
-  // NOTE: zuigActive boolean is beschikbaar voor toekomstige AI logica indien gewenst
-  // Momenteel wordt alleen de status ontvangen en gelogd, geen extra risico berekening
-  
   // Graduele aanpassing gebaseerd op risico niveau
   if (riskDetected && riskLevel > 0.2f) {
     // Risico gedetecteerd - verlaag speeds
     float targetTrust = 1.0f - (riskLevel * (1.0f - aiConfig.trustReduction));
-    // float targetSleeve = 1.0f - (riskLevel * (1.0f - aiConfig.sleeveReduction));  // UITGESCHAKELD
     
     currentTrustOverride = min(currentTrustOverride, targetTrust);
-    // currentSleeveOverride = min(currentSleeveOverride, targetSleeve);  // UITGESCHAKELD
     currentSleeveOverride = 1.0f;  // Sleeve altijd op 100%
     
     aiOverruleActive = true;
   } else {
     // Geen risico - geleidelijk herstellen
     currentTrustOverride = min(1.0f, currentTrustOverride + aiConfig.recoveryRate);
-    // currentSleeveOverride = min(1.0f, currentSleeveOverride + aiConfig.recoveryRate);  // UITGESCHAKELD
     currentSleeveOverride = 1.0f;  // Sleeve altijd op 100%
     
     if (currentTrustOverride >= 0.99f) {  // Alleen trust checken
@@ -633,7 +613,7 @@ static void logEvent(const char* eventType, const char* details, const char* par
   eventLogFile.printf("%u,%s,%s,%.2f,%s\n", timestamp, eventType, parameter, value, details);
   eventLogFile.flush();
   
-  Serial.printf("[EVENT] %s: %s=%1.f - %s\n", eventType, parameter, value, details);
+  Serial.printf("[EVENT] %s: %s=%.1f - %s\n", eventType, parameter, value, details);
 }
 
 static void stopEventLogging() {
@@ -681,9 +661,9 @@ static void enterMain(){
   body_gfx4_setLabel(G4_HOOFDESP, "SnelH");
   body_gfx4_setLabel(G4_ZUIGEN, "Zuigen");
   body_gfx4_setLabel(G4_TRIL, "Vibe");
-        bool aiActive = aiConfig.enabled || aiStressModeActive || aiTestModeActive;
-        body_gfx4_drawButtons(isRecording, isPlaying, uiMenu, aiActive);
-        updateStatusLabel();
+  bool aiActive = aiConfig.enabled || aiStressModeActive || aiTestModeActive;
+  body_gfx4_drawButtons(isRecording, isPlaying, uiMenu, aiActive);
+  updateStatusLabel();
 }
 
 static void enterMenu(){
@@ -692,8 +672,6 @@ static void enterMenu(){
   menu_begin(body_gfx);
   Serial.println("[BODY] Entered menu mode");
 }
-
-// Touch kalibratie verwijderd - niet nodig voor CYD touchscreen
 
 static void enterPlaylist(){
   mode = MODE_PLAYLIST;
@@ -876,26 +854,23 @@ static void processPlaybackSample() {
       
       if (commaCount >= 11) {
         // Parse trust speed (kolom 7) en converteer naar ZUIVERE stress level (1-7)
-        // Geen vibe/zuigen invloed - pure basis stress voor ML training
         float trustSpeed = line.substring(commaIndex[5] + 1, commaIndex[6]).toFloat();
         
-        // Zuivere mapping: Trust 0.0-2.0 -> Stress 1-7 (lineaire verdeling)
+        // Zuivere mapping: Trust 0.0-2.0 -> Stress 1-7
         if (trustSpeed <= 0.0f) {
-          stressLevel = 1;  // Minimum stress
+          stressLevel = 1;
         } else if (trustSpeed >= 2.0f) {
-          stressLevel = 7;  // Maximum stress
+          stressLevel = 7;
         } else {
-          // Lineaire mapping: 0.0-2.0 -> 1-7
           stressLevel = (int)(1 + (trustSpeed / 2.0f) * 6.0f);
         }
         
-        // Parse vibration level (kolom 12) - alleen eerste waarde voor volgende komma
+        // Parse vibration level (kolom 12)
         int vibrationEnd = line.indexOf(',', commaIndex[10] + 1);
-        if (vibrationEnd == -1) vibrationEnd = line.length();  // Als laatste kolom
+        if (vibrationEnd == -1) vibrationEnd = line.length();
         String vibrationStr = line.substring(commaIndex[10] + 1, vibrationEnd);
         vibrationStr.trim();
         float vibrationLevel = vibrationStr.toFloat();
-        // CORRECTED: Vibe sensor data: laag (-10 tot +10) = UIT, hoog (>50) = AAN
         playbackVibeOn = (vibrationLevel > 50.0f);
         
         // Parse suction level (kolom 9)
@@ -903,27 +878,20 @@ static void processPlaybackSample() {
         suctionStr.trim();
         float suctionLevel = suctionStr.toFloat();
         playbackZuigenOn = (suctionLevel > 0.5f);
-        
-        // DEBUG: Laat zien wat we hebben gelezen (threshold 50.0 voor vibe sensor)
-        Serial.printf("[PLAYBACK DEBUG] vibrationStr='%s' (%.2f) -> %s, suctionStr='%s' (%.2f) -> %s\n", 
-                      vibrationStr.c_str(), vibrationLevel, playbackVibeOn ? "ON" : "OFF",
-                      suctionStr.c_str(), suctionLevel, playbackZuigenOn ? "ON" : "OFF");
       } else {
-        stressLevel = 3;  // Default voor incomplete CSV
+        stressLevel = 3;
       }
     } else if (filename.endsWith(".aly")) {
       stressLevel = parseALYStressLevel(line);
-      // ALY heeft geen vibe/zuigen data, gebruik defaults
     }
     
     // Stuur stress level + vibe/zuigen data naar HoofdESP
     sendESPNowMessage(1.0f, 1.0f, false, "PLAYBACK_STRESS", stressLevel, playbackVibeOn, playbackZuigenOn);
     
-    Serial.printf("[PLAYBACK] Time=%u, Stress=%d, Vibe=%s, Zuigen=%s, File=%s\n", 
+    Serial.printf("[PLAYBACK] Time=%u, Stress=%d, Vibe=%s, Zuigen=%s\n", 
                   sampleTime, stressLevel, playbackVibeOn ? "ON" : "OFF", 
-                  playbackZuigenOn ? "ON" : "OFF", filename.c_str());
+                  playbackZuigenOn ? "ON" : "OFF");
     
-    // Update voor volgende sample
     nextSampleTime = sampleTime;
   } else {
     // Te vroeg - ga terug in bestand voor volgende keer
@@ -982,33 +950,47 @@ static void formatSD() {
   Serial.printf("[BODY] Verwijderd: %d bestanden\n", deletedCount);
 }
 
-// ===== Sensor Functies =====
-static void initSensors() {
-  // GSR sensor
-  pinMode(GSR_PIN, INPUT);
+// ===== ADS1115 SENSOR FUNCTIES (NIEUW!) =====
+
+static void calibrateADS1115Sensors() {
+  Serial.println("\n[CALIBRATIE] Start sensor calibratie...");
+  Serial.println("[CALIBRATIE] Raak sensoren NIET aan...");
+  delay(2000);
   
-  // MCP9808 initialiseren met juiste adres
-  Wire.beginTransmission(0x1F);
-  if (Wire.endTransmission() == 0) {
-    mcpInitialized = true;
-    Serial.println("[BODY] MCP9808 gevonden!");
-  } else {
-    mcpInitialized = false;
-    Serial.println("[BODY] MCP9808 niet gevonden");
+  // GSR calibratie (A0)
+  long gsr_sum = 0;
+  for(int i = 0; i < 500; i++) {
+    gsr_sum += ads.readADC_SingleEnded(0);
+    delay(5);
   }
+  gsr_threshold = gsr_sum / 500;
+  Serial.printf("[CALIBRATIE] GSR threshold = %d\n", gsr_threshold);
   
-  // ESP-NOW communicatie initialiseren
-  espNowInitialized = initESPNow();
-  if (espNowInitialized) {
-    Serial.println("[BODY] ESP-NOW gereed!");
-  } else {
-    Serial.println("[BODY] ESP-NOW fout!");
+  // Flex baseline (A1)
+  long flex_sum = 0;
+  for(int i = 0; i < 100; i++) {
+    flex_sum += ads.readADC_SingleEnded(1);
+    delay(10);
   }
+  flex_baseline = ads.computeVolts(flex_sum / 100);
+  Serial.printf("[CALIBRATIE] Flex baseline = %.3fV\n", flex_baseline);
+  
+  // Pulse baseline (A2)
+  long pulse_sum = 0;
+  for(int i = 0; i < 100; i++) {
+    pulse_sum += ads.readADC_SingleEnded(2);
+    delay(10);
+  }
+  pulse_baseline = pulse_sum / 100;
+  Serial.printf("[CALIBRATIE] Pulse baseline = %d\n", pulse_baseline);
+  
+  Serial.println("[CALIBRATIE] Klaar!\n");
 }
 
-static void readGSR() {
-  int rawValue = analogRead(GSR_PIN);
-  gsrValue = (float)rawValue;
+static void readADS1115Sensors() {
+  // ===== A0: GSR Sensor =====
+  int gsr_raw = ads.readADC_SingleEnded(0);
+  gsrValue = (float)gsr_raw;
   
   // Toepassen van baseline en sensitivity
   float calibratedValue = (gsrValue - sensorConfig.gsrBaseline) * sensorConfig.gsrSensitivity;
@@ -1019,23 +1001,107 @@ static void readGSR() {
   
   // Zorg dat waarde positief blijft
   if (gsrSmooth < 0) gsrSmooth = 0;
+  
+  // ===== A1: Flex Sensor (Ademhaling) =====
+  int flex_raw = ads.readADC_SingleEnded(1);
+  float flex_voltage = ads.computeVolts(flex_raw);
+  float ademhalingVal = 100 - ((flex_voltage - 0.5) / 2.0 * 100);
+  // Ademhaling wordt hieronder in loop gebruikt
+  
+  // ===== A2: Pulse Sensor =====
+  int pulse_raw = ads.readADC_SingleEnded(2);
+  
+  // Update min/max voor threshold
+  if(pulse_raw > pulse_max) pulse_max = pulse_raw;
+  if(pulse_raw < pulse_min) pulse_min = pulse_raw;
+  
+  int pulse_threshold_val = pulse_min + ((pulse_max - pulse_min) / 2);
+  
+  // Beat detection
+  bool beat = false;
+  if(pulse_raw > pulse_threshold_val && !beat_detected) {
+    unsigned long now = millis();
+    if(lastBeat > 0) {
+      unsigned long ibi = now - lastBeat;
+      if(ibi > 300 && ibi < 2000) {
+        BPM = 60000 / ibi;
+        beat = true;
+        lastBeatMs = now;
+      }
+    }
+    lastBeat = now;
+    beat_detected = true;
+  }
+  if(pulse_raw < pulse_threshold_val) {
+    beat_detected = false;
+  }
+  
+  // Reset min/max elke 2 seconden
+  static unsigned long lastReset = 0;
+  if(millis() - lastReset > 2000) {
+    pulse_max = pulse_baseline;
+    pulse_min = pulse_baseline;
+    lastReset = millis();
+  }
+  
+  // Voor filtering zoals in origineel - simuleer IR waarde uit pulse
+  float x = (float)pulse_raw;
+  float hp_y = HP_A * (hp_y_prev + x - x_prev);
+  hp_y_prev = hp_y; x_prev = x;
+  float bp_y = bp_y_prev + LP_A * (hp_y - bp_y_prev);
+  bp_y_prev = bp_y;
+  
+  float currAbs = fabsf(bp_y);
+  envAbs = fmaxf(envAbs * 0.98f, currAbs);
+  float targetDiv = fmaxf(150.0f, envAbs / 0.90f);
+  acDiv = acDiv*0.9f + targetDiv*0.1f;
+  
+  // ===== A3: NTC Temperatuur =====
+  int ntc_raw = ads.readADC_SingleEnded(3);
+  float ntc_voltage = ads.computeVolts(ntc_raw);
+  
+  if(ntc_voltage < 0.1) {
+    tempValue = 0.0f;  // Sensor open
+  } else if(ntc_voltage > 3.2) {
+    tempValue = 0.0f;  // Sensor short
+  } else {
+    float ntc_resistance = R_TOP * ntc_voltage / (3.3 - ntc_voltage);
+    float steinhart = ntc_resistance / NTC_NOMINAL;
+    steinhart = log(steinhart);
+    steinhart /= B_COEFFICIENT;
+    steinhart += 1.0 / (TEMP_NOMINAL + 273.15);
+    steinhart = 1.0 / steinhart;
+    tempValue = steinhart - 273.15 + sensorConfig.tempOffset;
+  }
 }
 
-static void readMCP9808() {
-  if (!mcpInitialized) return;
+// ===== SENSOR INITIALISATIE =====
+static void initSensors() {
+  Serial.println("[BODY] Initializing sensors...");
   
-  Wire.beginTransmission(0x1F);
-  Wire.write(0x05);  // Temperature register
-  if (Wire.endTransmission(false) != 0) return;
+  // Start sensor I2C bus (Wire1 op pins 10/11)
+  Wire1.begin(SENSOR_SDA, SENSOR_SCL);
+  Wire1.setClock(400000);
   
-  if (Wire.requestFrom(0x1F, 2) == 2) {
-    uint8_t msb = Wire.read();
-    uint8_t lsb = Wire.read();
+  // Initialize ADS1115
+  if (!ads.begin(0x48, &Wire1)) {
+    Serial.println("[BODY] ADS1115 niet gevonden!");
+    Serial.println("[BODY] Check I2C bedrading op GPIO 10/11");
+  } else {
+    Serial.println("[BODY] ADS1115 OK!");
+    ads.setGain(GAIN_ONE);              // ±4.096V
+    ads.setDataRate(RATE_ADS1115_128SPS); // 128 samples/sec
     
-    int16_t temp = ((msb & 0x1F) << 8) | lsb;
-    if (msb & 0x10) temp -= 8192;
-    
-    tempValue = temp * 0.0625f + sensorConfig.tempOffset;
+    // Calibreer sensors
+    calibrateADS1115Sensors();
+  }
+  
+  // ESP-NOW communicatie initialiseren
+  espNowInitialized = initESPNow();
+  if (espNowInitialized) {
+    Serial.println("[BODY] ESP-NOW gereed!");
+  } else {
+    Serial.println("[BODY] ESP-NOW fout!");
   }
 }
 
@@ -1056,14 +1122,18 @@ static void readESP32Comm() {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("[BODY] Starting Body ESP with HoofdESP styling...");
+  Serial.println("[BODY] Starting Body ESP SC01 Plus...");
+  Serial.println("[BODY] ADS1115 Sensor System Active");
   
-  rgbOffInit();
-
   // Initialize body display system
   body_gfx->begin();
   body_gfx->setRotation(DISPLAY_ROTATION);
   body_gfx->fillScreen(BODY_CFG.COL_BG);
+
+  // === BACKLIGHT AANZETTEN ===
+    pinMode(45, OUTPUT);
+    digitalWrite(45, HIGH);
+    Serial.println("[BODY] Backlight ON!");
   
   // Initialize body graphics system with HoofdESP styling
   body_gfx4_begin();
@@ -1071,45 +1141,21 @@ void setup() {
   // Set touch cooldowns: 3 seconds for main screen, 2 seconds for menu
   body_gfx4_setCooldown(3000, 2000);
   
-  Wire.begin(PIN_SDA, PIN_SCL);
-  Wire.setClock(400000);
-  bool ok = max30.begin(Wire, I2C_SPEED_STANDARD, MAX_I2C_ADDR) ||
-            max30.begin(Wire, I2C_SPEED_STANDARD);
-  if (!ok) {
-    body_gfx->setCursor(20, 20);
-    body_gfx->setTextColor(0xF800, 0x0000); // Red on black
-    body_gfx->print("MAX30102 niet gevonden!");
-    while (1) delay(1000);
-  }
-  max30.setup();
+  // Initialize touch system
+  inputTouchBegin(body_gfx);
   
   // Load sensor settings
   loadSensorConfig();
   Serial.println("[BODY] Sensor configuratie geladen");
   
-  // Configure MAX30102
-  max30.setPulseAmplitudeIR(sensorConfig.hrLedPower);
-  max30.setPulseAmplitudeRed(sensorConfig.hrLedPower);
-  max30.setPulseAmplitudeGreen(0);
-  max30.setLEDMode(2);  // Red + IR mode
-  max30.setSampleRate(100);  // 100 Hz
-  max30.setPulseWidth(411);  // 18 bit
-  max30.setADCRange(4096);   // 15-bit ADC
-  max30.enableDIETEMPRDY();
-  
-  Serial.printf("[BODY] MAX30102 configured - LED Power: %d\n", sensorConfig.hrLedPower);
-  
-  // Initialize touch with new display
-  inputTouchBegin(body_gfx);
+  // Initialize sensors (ADS1115 op Wire1, pins 10/11)
+  initSensors();
   
   // Initialize SD card
   initSDCard();
   
   // Initialize event logging
   initEventLogging();
-  
-  // Initialize sensors
-  initSensors();
   
   // Initialize ML Stress Analyzer
   Serial.println("[BODY] Initializing ML Stress Analyzer...");
@@ -1118,11 +1164,6 @@ void setup() {
   } else {
     Serial.println("[BODY] ML Stress Analyzer initialization failed, continuing without ML");
   }
-  
-  // TIJDELIJK UITGESCHAKELD - S3 upgrade
-  // Initialize MultiFunPlayer client
-  // Serial.println("[BODY] Initializing MultiFunPlayer integration...");
-  // setupMultiFunPlayer();
   
   // Reset alle AI status bij opstart
   aiTestModeActive = false;
@@ -1135,7 +1176,8 @@ void setup() {
   // Enter main mode
   enterMain();
   
-  Serial.println("[BODY] Initialization complete - Body monitoring active");
+  Serial.println("[BODY] Initialization complete");
+  Serial.println("[BODY] Sensors: GSR(A0), Flex(A1), Pulse(A2), NTC(A3)");
 }
 
 // AI Stress Management Control Function (Test 2)
@@ -1143,9 +1185,6 @@ void handleAIStressManagement() {
   if (!aiStressModeActive) return;
   
   uint32_t now = millis();
-  
-  // Update Stress Test (UITGESCHAKELD - gebruik seriële interface)
-  // stressTest();
   
   // AI beslissingslogica (elke 5 seconden evaluatie)
   if (now - lastStressCheck > 5000) {
@@ -1169,7 +1208,6 @@ void handleAIStressManagement() {
         sendESPNowMessage(newTrust, 1.0f, true, "AI_VACUUM_ON");
         
         Serial.println("[AI STRESS] NOODGEVAL! Niveau 7 - Max speed + Vibe + Vacuum");
-        Serial.println("[AI STRESS] Vibe & Vacuum ON commando's gestuurd naar HoofdESP");
         
       } else if (currentStressLevel == 6) {
         // Hoge stress: drastisch verlagen
@@ -1185,7 +1223,6 @@ void handleAIStressManagement() {
           sendESPNowMessage(newTrust, 1.0f, true, "AI_VIBE_OFF");
           
           Serial.println("[AI STRESS] Hoge stress (6) - Verlagen naar speed 1, vacuum UIT");
-          Serial.println("[AI STRESS] Vacuum/Vibe OFF commando's gestuurd naar HoofdESP");
         } else if (currentSpeedStep == 1) {
           currentSpeedStep = 0;  // Naar langzaamste
           Serial.println("[AI STRESS] Stress blijft hoog - Naar langzaamste (0)");
@@ -1201,7 +1238,6 @@ void handleAIStressManagement() {
           sendESPNowMessage(newTrust, 1.0f, true, "AI_VACUUM_ON");
           
           Serial.println("[AI STRESS] Stress daalt (5) - Auto vacuum weer AAN");
-          Serial.println("[AI STRESS] Vacuum ON commando gestuurd naar HoofdESP");
         }
         
       } else if (currentStressLevel <= 3 && prevStressLevel >= 5) {
@@ -1237,8 +1273,8 @@ void handleAIStressManagement() {
   // Debug output (elke 10 seconden)
   static uint32_t lastDebug = 0;
   if (now - lastDebug > 10000) {
-    Serial.printf("[AI STRESS] Level: %d, Speed: geschat, Vacuum: %s, Vibe: %s\n",
-                  currentStressLevel, aiVacuumControl ? "AAN" : "UIT", aiVibeControl ? "AAN" : "UIT");
+    Serial.printf("[AI STRESS] Level: %d, Speed: %d, Vacuum: %s, Vibe: %s\n",
+                  currentStressLevel, currentSpeedStep, aiVacuumControl ? "AAN" : "UIT", aiVibeControl ? "AAN" : "UIT");
     lastDebug = now;
   }
 }
@@ -1260,87 +1296,12 @@ void handleSerialInput() {
           currentStressLevel = stressLevel;
           Serial.printf("[SERIAL DEBUG] Stress level handmatig ingesteld op: %d\n", stressLevel);
           
-          // Trigger immediate AI response
-          static uint32_t lastStressForce = 0;
-          uint32_t now = millis();
-          if (now - lastStressForce > 1000) {  // Debounce 1 seconde
-            Serial.printf("[SERIAL DEBUG] AI reageert op stress level %d...\n", stressLevel);
-            
-            // Simuleer exacte stress response logica (uit handleAIStressManagement)
-            if (stressLevel == 7) {
-              // NOODGEVAL: Maximale interventie
-              currentSpeedStep = 7;  // Hoogste versnelling
-              aiVibeControl = true;  // Vibe AAN
-              aiVacuumControl = true; // Auto vacuum AAN
-              
-              // Stuur speciale commando's om vibe en vacuum aan te zetten op HoofdESP
-              float newTrust = (currentSpeedStep / 7.0f) * 2.0f;
-              sendESPNowMessage(newTrust, 1.0f, true, "AI_VIBE_ON");
-              delay(50); // Korte delay tussen commando's
-              sendESPNowMessage(newTrust, 1.0f, true, "AI_VACUUM_ON");
-              
-              Serial.println("[SERIAL DEBUG] NOODGEVAL! Niveau 7 - Max speed + Vibe + Vacuum");
-              Serial.println("[SERIAL DEBUG] Vibe & Vacuum commando's gestuurd naar HoofdESP");
-              Serial.println("[SERIAL DEBUG] TIP: Bij stress 7 stopt C-knop de hele AI!");
-              
-            } else if (stressLevel == 6) {
-              // Hoge stress: drastisch verlagen
-              if (currentSpeedStep > 1) {
-                currentSpeedStep = 1;  // Naar speed step 1
-                aiVacuumControl = false; // Auto vacuum UIT
-                aiVibeControl = false;   // Vibe UIT
-                
-                // Stuur commando's naar HoofdESP
-                float newTrust = (currentSpeedStep / 7.0f) * 2.0f;
-                sendESPNowMessage(newTrust, 1.0f, true, "AI_VACUUM_OFF");
-                delay(50); // Korte delay tussen commando's
-                sendESPNowMessage(newTrust, 1.0f, true, "AI_VIBE_OFF");
-                
-                Serial.println("[SERIAL DEBUG] Hoge stress (6) - Verlagen naar speed 1, vacuum UIT");
-                Serial.println("[SERIAL DEBUG] Vacuum/Vibe OFF commando's gestuurd naar HoofdESP");
-              } else if (currentSpeedStep == 1) {
-                currentSpeedStep = 0;  // Naar langzaamste
-                Serial.println("[SERIAL DEBUG] Stress blijft hoog - Naar langzaamste (0)");
-              }
-              
-            } else if (stressLevel == 5) {
-              // Stress daalt: vacuum weer aan
-              if (!aiVacuumControl) {
-                aiVacuumControl = true;
-                
-                // Stuur commando naar HoofdESP
-                float newTrust = (currentSpeedStep / 7.0f) * 2.0f;
-                sendESPNowMessage(newTrust, 1.0f, true, "AI_VACUUM_ON");
-                
-                Serial.println("[SERIAL DEBUG] Stress daalt (5) - Auto vacuum weer AAN");
-                Serial.println("[SERIAL DEBUG] Vacuum ON commando gestuurd naar HoofdESP");
-              }
-              
-            } else if (stressLevel <= 3) {
-              // Lage stress: speed weer verhogen
-              if (currentSpeedStep < aiStartSpeedStep) {
-                currentSpeedStep++;
-                Serial.printf("[SERIAL DEBUG] Stress gedaald (%d) - Speed verhogen naar %d\n", stressLevel, currentSpeedStep);
-              }
-            }
-            
-            // Stuur nieuwe instellingen naar HoofdESP (behalve bij level 4 - geen actie)
-            if (stressLevel != 4) {
-              float newTrust = (currentSpeedStep / 7.0f) * 2.0f;
-              sendESPNowMessage(newTrust, 1.0f, true, "AI_STRESS_MANUAL");
-            } else {
-              Serial.printf("[SERIAL DEBUG] Medium stress (%d) - Geen actie\n", stressLevel);
-            }
-            
-            lastStressForce = now;
-          }
-          
         } else {
           Serial.printf("[SERIAL DEBUG] ERROR: AI Stress Management is niet actief! Start eerst AI.\n");
         }
         
       } else {
-        Serial.printf("[SERIAL DEBUG] ERROR: Ongeldig stress level '%s'. Gebruik 1-7.\n", input.substring(7).c_str());
+        Serial.printf("[SERIAL DEBUG] ERROR: Ongeldig stress level. Gebruik 1-7.\n");
       }
       
     } else if (input == "ml") {
@@ -1350,7 +1311,6 @@ void handleSerialInput() {
         Serial.printf("[ML ANALYSE] Stress Level: %d (%.1f%% confidence)\n", 
                       result.stressLevel, result.confidence * 100);
         Serial.printf("[ML ANALYSE] Reasoning: %s\n", result.reasoning.c_str());
-        Serial.printf("[ML ANALYSE] Processing time: %d ms\n", result.processingTime);
         
         // Automatisch toepassen van ML resultaat
         if (aiStressModeActive && result.confidence > 0.7f) {
@@ -1361,44 +1321,11 @@ void handleSerialInput() {
         Serial.println("[ML ANALYSE] Onvoldoende sensor data - wacht even...");
       }
       
-    } else if (input == "mlinfo") {
-      // ML System Info
-      Serial.println("[ML INFO] " + mlAnalyzer.getModelInfo());
-      Serial.printf("[ML INFO] Ready: %s\n", mlAnalyzer.isReady() ? "JA" : "NEE");
-      Serial.printf("[ML INFO] Predictions: %d, Avg time: %.1fms\n", 
-                    mlAnalyzer.getPredictionCount(), mlAnalyzer.getAverageProcessingTime());
-      
-    } else if (input == "mlfeatures") {
-      // Show extracted features
-      if (mlAnalyzer.isReady()) {
-        mlAnalyzer.printFeatures();
-      } else {
-        Serial.println("[ML DEBUG] Onvoldoende data voor feature extractie");
-      }
-      
-    } else if (input == "mlbuffer") {
-      // Show sensor buffer
-      mlAnalyzer.printBuffer();
-      
     } else if (input == "help") {
       Serial.println("[SERIAL DEBUG] Beschikbare commando's:");
       Serial.println("  stress X    - Stel stress level in (X = 1-7)");
       Serial.println("  ml          - ML stress analyse uitvoeren");
-      Serial.println("  mlinfo      - ML systeem informatie");
-      Serial.println("  mlfeatures  - Toon extracted features");
-      Serial.println("  mlbuffer    - Toon sensor data buffer");
       Serial.println("  help        - Toon deze help");
-      Serial.println("");
-      Serial.println("[SERIAL DEBUG] Stress levels:");
-      Serial.println("  1-3: Lage stress -> Speed verhogen");
-      Serial.println("  4:   Medium stress -> Geen actie");
-      Serial.println("  5:   Stress daalt -> Vacuum weer aan");
-      Serial.println("  6:   Hoge stress -> Speed naar 1, vacuum uit");
-      Serial.println("  7:   NOODGEVAL -> Max speed + vibe + vacuum");
-      Serial.println("       (Bij stress 7 stopt C-knop de hele AI!)");
-      
-    } else if (input.length() > 0) {
-      Serial.printf("[SERIAL DEBUG] Onbekend commando: '%s'. Type 'help' voor hulp.\n", input.c_str());
     }
   }
 }
@@ -1408,44 +1335,12 @@ void handleAIPauseDetection() {
   // Skip als er geen AI actief is
   if (!aiStressModeActive && !aiTestModeActive) return;
   
-  // DEBUG: Pauze conditie check (ook voor continue monitoring)
-  static bool lastPauseState = false;
-  static uint32_t lastPauseDebug = 0;
-  if (pauseActive != lastPauseState) {
-    Serial.printf("[DEBUG PAUZE] pauseActive veranderd: %s -> %s\n", 
-                  lastPauseState ? "JA" : "NEE", pauseActive ? "JA" : "NEE");
-    Serial.printf("[DEBUG PAUZE] Conditie check: aiControlActive=%s, userPausedAI=%s\n",
-                  aiControlActive ? "JA" : "NEE", userPausedAI ? "JA" : "NEE");
-    lastPauseState = pauseActive;
-    lastPauseDebug = millis();
-  }
-  
-  // Extra debug elke 5 seconden als pauseActive blijft true
-  if (pauseActive && (millis() - lastPauseDebug > 5000)) {
-    Serial.printf("[DEBUG PAUZE CONTINUE] pauseActive=JA, aiControl=%s, userPaused=%s\n",
-                  aiControlActive ? "JA" : "NEE", userPausedAI ? "JA" : "NEE");
-    lastPauseDebug = millis();
-  }
-  
-  // Detect user pause (C-knop van HoofdESP) - gedrag afhankelijk van AI modus
-  static bool lastPauseCheck = false;
-  bool currentPauseCheck = (aiControlActive && pauseActive && !userPausedAI);
-  if (currentPauseCheck != lastPauseCheck) {
-    Serial.printf("[DEBUG PAUSE LOGICA] Conditie veranderd naar %s (aiControl:%s, pause:%s, !userPaused:%s)\n",
-                  currentPauseCheck ? "WAAR" : "ONWAAR", 
-                  aiControlActive ? "JA" : "NEE", 
-                  pauseActive ? "JA" : "NEE", 
-                  !userPausedAI ? "JA" : "NEE");
-    lastPauseCheck = currentPauseCheck;
-  }
-  
+  // Detect user pause (C-knop van HoofdESP)
   if (aiControlActive && pauseActive && !userPausedAI) {
-    Serial.println("[DEBUG PAUSE LOGICA] ALLE VOORWAARDEN VOLDAAN - Pause logica wordt uitgevoerd!");
     
     if (aiStressModeActive && currentStressLevel == 7) {
       // STRESS LEVEL 7: C-knop schakelt AI volledig uit + emergency safe mode
       Serial.println("[AI STRESS] C-knop EMERGENCY OVERRIDE bij stress level 7!");
-      Serial.println("[AI STRESS] AI volledig uit → Safe mode: animatie pauze, min snelheid, vibe uit, zuigen uit");
       
       // Stuur emergency override commando naar HoofdESP
       sendESPNowMessage(0.0f, 0.0f, false, "AI_EMERGENCY_OVERRIDE");
@@ -1459,18 +1354,16 @@ void handleAIPauseDetection() {
       userPausedAI = true;
       aiControlActive = false;
       redBackgroundActive = true;
-      Serial.printf("[AI STRESS] User pause bij stress level %d - rode achtergrond ON (test 1 gedrag)\n", currentStressLevel);
+      Serial.printf("[AI STRESS] User pause bij stress level %d - rode achtergrond ON\n", currentStressLevel);
       
     } else {
       // Test 1 modus: rode scherm gedrag
       userPausedAI = true;
       aiControlActive = false;
       redBackgroundActive = true;
-      Serial.println("[AI LEER] User pause detected - GEREGISTREERD, rode achtergrond ON");
+      Serial.println("[AI TEST] User pause detected - GEREGISTREERD, rode achtergrond ON");
     }
   }
-  
-  // Resume logica is verplaatst naar directe touch handler voor betere responsiviteit
 }
 
 // AI Test Control Function
@@ -1482,7 +1375,7 @@ void handleAITestControl() {
   // Start AI control
   if (!aiControlActive && !userPausedAI) {
     aiControlActive = true;
-    Serial.println("[AI TEST] AI neemt controle - Versnelling 6 + Vibe ON");
+    Serial.println("[AI TEST] AI neemt controle");
     
     // Send AI commands to HoofdESP
     sendESPNowMessage(aiTargetTrust, 1.0f, true, "AI_TEST_START");
@@ -1493,16 +1386,14 @@ void handleAITestControl() {
     // Check vibe changes
     static bool lastVibeState = false;
     if (vibeOn != lastVibeState) {
-      Serial.printf("[AI LEER] User toggled VIBE to %s - GEREGISTREERD (geen actie)\n", vibeOn ? "ON" : "OFF");
-      // AI leert: vibe toggle gedetecteerd, maar doet niks
+      Serial.printf("[AI LEER] User toggled VIBE to %s - GEREGISTREERD\n", vibeOn ? "ON" : "OFF");
       lastVibeState = vibeOn;
     }
     
     // Check zuig changes  
     static bool lastZuigState = false;
     if (zuigActive != lastZuigState) {
-      Serial.printf("[AI LEER] User toggled ZUIGEN to %s - GEREGISTREERD (geen actie)\n", zuigActive ? "ACTIEF" : "UIT");
-      // AI leert: zuig toggle gedetecteerd, maar doet niks
+      Serial.printf("[AI LEER] User toggled ZUIGEN to %s - GEREGISTREERD\n", zuigActive ? "ACTIEF" : "UIT");
       lastZuigState = zuigActive;
     }
     
@@ -1523,197 +1414,131 @@ void loop() {
       int16_t x, y; uint16_t w, h;
       String pauseMsg = "AI GEPAUZEERD";
       body_gfx->getTextBounds(pauseMsg, 0, 0, &x, &y, &w, &h);
-      body_gfx->setCursor((320 - w) / 2, 80);
+      body_gfx->setCursor((SCR_W - w) / 2, SCR_H / 2 - 40);
       body_gfx->print(pauseMsg);
       
       body_gfx->setTextSize(1);
       String touchMsg = "Raak scherm aan om door te gaan";
       body_gfx->getTextBounds(touchMsg, 0, 0, &x, &y, &w, &h);
-      body_gfx->setCursor((320 - w) / 2, 120);
+      body_gfx->setCursor((SCR_W - w) / 2, SCR_H / 2);
       body_gfx->print(touchMsg);
       
-      // Check voor ANY touch input om door te gaan (rode scherm = volledig scherm touch)
+      // Check voor ANY touch input om door te gaan
       int16_t tx, ty;
       if (inputTouchRead(tx, ty)) {
         Serial.printf("[RODE SCHERM] Touch detected at (%d,%d)\n", tx, ty);
         redBackgroundActive = false;
         
-        // Direct AI resume handling - niet wachten op volgende loop
+        // Direct AI resume handling
         if (userPausedAI) {
           userPausedAI = false;
           aiControlActive = true;
           
           if (aiStressModeActive) {
-            // Stress management: herstart vanaf speed 0 met stress monitoring
-            float resumeTrust = 0.1f;  // Allerlaagste versnelling
+            float resumeTrust = 0.1f;
             sendESPNowMessage(resumeTrust, 1.0f, true, "AI_STRESS_RESUME");
-            Serial.printf("[AI STRESS] Touch resume bij stress level %d - herstart langzaam\n", currentStressLevel);
+            Serial.printf("[AI STRESS] Touch resume bij stress level %d\n", currentStressLevel);
           } else if (aiTestModeActive) {
-            // Test 1 gedrag: herstart langzaam
             aiTargetTrust = 0.1f;
             sendESPNowMessage(aiTargetTrust, 1.0f, true, "AI_RESUME_SLOW");
-            Serial.println("[AI LEER] Touch resume GEREGISTREERD - AI herstart allerlaagste (trustSpeed 0.1)");
-          } else {
-            // Fallback: normale resume
-            sendESPNowMessage(1.0f, 1.0f, false, "HEARTBEAT");
-            Serial.println("[BODY] Touch detected op rode scherm - resuming normal operation");
+            Serial.println("[AI TEST] Touch resume");
           }
-        } else {
-          // Geen AI resume nodig
-          sendESPNowMessage(1.0f, 1.0f, false, "HEARTBEAT");
-          Serial.println("[BODY] Touch detected op rode scherm - resuming normal operation");
         }
         
         // Terug naar normale display
         enterMain();
       }
       
-      delay(50);  // Korte delay voor touch responsiveness
+      delay(50);
       return;
     }
-    // Lees alle sensoren
-    long ir = max30.getIR();
-    readGSR();
-    readMCP9808();
+    
+    // Lees alle sensoren via ADS1115 (NIEUW!)
+    readADS1115Sensors();
     readESP32Comm();
 
-    // MAX30102 hartslag processing
-    float x = (float)ir;
-    float hp_y = HP_A * (hp_y_prev + x - x_prev);
-    hp_y_prev = hp_y; x_prev = x;
-    float bp_y = bp_y_prev + LP_A * (hp_y - bp_y_prev);
-    bp_y_prev = bp_y;
-
-    float currAbs = fabsf(bp_y);
-    envAbs = fmaxf(envAbs * 0.98f, currAbs);
-    float targetDiv = fmaxf(150.0f, envAbs / 0.90f);
-    acDiv = acDiv*0.9f + targetDiv*0.1f;
-
-    // Beat detection
-    bool beat = (ir > sensorConfig.hrThreshold) && checkForBeat(ir);
-    if (beat) {
-      uint32_t now = millis();
-      uint32_t dt = now - lastBeatMs;
-      lastBeatMs = now;
-      if (dt > 300 && dt < 2000) BPM = (uint16_t)(60000UL / dt);
-    }
-
-    // Use real sensor data with fallback
-    float tempVal = mcpInitialized ? tempValue : (36.5f + 0.5f * sin(dummyPhase/3));
+    // Gebruik echte sensor data
+    float heartVal = (float)BPM;
+    float tempVal = tempValue;
     float huidVal = gsrSmooth;
     
     // Feed sensor data to ML analyzer (every 100ms = 10Hz)
     static uint32_t lastMLUpdate = 0;
     if (millis() - lastMLUpdate >= 100) {
-      mlAnalyzer.addSensorSample((float)BPM, tempVal, huidVal);
+      mlAnalyzer.addSensorSample(heartVal, tempVal, huidVal);
       lastMLUpdate = millis();
     }
     
-    // Dummy oxygen
+    // Dummy oxygen (nog geen sensor voor)
     dummyPhase += 0.1f;
     if (dummyPhase > TWO_PI) dummyPhase -= TWO_PI;
     float oxyVal = 95 + 2 * sin(dummyPhase/7);
     
-    // Dummy ademhaling (flex-sensor simulatie)
-    float ademhalingVal = 50 + 30 * sin(dummyPhase/4);  // Langzamere ademhaling
+    // Ademhaling komt nu van Flex sensor (A1)
+    int flex_raw = ads.readADC_SingleEnded(1);
+    float flex_voltage = ads.computeVolts(flex_raw);
+    float ademhalingVal = 100 - ((flex_voltage - 0.5) / 2.0 * 100);
+    ademhalingVal = constrain(ademhalingVal, 0, 100);
+    
+    // Beat detection voor display
+    bool beat = (millis() - lastBeatMs < 200);  // Beat indicator
 
-    // Draw samples naar scherm met HoofdESP styling - nieuwe volgorde
-    body_gfx4_pushSample(G4_HART, bp_y, beat);
+    // Draw samples naar scherm met HoofdESP styling
+    body_gfx4_pushSample(G4_HART, bp_y_prev, beat);
     body_gfx4_pushSample(G4_HUID, huidVal);
     body_gfx4_pushSample(G4_TEMP, tempVal);
     body_gfx4_pushSample(G4_ADEMHALING, ademhalingVal);
     body_gfx4_pushSample(G4_OXY, oxyVal);
     
-    // SNELH: Simpele trust speed animatie met lube reset
+    // SNELH: Trust speed animatie
     float snelheidVal;
-    float currentAnimationPhase = 0.0f;
-    
-    // Animatie gebaseerd op tijd sinds lube trigger + trust speed
     static uint32_t animStartTime = 0;
     
-    // Reset bij lube trigger - ALLEEN bij lage snelheid
-    if (lubeTrigger) {
-      float speed = max(0.1f, cyclusTijd);  // cyclusTijd = trustSpeed
-      if (speed < 1.0f) {  // Alleen reset bij lage snelheid
-        animStartTime = millis();
-        Serial.println("[SNELH] Reset door lube trigger (lage snelheid)");
-      } else {
-        Serial.printf("[SNELH] Lube trigger genegeerd bij snelheid %.1f\n", speed);
-      }
+    if (lubeTrigger && trustSpeed < 1.0f) {
+      animStartTime = millis();
     }
     
     if (pauseActive) {
-      // Pauze actief
       snelheidVal = 0.0f;
-      currentAnimationPhase = 0.0f;
     } else {
-      // Bereken animatie gebaseerd op trust speed
       uint32_t timeSinceReset = millis() - animStartTime;
-      float speed = max(0.1f, cyclusTijd);  // cyclusTijd = trustSpeed
-      
-      // Animatie frequentie: hogere speed = snellere golven
-      float animFreq = speed * BODY_CFG.SNELH_SPEED_FACTOR;  // Direct speed naar frequentie
+      float speed = max(0.1f, cyclusTijd);
+      float animFreq = speed * BODY_CFG.SNELH_SPEED_FACTOR;
       float phase = (timeSinceReset / 1000.0f) * animFreq;
-      phase = fmod(phase, 1.0f) * 2.0f * PI;  // Wrap naar golf cyclus
-      
-      // Golf van 0-100% - start bij 0% (niet 50%)
-      float s = 0.5f * (sinf(phase - PI/2.0f) + 1.0f);  // Start bij 0%
-      snelheidVal = s * 100.0f;  // 0-100%
-      currentAnimationPhase = phase;
+      phase = fmod(phase, 1.0f) * 2.0f * PI;
+      float s = 0.5f * (sinf(phase - PI/2.0f) + 1.0f);
+      snelheidVal = s * 100.0f;
     }
     body_gfx4_pushSample(G4_HOOFDESP, snelheidVal);
     
-    // ZUIGEN: Echte vacuum data van HoofdESP in mbar (configureerbaar bereik)
-    // Schalen naar grafiek waarde: 0 mbar = baseline, maxMbar = top grafiek
+    // ZUIGEN: Vacuum data
     float zuigenVal;
     if (zuigActive && vacuumMbar > 0) {
-      // Actieve zuiging: schaal 0-maxMbar naar 20-100 grafiek waarde
-      float maxMbar = BODY_CFG.vacuumGraphMaxMbar;  // Configureerbaar maximum (standaard 10.0f)
-      float scaledVacuum = min(vacuumMbar / maxMbar, 1.0f);  // Normaliseren naar 0-1
-      zuigenVal = 20.0f + (scaledVacuum * 80.0f);  // 0mbar=20, maxMbar=100
+      float maxMbar = BODY_CFG.vacuumGraphMaxMbar;
+      float scaledVacuum = min(vacuumMbar / maxMbar, 1.0f);
+      zuigenVal = 20.0f + (scaledVacuum * 80.0f);
     } else {
-      // Geen zuiging actief: lage baseline waarde
       zuigenVal = 5.0f;
     }
     body_gfx4_pushSample(G4_ZUIGEN, zuigenVal);
     
-    // VIBE: Handmatige VIBE toggle van HoofdESP Z-knop (bit 3 debug LED)
+    // VIBE: Handmatige VIBE toggle
     static float vibePhase = 0;
     vibePhase += 0.1f;
-    bool vibeActive = vibeOn;  // Gebruik echte VIBE signaal van HoofdESP!
-    float trilVal = vibeActive ? (100 + (3 * sin(vibePhase))) : (3 * sin(vibePhase));
+    float trilVal = vibeOn ? (100 + (3 * sin(vibePhase))) : (3 * sin(vibePhase));
     body_gfx4_pushSample(G4_TRIL, trilVal);
-    // Teken knoppen elke loop (omdat ze door grafieken overschreven kunnen worden)
+    
+    // Teken knoppen elke loop
     bool aiActive = aiConfig.enabled || aiStressModeActive || aiTestModeActive;
     body_gfx4_drawButtons(isRecording, isPlaying, uiMenu, aiActive);
     
     // Debug output (elke 2 seconden)
     static uint32_t lastDebugTime = 0;
-    static bool dimensionsShown = false;
     if (millis() - lastDebugTime >= 2000) {
-      bool effectiveAI = aiOverruleActive || aiStressModeActive || aiTestModeActive;
-      Serial.printf("[BODY] HR:%.0f Temp:%.1f GSR:%.0f AI:%s\n", 
-                    (float)BPM, tempVal, huidVal, effectiveAI ? "ON" : "OFF");
-      Serial.printf("[DEBUG AI] aiOverrule:%s aiStress:%s aiTest:%s aiControl:%s\n",
-                    aiOverruleActive ? "Y" : "N", aiStressModeActive ? "Y" : "N", 
-                    aiTestModeActive ? "Y" : "N", aiControlActive ? "Y" : "N");
-      if (aiOverruleActive) {
-        Serial.printf("[AI] Trust:%.2f (Sleeve:%.2f UITGESCHAKELD)\n", 
-                      currentTrustOverride, currentSleeveOverride);
-      }
-      Serial.printf("[HOOFD] Trust:%.1f Sleeve:%.1f Suction:%.1f Pause:%.1f\n",
-                    trustSpeed, sleeveSpeed, suctionLevel, pauseTime);
-      Serial.printf("[SNELH] trustSpeed:%.1f pauseActive:%s animPhase:%.1f sleeve:%.1f%%\n",
-                    trustSpeed, pauseActive ? "JA" : "NEE", currentAnimationPhase, sleevePercentage);
-      Serial.printf("[VACUUM] Zuigen:%s Vacuum:%.1f mbar (grafiek:%.1f)\n",
-                    zuigActive ? "ACTIEF" : "UIT", vacuumMbar, zuigenVal);
-      
-      // Show grafiek dimensions once
-      if (!dimensionsShown) {
-        Serial.printf("[GRAFIEK] Screen: %dx%d pixels\n", body_gfx->width(), body_gfx->height());
-        dimensionsShown = true;
-      }
-      
+      Serial.printf("[SENSORS] HR:%d Temp:%.1f GSR:%.0f Flex:%.0f%%\n", 
+                    BPM, tempVal, huidVal, ademhalingVal);
+      Serial.printf("[HOOFD] Trust:%.1f Sleeve:%.1f Vacuum:%.1f\n",
+                    trustSpeed, sleeveSpeed, vacuumMbar);
       lastDebugTime = millis();
     }
     
@@ -1721,29 +1546,20 @@ void loop() {
     handleSerialInput();
     
     // Update AI overrule systeem
-    updateAIOverrule((float)BPM, tempVal, gsrSmooth);
+    updateAIOverrule(heartVal, tempVal, huidVal);
     
-    // Handle AI pause detection (universeel voor alle AI modes)
+    // Handle AI pause detection
     handleAIPauseDetection();
     
     // Handle AI test control
     handleAITestControl();
     
-    // Handle AI stress management (Test 2)
+    // Handle AI stress management
     handleAIStressManagement();
     
-    // DEBUG: AI test timer (UITGESCHAKELD)
-    // static bool aiTestStarted = false;
-    // if (!aiTestStarted && millis() > 10000) {
-    //   startAITest();
-    //   aiTestStarted = true;
-    // }
-    
-    // Send heartbeat naar HoofdESP (elke 2 seconden voor debug)
+    // Send heartbeat naar HoofdESP
     static uint32_t lastHeartbeat = 0;
     if (millis() - lastHeartbeat >= 2000) {
-      Serial.println("[BODY] Sending heartbeat to HoofdESP...");
-      // Zorg dat AI status correct is voor stress management
       bool effectiveAIActive = aiOverruleActive || aiStressModeActive || aiTestModeActive;
       sendESPNowMessage(currentTrustOverride, currentSleeveOverride, effectiveAIActive, "HEARTBEAT");
       lastHeartbeat = millis();
@@ -1754,13 +1570,9 @@ void loop() {
       processPlaybackSample();
     }
     
-    // TIJDELIJK UITGESCHAKELD - S3 upgrade  
-    // Process MultiFunPlayer WebSocket communication
-    // mfpClient.loop();
-    
     // Record data if recording
     if (isRecording) {
-      recordSampleExtended((float)BPM, tempVal, huidVal, oxyVal, beat, 
+      recordSampleExtended(heartVal, tempVal, huidVal, oxyVal, beat, 
                           trustSpeed, sleeveSpeed, suctionLevel, pauseTime, 
                           ademhalingVal, trilVal);
     }
@@ -1772,7 +1584,6 @@ void loop() {
         body_gfx4_registerTouch(true);
         
         if (ev.kind == TE_TAP_REC) {
-          // Toggle recording
           if (isRecording) {
             isRecording = false;
             stopRecording();
@@ -1785,57 +1596,41 @@ void loop() {
           if (isPlaying) {
             stopPlayback();
             isPlaying = false;
-            Serial.println("[BODY] Playback stopped");
           } else {
-            // Open playlist voor file selectie
             enterPlaylist();
             return;
           }
         }
         if (ev.kind == TE_TAP_MENU) {
           uiMenu = true;
-          mode = MODE_MENU;  // Switch to menu mode
+          mode = MODE_MENU;
           bool aiActive = aiConfig.enabled || aiStressModeActive || aiTestModeActive;
           body_gfx4_drawButtons(isRecording, isPlaying, uiMenu, aiActive);
-          Serial.println("[BODY] Entering menu mode");
-          
-          // Initialize menu system
           menu_begin(body_gfx);
-          Serial.println("[BODY] Menu initialized");
           return;
         }
         if (ev.kind == TE_TAP_OVERRULE) {
-          // AI knop: Universele AI toggle - kan altijd alle AI systemen uit/aan
+          // AI knop: Universele AI toggle
           bool anyAIActive = aiStressModeActive || aiTestModeActive || aiConfig.enabled;
           
           if (anyAIActive) {
             // STOP alle AI systemen
-            if (aiStressModeActive) {
-              stopAIStressManagement();
-              Serial.println("[BODY] AI Stress Management gestopt via AI knop!");
-            }
-            if (aiTestModeActive) {
-              stopAITest();
-              Serial.println("[BODY] AI Test gestopt via AI knop!");
-            }
+            if (aiStressModeActive) stopAIStressManagement();
+            if (aiTestModeActive) stopAITest();
             if (aiConfig.enabled) {
               aiConfig.enabled = false;
               aiOverruleActive = false;
-              Serial.println("[BODY] AI Overrule uitgeschakeld via AI knop!");
             }
-            Serial.println("[BODY] ==> ALLE AI SYSTEMEN UITGESCHAKELD");
-            
           } else {
-            // START AI stress management (als niks actief is)
+            // START AI stress management
             startAIStressManagement();
-            Serial.println("[BODY] AI Stress Management gestart via AI knop!");
           }
           
           bool aiActive = aiConfig.enabled || aiStressModeActive || aiTestModeActive;
           body_gfx4_drawButtons(isRecording, isPlaying, uiMenu, aiActive);
           return;
         }
-        // Update button display om AI stress status te tonen
+        
         bool aiActive = aiConfig.enabled || aiStressModeActive || aiTestModeActive;
         body_gfx4_drawButtons(isRecording, isPlaying, uiMenu, aiActive);
         updateStatusLabel();
@@ -1846,31 +1641,16 @@ void loop() {
     return;
   }
 
-  // Menu mode - HoofdESP style menu  
+  // Menu mode  
   if (mode == MODE_MENU){
     MenuEvent mev = menu_poll();
     if (mev == ME_NONE) { delay(10); return; }
     if (mev == ME_BACK) { uiMenu = false; enterMain(); return; }
-    if (mev == ME_SENSOR_SETTINGS){
-      enterSensorSettings();
-      return;
-    }
-    if (mev == ME_OVERRULE){
-      enterOverrule();
-      return;
-    }
-    if (mev == ME_SYSTEM_SETTINGS){
-      enterSystemSettings();
-      return;
-    }
-    if (mev == ME_PLAYLIST){
-      enterPlaylist();
-      return;
-    }
-    if (mev == ME_ML_TRAINING){
-      enterMLTraining();
-      return;
-    }
+    if (mev == ME_SENSOR_SETTINGS){ enterSensorSettings(); return; }
+    if (mev == ME_OVERRULE){ enterOverrule(); return; }
+    if (mev == ME_SYSTEM_SETTINGS){ enterSystemSettings(); return; }
+    if (mev == ME_PLAYLIST){ enterPlaylist(); return; }
+    if (mev == ME_ML_TRAINING){ enterMLTraining(); return; }
   }
 
   if (mode == MODE_PLAYLIST){
@@ -1879,16 +1659,12 @@ void loop() {
     if (pev == PE_BACK) { enterMain(); return; }
     if (pev == PE_PLAY_FILE) {
       String filename = playlist_getSelectedFile();
-      if (filename.length() > 0) {
-        startPlayback(filename);
-      }
+      if (filename.length() > 0) startPlayback(filename);
       return;
     }
     if (pev == PE_DELETE_CONFIRM) {
       String filename = playlist_getSelectedFile();
-      if (filename.length() > 0) {
-        showDeleteConfirm(filename);
-      }
+      if (filename.length() > 0) showDeleteConfirm(filename);
       return;
     }
     if (pev == PE_DELETE_FILE) {
@@ -1900,22 +1676,10 @@ void loop() {
       return;
     }
     if (pev == PE_AI_ANALYZE) {
-      Serial.println("[BODY] PE_AI_ANALYZE event triggered");
       String filename = playlist_getSelectedFile();
-      Serial.printf("[BODY] Got filename from playlist: '%s'\n", filename.c_str());
-      
       if (filename.length() > 0) {
-        Serial.println("[BODY] Filename is valid, setting in AI Analyze...");
-        
-        // Set selected file in AI Analyze en start
         aiAnalyze_setSelectedFile(filename);
-        Serial.println("[BODY] File set successfully, entering AI Analyze...");
         enterAIAnalyze();
-        Serial.println("[BODY] AI Analyze entered successfully");
-      } else {
-        Serial.println("[BODY] ERROR: No filename selected!");
-        body_gfx4_drawStatus("Geen bestand geselecteerd!");
-        delay(2000);
       }
       return;
     }
@@ -1930,14 +1694,8 @@ void loop() {
       systemSettings_begin(body_gfx);
       return;
     }
-    if (sse == SSE_COLORS) {
-      enterColors();
-      return;
-    }
-    if (sse == SSE_FORMAT_SD) {
-      showFormatConfirm();
-      return;
-    }
+    if (sse == SSE_COLORS) { enterColors(); return; }
+    if (sse == SSE_FORMAT_SD) { showFormatConfirm(); return; }
   }
   
   if (mode == MODE_SENSOR_SETTINGS) {
@@ -1979,14 +1737,8 @@ void loop() {
       overrule_begin(body_gfx);
       return;
     }
-    if (oev == OE_ANALYZE) {
-      enterAIAnalyze();
-      return;
-    }
-    if (oev == OE_CONFIG) {
-      enterAIEventConfig();
-      return;
-    }
+    if (oev == OE_ANALYZE) { enterAIAnalyze(); return; }
+    if (oev == OE_CONFIG) { enterAIEventConfig(); return; }
   }
   
   if (mode == MODE_AI_ANALYZE) {
@@ -1995,9 +1747,7 @@ void loop() {
     if (aev == AE_BACK) { enterOverrule(); return; }
     if (aev == AE_TRAIN) {
       String filename = aiAnalyze_getSelectedFile();
-      if (filename.length() > 0) {
-        enterAITraining(filename);
-      }
+      if (filename.length() > 0) enterAITraining(filename);
       return;
     }
   }
@@ -2025,7 +1775,6 @@ void loop() {
     if (ce == CE_NONE) { delay(10); return; }
     if (ce == CE_BACK) { enterSystemSettings(); return; }
     if (ce == CE_COLOR_CHANGE) {
-      // Kleur is gewijzigd, voorlopig alleen feedback
       body_gfx4_drawStatus("Kleur gewijzigd!");
       delay(1000);
       return;
@@ -2033,42 +1782,19 @@ void loop() {
   }
   
   if (mode == MODE_AI_TRAINING) {
-    // Check if we're using the old AI Training system (12 feedback buttons)
-    // This is determined by checking if currentFile is set in ai_training_view.cpp
-    
-    // Try AI Training system first (12 feedback buttons for .csv labeling)
     TrainingResult tr = aiTraining_poll();
     if (tr != TR_NONE) {
-      if (tr == TR_BACK) {
-        enterOverrule(); // AI Training goes back to AI Analyze
-        return;
-      }
-      if (tr == TR_COMPLETE) {
-        // Training completed - could save .aly file or return to analyze
-        enterOverrule();
-        return;
-      }
+      if (tr == TR_BACK) { enterOverrule(); return; }
+      if (tr == TR_COMPLETE) { enterOverrule(); return; }
       return;
     }
     
-    // If AI Training returns TR_NONE, try ML Training system
     MLTrainingEvent mte = mlTraining_poll();
     if (mte == MTE_NONE) { delay(10); return; }
     if (mte == MTE_BACK) { enterMenu(); return; }
-    
-    // Handle ML Training state transitions
-    if (mte == MTE_IMPORT_DATA) {
-      mlTraining_setState(ML_STATE_IMPORT);
-      return;
-    }
-    if (mte == MTE_TRAIN_MODEL) {
-      mlTraining_setState(ML_STATE_TRAINING);
-      return;
-    }
-    if (mte == MTE_MODEL_MANAGER) {
-      mlTraining_setState(ML_STATE_MODEL_MANAGER);
-      return;
-    }
+    if (mte == MTE_IMPORT_DATA) { mlTraining_setState(ML_STATE_IMPORT); return; }
+    if (mte == MTE_TRAIN_MODEL) { mlTraining_setState(ML_STATE_TRAINING); return; }
+    if (mte == MTE_MODEL_MANAGER) { mlTraining_setState(ML_STATE_MODEL_MANAGER); return; }
   }
   
   if (mode == MODE_CONFIRM) {
@@ -2099,4 +1825,3 @@ void loop() {
   
   delay(10);
 }
-

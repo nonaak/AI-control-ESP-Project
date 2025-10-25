@@ -166,8 +166,8 @@ static void drawFileList() {
 
 void playlist_begin(Arduino_GFX* gfx) {
   g = gfx;
-  SCR_W = g->width();
-  SCR_H = g->height();
+  //SCR_W = g->width();
+  //SCR_H = g->height();
   
   g->fillScreen(COL_BG);
   g->setTextColor(COL_TX);
