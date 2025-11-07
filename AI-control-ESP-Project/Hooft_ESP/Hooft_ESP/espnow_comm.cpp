@@ -10,7 +10,8 @@ extern bool vibeState;
 // ===============================================================================
 // MAC ADDRESSES
 // ===============================================================================
-const uint8_t bodyESP_MAC[6] = {0xEC, 0xDA, 0x3B, 0x98, 0xC5, 0x24};  // Body ESP - T-HMI ESP32-S3
+//const uint8_t bodyESP_MAC[6] = {0xEC, 0xDA, 0x3B, 0x98, 0xC5, 0x24};  // Body ESP - T-HMI ESP32-S3
+const uint8_t bodyESP_MAC[6] = {0xE8, 0x06, 0x90, 0xDD, 0x7E, 0x18};  // Body ESP - Smart Panlee SC01 Plus
 const uint8_t pumpUnit_MAC[6] = {0x62, 0x01, 0x94, 0x59, 0x18, 0x86}; // Pomp Unit - All on Ch 4 (AP mode MAC)
 const uint8_t m5atom_MAC[6] = {0x30, 0x83, 0x98, 0xE2, 0xC7, 0x64};   // M5StickC Plus - All on Ch 4
 
@@ -207,7 +208,8 @@ void onESPNowReceive(const esp_now_recv_info *info, const uint8_t *data, int len
                   info->src_addr[0], info->src_addr[1], info->src_addr[2],
                   info->src_addr[3], info->src_addr[4], info->src_addr[5], len);
     Serial.printf("[ESP-NOW] Expected Pump Unit MAC: 62:01:94:59:18:86\n");
-    Serial.printf("[ESP-NOW] Expected Body ESP MAC:  08:D1:F9:DC:C3:A4\n");
+    //Serial.printf("[ESP-NOW] Expected Body ESP MAC:  08:D1:F9:DC:C3:A4\n");
+    Serial.printf("[ESP-NOW] Expected Body ESP MAC:  E8:06:90:DD:7E:18\n");
     Serial.printf("[ESP-NOW] Expected M5Atom MAC:    30:83:98:E2:C7:64\n");
   }
 }
@@ -320,15 +322,20 @@ void handleBodyESPMessage(const bodyESP_message_t &msg) {
     Serial.printf("[PLAYBACK] Stress level %d, Vibe: %s, Zuigen: %s received during playback\n", 
                   msg.stressLevel, msg.vibeOn ? "ON" : "OFF", msg.zuigenOn ? "ON" : "OFF");
     
-    // Convert stress level (1-7) to speed step (0-6)
+    // Convert stress level (1-7) to speed step (0-7) - FIXED voor max playback
     extern uint8_t g_speedStep;
     extern bool paused;
     
-    // Map stress level (1-7) to speed step (0-6)
-    g_speedStep = msg.stressLevel - 1;  // 1->0, 2->1, ..., 7->6
+    // // Map stress level (1-7) to speed step (0-6) - OUDE FORMULE
+    // g_speedStep = msg.stressLevel - 1;  // 1->0, 2->1, ..., 7->6
+    // if (g_speedStep > 6) g_speedStep = 6;
     
-    // Clamp to valid range (0-6, max speed step is 7)
-    if (g_speedStep > 6) g_speedStep = 6;
+    // NIEUWE: Map stress 1-7 → speed 0-7 (8 stappen)
+    // Stress 1 → 0, Stress 2 → 1, Stress 3 → 3, Stress 4 → 4, Stress 5 → 5, Stress 6 → 6, Stress 7 → 7
+    g_speedStep = msg.stressLevel;  // Direct: 1->1, 2->2, ..., 7->7
+    if (g_speedStep > 0) g_speedStep--;  // Shift naar 0-based: 1->0, 2->1, ..., 7->6
+    if (msg.stressLevel == 7) g_speedStep = 7;  // Stress 7 = MAX speed 7
+    if (g_speedStep > 7) g_speedStep = 7;  // Safety cap
     
     // Update vibe status voor playback
     vibeState = msg.vibeOn;
