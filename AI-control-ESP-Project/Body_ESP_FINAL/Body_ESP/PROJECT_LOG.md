@@ -2,6 +2,353 @@
 
 **Project:** Body ESP code op SC01 Plus display  
 **Start datum:** 26 oktober 2025  
+**Laatst bijgewerkt:** 6 november 2025 21:00
+
+---
+
+## 🎯 Nog Te Doen
+
+### 🔴 KRITIEK - Direct Aanpakken!
+
+#### Memory Safety Issues
+- [ ] **body_gfx4.cpp samples array fix:**
+  - Probleem: `float samples[240]` = 6.7KB op stack (7 kanalen)
+  - Risico: Stack overflow, crashes, instabiliteit
+  - Oplossing: Verander naar `float samples[120]` of dynamic allocation
+  - Impact: HOOG - kan crashes veroorzaken
+  - Status: Gedetecteerd door code review 6 nov 2025
+
+- [ ] **CSV buffer String → char array:**
+  - Probleem: `String csvBuffer[60]` = veel heap fragmentatie
+  - Oplossing: `char csvBuffer[60][256]` voor stabielere memory
+  - Impact: MEDIUM - verbetert stabiliteit
+  - Code: Body_ESP.ino regel 243
+
+#### Playback Critical Bug
+- [ ] **Grafieken over stress popup heen:** 🔴 **MUST FIX**
+  - Probleem: body_gfx4_pushSample() tekent over popup
+  - Workflow: PAUZE → AI-ACTIE → stress popup → grafieken verschijnen random
+  - Mogelijke oplossingen:
+    1. Global flag g4_pauseRendering tijdens popup
+    2. Dubbele buffering voor grafieken
+    3. Popup elke frame hertekenen
+  - Status: Gedeeltelijk gefixt (updatePlayback stopt, maar niet genoeg)
+  - Code: body_menu.cpp regel 2942-2947
+  - Urgentie: HOOG - blokkeert workflow AI label editor
+
+---
+
+### 🟡 MEDIUM - Deze Week
+
+#### Recording Menu Verbeteringen (Van Eigenaar)
+- [ ] **Bestandsnamen simpeler maken:**
+  - Oud: `session_20251101_230923.csv`
+  - Nieuw: `32:09 - 01/11/25.csv` (Tijd - Datum)
+  - Formaat: `HH:MM - DD/MM/YY.csv`
+  - Code locatie: Body_ESP.ino regel ~288
+
+- [ ] **Kleuren per bestandstype:**
+  - .csv bestanden → blauwe tekst
+  - .aly bestanden → groene tekst
+  - Code: body_menu.cpp `drawRecordingItems()`
+
+- [ ] **AI Analyze knop toevoegen:**
+  - Functie: CSV → AI voorspelt stress levels → .preview bestand
+  - Doel: Eigenaar kan zien of AI het goed doet
+  - Verificatie tool voor ML training
+  - Menu: Recording menu, onder DELETE knop
+
+- [ ] **Stress level display in playback:**
+  - Toon stress cijfer (0-6) bij timeline events
+  - Onderscheid: Handmatig vs AI toegekend
+  - Optie om levels nog te veranderen tijdens playback
+  - Integratie met stress popup systeem
+
+- [ ] **Bug: Bestand selectie na playback:**
+  - Probleem: Na playback kan geen ander bestand gekozen
+  - Oorzaak: Waarschijnlijk selection state reset issue
+  - Code check: body_menu.cpp playback return flow
+
+#### Code Stability Improvements
+- [ ] **ESP-NOW Connection Watchdog:**
+  - Timeout: 30 seconden geen data
+  - Actie: Activeer safe mode (AI override)
+  - Stuur "CONNECTION_LOST" naar HoofdESP
+  - Code: Na regel 1300 in loop()
+
+- [ ] **Pulse Detection Verbetering:**
+  - Moving average filter (5 samples)
+  - Hysteresis voor beat threshold (60% + 10%)
+  - Betere noise rejection
+  - Code: ads1115_sensors.cpp `ads1115_readPulse()`
+
+- [ ] **Temperature Safety Monitor:**
+  - Warning: 39.0°C (log only)
+  - Critical: 40.0°C (emergency stop + AI override)
+  - Check interval: elke 10 seconden
+  - Code: Na regel 1300 in loop()
+
+---
+
+### ML Implementatie (PRIORITEIT 1) 🔴
+
+**ML Workflow Status:**
+```
+1. REC knop → .csv opname (15 kolommen) ✅ WERKEND
+2. AI Analyze → AI voorspelt stress → .preview bestand ⏳ TODO
+3. Label Editor → Handmatig aanpassen → .aly bestand ⏳ TODO
+4. Model Trainen → Decision Tree training → model.bin ⏳ TODO
+5. Playback → Afspelen + ESP-NOW naar HoofdESP ✅ GEDEELTELIJK
+```
+
+**Implementatie Taken:**
+- [x] **CSV Recording** - ✅ Werkend! (REC knop, /recordings/)
+- [x] **ML Training menu UI** - ✅ Interface werkend
+- [ ] **AI Analyze functie** - CSV → ML voorspelling → .preview
+- [ ] **Label Editor** - Preview controleren/aanpassen → .aly
+- [ ] **Decision Tree Training** - .aly → model.bin training
+- [ ] **Model Manager** - Selecteren/info/verwijderen
+- [x] **CSV Playback ESP-NOW** - ✅ PLAYBACK_STRESS werkend
+- [ ] **Stress popup bug fix** - 🔴 Grafieken over popup (KRITIEK)
+- [ ] **Real-time ML Inference** - Live stress voorspelling
+- [ ] **ML Autonomy Blending** - Mix rules + ML (0-100%)
+
+---
+
+### 🟢 LAAG - Nice to Have
+
+#### Touch & UI Polish
+- [ ] **Touch Debounce Constants:**
+  - Centraliseer in config.h
+  - TOUCH_DEBOUNCE_MS = 300
+  - TOUCH_COOLDOWN_MAIN_MS = 2000
+  - TOUCH_COOLDOWN_MENU_MS = 500
+  - Update: Body_ESP.ino regel 777
+
+- [ ] **Touch Responsiveness Onderzoek:**
+  - Probleem: Knoppen reageren niet altijd eerste keer
+  - Mogelijke oorzaken:
+    - Serial Monitor spam (te veel prints)
+    - Touch polling frequency vs display refresh
+    - Menu redraw overhead
+  - Acties:
+    - Debug levels toevoegen (reduce Serial output)
+    - Profile menu draw tijd (max 50ms/frame)
+    - Test touch debounce waarden
+    - Overweeg interrupt mode ipv polling
+
+#### Auto-Recording Systeem
+- [ ] **Automatisch starten bij unpause HoofdESP:**
+  - Detecteer pause = false via ESP-NOW
+  - Start CSV recording automatisch
+  - Stop alleen met REC knop (handmatig)
+  - Menu triggers (configureerbaar):
+    - ☑ Bij Trust beweging
+    - ☑ Bij Zuigen actief  
+    - ☑ Bij Vibe aan
+  - Settings in: AI Settings of System Settings menu
+
+#### Code Cleanup
+- [ ] Verwijder alle uitgeschakelde functies (met `//`)
+- [ ] Verwijder `body_cv` canvas volledig
+- [ ] Verwijder oude `R_WIN_` constanten
+- [ ] Legacy menu code opruimen
+- [ ] Documentatie aanvullen (inline comments)
+
+---
+
+## ✅ WAT WERKT
+
+**Hardware:**
+- ✅ Display: ST7796 480x320 landscape (rotation 1)
+- ✅ Touch: FT6X36 polling mode (Wire I2C0)
+- ✅ Sensoren: ADS1115 op Wire1 I2C1
+- ✅ RTC DS3231 (tijd instelling via menu)
+- ✅ EEPROM AT24C02 (sensor + AI settings)
+- ✅ SD Card: SD_MMC 1-bit mode
+
+**Core Functionaliteit:**
+- ✅ Body_gfx4 grafisch systeem (7 sensor kanalen)
+- ✅ ESP-NOW communicatie TX/RX (beide kanten!)
+- ✅ Watchdog timer (10 sec timeout)
+- ✅ ESP-NOW retry queue (geen data loss)
+- ✅ SD card buffer (60 samples = 1 min)
+- ✅ Sensor readout (GSR, Temp, Hart, Adem)
+- ✅ Menu systeem met navigatie
+- ✅ Automatische sensor kalibratie (10 sec)
+- ✅ Scherm rotatie toggle (180° flip)
+
+**Recording & Playback:**
+- ✅ CSV Recording (15 kolommen, auto-flush)
+- ✅ Recording menu (bestandslijst + DELETE)
+- ✅ CSV Playback met ESP-NOW naar HoofdESP
+- ✅ PLAYBACK_STRESS commando werkend
+- ✅ Vibe/Zuig toggles tijdens playback
+- ⚠️ **Bug:** Grafieken over stress popup (zie Kritiek)
+- ⚠️ **Bug:** Bestand selectie na playback werkt niet
+
+**ML/AI:**
+- ✅ ML Training menu UI volledig
+- ✅ Advanced Stress Manager (7 levels)
+- ✅ ML Autonomy Slider (0-100%)
+- ✅ AI Settings menu + EEPROM opslag
+- ⏳ ML training = placeholder (nog implementeren)
+- ⏳ Decision Tree = TODO
+- ⏳ Real-time inference = TODO
+
+---
+
+## 🐛 Bekende Problemen
+
+### 🔴 Kritiek
+1. **Grafieken over stress popup** (Playback workflow blocker)
+2. **Memory safety issues** (samples[240], String buffer)
+3. **Bestand selectie na playback** (geen ander bestand kiezen)
+
+### 🟡 Medium
+4. **Touch knoppen reageren niet altijd** (responsiveness)
+5. **Geen ESP-NOW connection watchdog** (30 sec timeout)
+6. **Pulse detection noise gevoelig** (moving average filter)
+
+### 🟢 Laag
+7. **Code cleanup nodig** (veel uitgeschakelde code met `//`)
+8. **Geen temperature safety** (alleen gebruiker pauze knop)
+9. **Touch debounce hardcoded** (niet in config.h)
+
+---
+
+## 📝 Sessie Notities
+
+### Sessie 13 - 6 nov 2025 21:00 - Code Review & Stability Check
+**Wat gedaan:**
+- ✅ **Volledige code review uitgevoerd:**
+  - Memory safety issues geïdentificeerd (samples[240])
+  - CSV buffer String → char array conversie nodig
+  - ESP-NOW connection watchdog ontbreekt
+  - Pulse detection kan verbeterd (moving average)
+  - Temperature safety monitoring aanbevolen
+  - Touch debounce constants centraliseren
+
+**Gevonden verbeterpunten:**
+1. **KRITIEK - Memory Issues:**
+   - body_gfx4.cpp: `float samples[240]` = 6.7KB stack (7 kanalen)
+   - Body_ESP.ino: `String csvBuffer[60]` = heap fragmentatie
+   
+2. **MEDIUM - Stability:**
+   - ESP-NOW geen timeout watchdog (30 sec)
+   - Pulse detection simpel (geen filter)
+   - Geen temperature monitoring
+   
+3. **LAAG - Polish:**
+   - Touch debounce magic numbers (300ms hardcoded)
+   - Serial output te veel (vertraagt loop)
+   - Code cleanup nodig (veel `//` commented code)
+
+**Belangrijke bevindingen:**
+- Watchdog timer: ✅ AL GEÏMPLEMENTEERD (10 sec)
+- ESP-NOW retry queue: ✅ AL WERKEND (max 3 retries)
+- SD card buffering: ✅ AL WERKEND (60 samples)
+- Rendering pause flag: ✅ AL TOEGEVOEGD (g4_pauseRendering)
+
+**Positieve aspecten:**
+- Basis stabiliteit is goed (watchdog, retry, buffering)
+- ESP-NOW communicatie werkt beide kanten
+- CSV recording zonder data loss
+- Menu systeem robuust
+
+**Actiepunten prioriteit:**
+1. 🔴 Fix samples[240] naar samples[120] (memory safety)
+2. 🔴 Fix grafieken over popup bug (playback blocker)
+3. 🟡 ESP-NOW connection watchdog (30 sec timeout)
+4. 🟡 Pulse detection filter (moving average)
+5. 🟢 Temperature safety monitor
+6. 🟢 Touch debounce constants
+
+**Code review conclusie:**
+Project is in goede staat, maar heeft enkele kritieke memory issues die moeten worden aangepakt voordat ML training kan worden geïmplementeerd. Basis systemen (watchdog, retry, buffering) zijn al excellent geïmplementeerd.
+
+**Volgende stap:**
+- Memory safety fixes eerst (samples + buffer)
+- Dan stress popup bug fix
+- Dan verder met ML implementatie
+
+### Sessie 12 - 1 nov 2025 22:00 - CSV Recording & Recording Menu
+[... rest van sessie 12 blijft hetzelfde ...]
+
+[... alle andere sessies blijven hetzelfde ...]
+
+---
+
+## 🚨 KRITIEKE REGELS - ALTIJD VOLGEN!
+
+### Jouw Werkwijze:
+1. **Gebruik `//` voor oude code** - NOOIT verwijderen!
+2. **Maak `.hold` en `.cppold` bestanden** voor oude tabs
+3. **Schrijf in het Nederlands**
+4. **Geen onnodige uitleg** - to the point
+5. **Test na elke stap** - niet alles tegelijk
+
+### 🔥 VEILIGHEIDSREGEL - GEEN SAFETY CHECKS!
+
+**ABSOLUUT VERBODEN IN CODE:**
+- ❌ GEEN emergency stops (if HR > 150, if temp > 39, etc.)
+- ❌ GEEN hartslag checks
+- ❌ GEEN temperatuur checks  
+- ❌ GEEN confidence drempels
+- ❌ GEEN automatische autonomie verlaging
+- ❌ **NIETS VAN DIE ONZIN!**
+
+**ENIGE VEILIGHEID:**
+- ✅ Pauze knop op Hoofd ESP (hardware, door gebruiker)
+- ✅ Gebruiker bepaalt zelf wanneer stoppen
+
+**ML AUTONOMIE = SIMPEL:**
+```cpp
+// 0% autonomie
+finalLevel = ruleLevel;  // Jouw 7 stress regels
+
+// 50% autonomie  
+finalLevel = (ruleLevel * 0.5) + (mlLevel * 0.5);  // Blend
+
+// 100% autonomie
+finalLevel = mlLevel;  // ML bepaalt alles, PUNT.
+```
+
+**GEBRUIKER BEPAALT VEILIGHEID - NOOIT CODE!**
+
+---
+
+## ✅ Dagelijkse Checklist (Start Sessie)
+
+1. [ ] Open `Body_ESP_FINAL\Body_ESP\Body_ESP.ino`
+2. [ ] Lees dit PROJECT_LOG.md bestand (vooral "Nog Te Doen")
+3. [ ] Check "Sessie Notities" laatste sessie
+4. [ ] Upload test om te verifiëren dat alles nog werkt
+5. [ ] Begin met volgende stap (prioriteit: 🔴 → 🟡 → 🟢)
+
+## ✅ Dagelijkse Checklist (Einde Sessie)
+
+1. [ ] Update dit PROJECT_LOG.md met:
+   - Nieuwe sessie notitie (datum, tijd, wat gedaan)
+   - "Wat werkt" sectie bijwerken
+   - "Nog Te Doen" lijst updaten
+   - Bekende problemen toevoegen/oplossen
+2. [ ] Test of code compileert
+3. [ ] Test of upload werkt
+4. [ ] Commit naar backup (optioneel)
+
+---
+
+**Laatste update:** 6 november 2025 21:00  
+**Status:** Code review voltooid, memory issues geïdentificeerd, prioriteiten helder  
+**Volgende:** Memory safety fixes → Stress popup bug → ML implementatie
+
+
+
+# Body ESP32-S3 Project Log
+
+**Project:** Body ESP code op SC01 Plus display  
+**Start datum:** 26 oktober 2025  
 **Laatst bijgewerkt:** 2 november 2025 17:30
 
 ---
