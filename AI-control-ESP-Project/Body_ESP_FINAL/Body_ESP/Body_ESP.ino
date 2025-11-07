@@ -8,6 +8,8 @@
   - Serial output met touch coordinaten
 */
 
+// TEST 2025-11-07
+
 // ========== TOUCH CALIBRATIE INSTELLINGEN ==========
 // METHODE 1: Gebruik rotatie (makkelijk)
 // 0 = 0°   (portrait)
