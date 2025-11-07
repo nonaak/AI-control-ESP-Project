@@ -1,3 +1,5 @@
+// TEST 123
+
 /*
   SC01 Plus Touch Test - FT6336U Calibratie
   
@@ -7,8 +9,6 @@
   - Teken witte pixels waar je aanraakt
   - Serial output met touch coordinaten
 */
-
-// TEST 2025-11-07
 
 // ========== TOUCH CALIBRATIE INSTELLINGEN ==========
 // METHODE 1: Gebruik rotatie (makkelijk)
