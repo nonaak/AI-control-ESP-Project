@@ -2,16 +2,6 @@
 #include "display.h"
 
 // ------------------ Display pinout ------------------
-// // Old SPI ST7789 pinout (commented for Jingcai RGB)
-// const int LCD_DC   = 2;
-// const int LCD_CS   = 15;
-// const int LCD_SCK  = 14;
-// const int LCD_MOSI = 13;
-// const int LCD_MISO = GFX_NOT_DEFINED;
-// const int LCD_RST  = -1;
-// const int LCD_ROT  = 1;           // landscape
-// const int LCD_BL   = 27;
-
 // Jingcai ESP32-4827S043 RGB parallel pins
 const int LCD_DC   = GFX_NOT_DEFINED;
 const int LCD_CS   = GFX_NOT_DEFINED;
@@ -23,11 +13,7 @@ const int LCD_ROT  = 0;           // no rotation for RGB
 const int LCD_BL   = 2;           // backlight pin
 
 // ------------------ GFX + Canvas ------------------
-// // Old SPI bus (commented for Jingcai RGB)
-// Arduino_DataBus *bus = new Arduino_ESP32SPI(LCD_DC, LCD_CS, LCD_SCK, LCD_MOSI, LCD_MISO);
-// Arduino_GFX     *gfx = new Arduino_ST7789(bus, LCD_RST, LCD_ROT, true /*IPS*/);
-
-// Jingcai RGB parallel bus (480x272 ILI6485) - oude library syntax
+// Jingcai RGB parallel bus (480x272 ILI6485) - FIXED bounce buffer size
 Arduino_ESP32RGBPanel *bus = new Arduino_ESP32RGBPanel(
     40 /* DE */, 41 /* VSYNC */, 39 /* HSYNC */, 42 /* PCLK */,
     45 /* R0 */, 48 /* R1 */, 47 /* R2 */, 21 /* R3 */, 14 /* R4 */,
@@ -36,30 +22,21 @@ Arduino_ESP32RGBPanel *bus = new Arduino_ESP32RGBPanel(
     0 /* hsync_polarity */, 8 /* hsync_front_porch */, 4 /* hsync_pulse_width */, 43 /* hsync_back_porch */,
     0 /* vsync_polarity */, 8 /* vsync_front_porch */, 4 /* vsync_pulse_width */, 12 /* vsync_back_porch */,
     1 /* pclk_active_neg */, 9000000 /* prefer_speed */, true /* auto_flush */,
-    0 /* de_idle_high */, 0 /* pclk_idle_high */, 16000000 /* max_transfer_sz */);
+    0 /* de_idle_high */, 0 /* pclk_idle_high */, 15360 /* max_transfer_sz = 16 lines (FIXED!) */);
 
 Arduino_GFX *gfx = new Arduino_RGB_Display(480 /* width */, 272 /* height */, bus);
 
 // Linker paneel (scaled for 480x272)
-// // Old pinout for 320x240:
-// const int L_PANE_W = 108;
-// const int L_PANE_H = 196;
-// const int L_PANE_X = 4;
-// const int L_PANE_Y = 44;
 const int L_PANE_W = 200;
 const int L_PANE_H = 272;
 const int L_PANE_X = 10;
 const int L_PANE_Y = 0;
 
 // Binnenmarges + header (pijl-zone)
-// // const int L_PAD      = 6;
-// // const int L_HEADER_H = 36;
 const int L_PAD      = 12;
 const int L_HEADER_H = 70;   // ruimte voor pijl
 
 // Animatie-canvas
-// // const int L_CANVAS_W = L_PANE_W - 2 * L_PAD;   // 96
-// // const int L_CANVAS_H = 136;
 const int L_CANVAS_W = L_PANE_W - 2 * L_PAD;   // 176
 const int L_CANVAS_H = 170;
 const int L_CANVAS_X = L_PANE_X + L_PAD;
@@ -68,10 +45,6 @@ const int L_CANVAS_Y = L_PANE_Y + L_PAD + L_HEADER_H;
 Arduino_Canvas  *cv  = new Arduino_Canvas(L_CANVAS_W, L_CANVAS_H, gfx, L_CANVAS_X, L_CANVAS_Y);
 
 // Rechter menu-paneel (scaled for 480x272)
-// // const int R_WIN_X = L_PANE_X + L_PANE_W;
-// // const int R_WIN_Y = 0;
-// // const int R_WIN_W = 320 - R_WIN_X;
-// // const int R_WIN_H = 240;
 const int R_WIN_X = L_PANE_X + L_PANE_W;
 const int R_WIN_Y = 0;
 const int R_WIN_W = 480 - R_WIN_X;
