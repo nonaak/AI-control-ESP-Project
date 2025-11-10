@@ -1,20 +1,16 @@
 #pragma once
 #include <Arduino.h>
-// Arduino_GFX includes VERWIJDERD - gebruiken nu LovyanGFX!
+#include <Arduino_GFX_Library.h>
+#include <canvas/Arduino_Canvas.h>
 #include "fonts.h"
 #include "config.h"
 
-// Forward declarations voor LovyanGFX wrappers
-class DisplayWrapper;
-class CanvasWrapper;
-
-// Externe GFX objecten (nu LovyanGFX wrappers)
-extern DisplayWrapper  *gfx;
-extern CanvasWrapper   *cv;
+// Externe GFX objecten
+extern Arduino_GFX     *gfx;
+extern Arduino_Canvas  *cv;
 
 // Pinout/rotatiewaarden worden in display.cpp gezet
-// (Niet meer nodig voor LovyanGFX maar houden voor compatibiliteit)
-extern const int LCD_BL;
+extern const int LCD_DC, LCD_CS, LCD_SCK, LCD_MOSI, LCD_MISO, LCD_RST, LCD_ROT, LCD_BL;
 
 // Geometrie linker/rechter paneel (waardes in display.cpp)
 extern const int L_PANE_W, L_PANE_H, L_PANE_X, L_PANE_Y;
