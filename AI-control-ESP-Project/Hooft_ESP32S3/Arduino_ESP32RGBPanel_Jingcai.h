@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _ARDUINO_ESP32RGBPANEL_H_
+#define _ARDUINO_ESP32RGBPANEL_H_
 
 // ESP_LCD_Panel implementation for esp32s3.
 
@@ -147,3 +148,5 @@ private:
 };
 
 #endif // #if defined(ESP32) && (CONFIG_IDF_TARGET_ESP32S3)
+
+#endif // _ARDUINO_ESP32RGBPANEL_H_
