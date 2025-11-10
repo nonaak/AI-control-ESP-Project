@@ -1,5 +1,6 @@
 #include <math.h>
 #include "display.h"
+#include "Arduino_ESP32RGBPanel_Jingcai.h"  // ← TOEGEVOEGD!
 
 // ------------------ Display pinout ------------------
 // Jingcai ESP32-4827S043 RGB parallel pins
@@ -13,23 +14,18 @@ const int LCD_ROT  = 0;           // no rotation for RGB
 const int LCD_BL   = 2;           // backlight pin
 
 // ------------------ GFX + Canvas ------------------
-// Arduino_GFX 1.6.2 + ESP32 3.3.3 - CORRECTE SYNTAX!
-// Geen max_transfer_sz parameter meer - wordt automatisch berekend
+// Jingcai RGB parallel bus (480x272 ILI6485) - Arduino_GFX 1.6.2 syntax
 Arduino_ESP32RGBPanel *bus = new Arduino_ESP32RGBPanel(
-    GFX_NOT_DEFINED /* CS */, GFX_NOT_DEFINED /* SCK */, GFX_NOT_DEFINED /* SDA */,
     40 /* DE */, 41 /* VSYNC */, 39 /* HSYNC */, 42 /* PCLK */,
     45 /* R0 */, 48 /* R1 */, 47 /* R2 */, 21 /* R3 */, 14 /* R4 */,
     5 /* G0 */, 6 /* G1 */, 7 /* G2 */, 15 /* G3 */, 16 /* G4 */, 4 /* G5 */,
     8 /* B0 */, 3 /* B1 */, 46 /* B2 */, 9 /* B3 */, 1 /* B4 */,
-    1 /* hsync_polarity */, 8 /* hsync_front_porch */, 4 /* hsync_pulse_width */, 43 /* hsync_back_porch */,
-    1 /* vsync_polarity */, 8 /* vsync_front_porch */, 4 /* vsync_pulse_width */, 12 /* vsync_back_porch */,
-    1 /* pclk_active_neg */, 14000000 /* prefer_speed */, true /* auto_flush */);
+    0 /* hsync_polarity */, 8 /* hsync_front_porch */, 4 /* hsync_pulse_width */, 43 /* hsync_back_porch */,
+    0 /* vsync_polarity */, 8 /* vsync_front_porch */, 4 /* vsync_pulse_width */, 12 /* vsync_back_porch */,
+    1 /* pclk_active_neg */, 9000000 /* prefer_speed */, true /* auto_flush */,
+    0 /* de_idle_high */, 0 /* pclk_idle_high */, 0 /* bounce_buffer_size_px */);  // ← GEWIJZIGD!
 
-Arduino_GFX *gfx = new Arduino_RGB_Display(
-    480 /* width */, 272 /* height */, 
-    bus, 
-    0 /* rotation */, 
-    true /* auto_flush */);
+Arduino_GFX *gfx = new Arduino_RGB_Display(480 /* width */, 272 /* height */, bus);
 
 // Linker paneel (scaled for 480x272)
 const int L_PANE_W = 200;
