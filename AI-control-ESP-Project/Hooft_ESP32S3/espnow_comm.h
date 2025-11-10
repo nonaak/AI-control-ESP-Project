@@ -227,7 +227,3 @@ void handleBodyESPBioFeedback(const bodyESP_message_t &msg);
 void handleBodyESPSafetyOverride(const bodyESP_message_t &msg);
 void handleBodyESPComfortAdjust(const bodyESP_message_t &msg);
 void processAIDecisions(const bodyESP_message_t &msg);
-
-// Keon integration sync functions
-void syncKeonToAnimation();                      // Sync met animatie speed/direction
-void syncKeonToStressLevel(uint8_t stressLevel); // Sync met Body ESP stress level

@@ -11,7 +11,6 @@
 #include "vacuum.h"
 #include "display.h"
 #include "settings.h"
-#include "keon.h"
 
 // --------- C-knop events ----------
 enum CEvent : uint8_t { CE_NONE=0, CE_SHORT=1, CE_LONG=2 };
@@ -173,15 +172,13 @@ bool  paused   = true;
 static bool  parkToBottom = false;
 static float capY_draw    = 0.0f;
 
-// bool keonConnected   = false;  // Now defined in keon.cpp
-extern bool keonConnected;
+bool keonConnected   = false;
 bool solaceConnected = false;
 bool motionConnected = false;
 bool bodyConnected   = false;
 
 // Vibe status voor M5StickC Plus (bit 3 in ESP-NOW flags)
 bool vibeState = false;
-bool suctionState = false;  // Suction symbol status
 
 // Sleeve percentage voor Body_ESP synchronisatie
 float getSleevePercentage() {
@@ -207,8 +204,8 @@ float getSleevePercentage() {
   return max(0.0f, min(100.0f, percentage));  // Clamp 0-100%
 }
 
-// // Suction status - currently tied to zuigen state
-// bool suctionState = false;  // VERWIJDERD: dubbele definitie (al op regel 184)
+// Suction status - currently tied to zuigen state
+bool suctionState = false;
 
 // Connection popup variables
 static bool connectionPopupOpen = false;
@@ -228,10 +225,6 @@ static void startKeonConnection() {
   Serial.println("[CONNECTION] Starting Keon connection attempt...");
   connectionInProgress = true;
   connectionStartTime = millis();
-  
-  // Call real Keon connect in background
-  extern bool keonConnect();
-  keonConnect();
 }
 
 static bool checkKeonConnectionProgress() {
@@ -239,22 +232,37 @@ static bool checkKeonConnectionProgress() {
   
   uint32_t elapsed = millis() - connectionStartTime;
   
-  // Give it time to connect
-  if (elapsed < KEON_CONNECTION_TIMEOUT_MS) {
-    return false;  // Still connecting
+  // Simulate connection process stages
+  if (elapsed < 1000) {
+    // Still connecting...
+    return false;
+  } else if (elapsed < 1200) {
+    // Connection attempt completed
+    connectionInProgress = false;
+    
+    // Simulate success/failure (70% success rate)
+    bool success = (random(100) < 70);
+    
+    if (success) {
+      Serial.println("[CONNECTION] Keon handshake successful");
+      Serial.println("[CONNECTION] Keon connected successfully");
+      return true;
+    } else {
+      Serial.println("[CONNECTION] Keon handshake failed");
+      Serial.println("[CONNECTION] Keon connection failed - device not responding");
+      return false;
+    }
   }
   
-  // Check result
-  connectionInProgress = false;
-  extern bool keonConnected;
-  return keonConnected;
+  return false; // Still in progress
 }
 
 static void disconnectKeon() {
   if (keonConnected) {
     Serial.println("[CONNECTION] Disconnecting from Keon...");
-    extern void keonDisconnect();
-    keonDisconnect();
+    // Send disconnect command to device
+    Serial.println("[CONNECTION] Sending disconnect signal to Keon");
+    delay(200); // Simulate disconnect time
     keonConnected = false;
     Serial.println("[CONNECTION] Keon disconnected");
   }
@@ -1523,10 +1531,8 @@ if (LCD_BL >= 0) {
   digitalWrite(LCD_BL, HIGH);
 }
 
-  // // cv->begin() causes RGB panel slot conflict - commented for Jingcai RGB
   cv->begin();
-  cv->fillScreen(CFG.COL_BG);
-  cv->flush();
+  cv->fillScreen(CFG.COL_BG); cv->flush();
 
   uiMode  = MODE_MENU;
   paused  = true;
@@ -1639,12 +1645,8 @@ void uiTick() {
     menuEdit = false; colorEdit=false; paletteOpen=false;
     drawRightMenu();
   } else if (cev==CE_SHORT && !paletteOpen){
-    if (!paused) {
-      parkToBottom = true;
-      // Park Keon at bottom when pausing
-      extern void keonParkToBottom();
-      keonParkToBottom();
-    } else { 
+    if (!paused) parkToBottom = true;
+    else { 
       paused = false; parkToBottom = false; 
       // CRISPY FIX: Reset velEMA voor onmiddellijke auto vacuum response na unpause
       velEMA = 0.0f;
@@ -2031,10 +2033,6 @@ void uiTick() {
   // Sync suctionState with pompUnitZuigActive for visual indicators
   extern bool pompUnitZuigActive;
   suctionState = pompUnitZuigActive;
-  
-  // Sync Keon animation if connected
-  extern void syncKeonToAnimation();
-  syncKeonToAnimation();
   
   // ================= CONTINUE ANIMATIE RENDERING =================
   // Animation calculations moved to auto vacuum section above

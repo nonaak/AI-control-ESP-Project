@@ -1,6 +1,5 @@
 #pragma once
 #include <Arduino.h>
-#include "Arduino_ESP32RGBPanel_Jingcai.h"
 #include <Arduino_GFX_Library.h>
 #include <canvas/Arduino_Canvas.h>
 #include "fonts.h"
