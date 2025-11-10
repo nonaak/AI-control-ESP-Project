@@ -1,6 +1,7 @@
 // ESP_LCD_Panel implementation for esp32s3.
 
-#include "Arduino_ESP32RGBPanel.h"
+//#include "Arduino_ESP32RGBPanel.h"
+#include "Arduino_ESP32RGBPanel_Jingcai.h"
 
 //#if defined(ESP32) && (CONFIG_IDF_TARGET_ESP32S3)
 #if defined(ESP32) && (CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32P4)  //Modify
@@ -44,6 +45,15 @@ bool Arduino_ESP32RGBPanel::begin(int32_t speed)
 
 uint16_t *Arduino_ESP32RGBPanel::getFrameBuffer(int16_t w, int16_t h)
 {
+
+// FIX VOOR JINGCAI 480x272: Forceer correcte bounce buffer size
+// Frame buffer = 480 * 272 * 2 = 261,120 bytes  
+// 16 regels = 480 * 16 = 7,680 pixels (15,360 bytes) - perfect deelbaar!
+size_t fixed_bounce_buffer = _bounce_buffer_size_px;
+if (fixed_bounce_buffer == 0 && w == 480 && h == 272) {
+    fixed_bounce_buffer = 480 * 16;  // 7,680 pixels voor Jingcai board
+}
+
   esp_lcd_rgb_panel_config_t panel_config = {
 #if (!defined(ESP_ARDUINO_VERSION_MAJOR)) || (ESP_ARDUINO_VERSION_MAJOR < 3)
       .clk_src = LCD_CLK_SRC_PLL160M,
@@ -73,7 +83,15 @@ uint16_t *Arduino_ESP32RGBPanel::getFrameBuffer(int16_t w, int16_t h)
 #else
       .bits_per_pixel = 16,
       .num_fbs = 1,
-      .bounce_buffer_size_px = _bounce_buffer_size_px,
+      .bounce_buffer_size_px = fixed_bounce_buffer,
+      //.bounce_buffer_size_px = _bounce_buffer_size_px,
+      // FIX VOOR JINGCAI 480x272: Zorg dat bounce buffer een deler is van frame buffer
+      // Frame buffer = 480 * 272 * 2 = 261,120 bytes
+      // 16 regels = 480 * 16 pixels = 7,680 pixels = 15,360 bytes (perfect deelbaar!)
+      //if (panel_config.bounce_buffer_size_px == 0) {
+    //panel_config.bounce_buffer_size_px = 480 * 16;  // = 7,680 pixels
+//}
+
 #endif
       .sram_trans_align = 8,
       .psram_trans_align = 64,

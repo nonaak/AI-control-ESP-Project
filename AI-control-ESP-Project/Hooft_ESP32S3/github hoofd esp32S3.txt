@@ -57,3 +57,6 @@ https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP32S3/vacuum.cpp
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP32S3/vacuum.h
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP32S3/visuals.h
+
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP32S3/Arduino_ESP32RGBPanel_Jingcai.cpp
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP32S3/Arduino_ESP32RGBPanel_Jingcai.h
