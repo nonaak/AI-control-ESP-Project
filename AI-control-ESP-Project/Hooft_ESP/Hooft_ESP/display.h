@@ -34,6 +34,6 @@ void drawZigzagSegment(int x1, int y1, int x2, int y2, uint16_t mainColor, uint1
 // Suction symbol effects
 void drawSuctionSymbol(bool leftSide);
 
-// External states
+// External states (defined in ui.cpp)
 extern bool vibeState;
 extern bool suctionState;

@@ -234,22 +234,21 @@ bool keonIsConnected() {
 }
 
 /**
- * Check connection state and attempt reconnect if needed
+ * Check connection state - ULTRA LIGHTWEIGHT!
  * CALL THIS IN YOUR MAIN LOOP!
  * 
- * AUTO-RECONNECT IS DISABLED to prevent ESP freezing!
- * User must manually connect via menu.
+ * Only checks connection status, no reconnect logic.
+ * This ensures animation keeps running smoothly.
  */
 void keonCheckConnection() {
-  // Check if still connected
-  if (keonConnected && keonClient != nullptr && !keonClient->isConnected()) {
-    Serial.println("[KEON] Connection lost!");
-    keonConnected = false;
-    keonTxCharacteristic = nullptr;
+  // Ultra-fast connection check (no blocking!)
+  if (keonConnected && keonClient != nullptr) {
+    if (!keonClient->isConnected()) {
+      keonConnected = false;
+      keonTxCharacteristic = nullptr;
+      Serial.println("[KEON] Connection lost - reconnect via menu");
+    }
   }
-  
-  // AUTO-RECONNECT DISABLED - prevents ESP freezing with ESP-NOW
-  // User must manually reconnect via menu
 }
 
 /**
@@ -270,40 +269,40 @@ void keonReconnect() {
 /**
  * Sync Keon movement with HoofdESP animation
  * 
- * Velocity/Direction Mapping:
- * - isMovingUp=true  → Keon naar BOVEN (99)
- * - isMovingUp=false → Keon naar BENEDEN (0)
- * - Speed follows animation speed step (0-7 → 0-99)
+ * Simple 1:1 mapping:
+ * - Keon follows sleeve position exactly (0-99 full range)
+ * - Tempo is determined by animation speed (slow → fast)
+ * - Just like the on-screen animation!
  */
-void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, bool isMovingUp) {
+void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, float sleevePercentage) {
   if (!keonConnected) return;
 
   static uint8_t lastPosition = 50;
-  static uint8_t lastSpeed = 0;
-  static bool lastDirection = false;
   static uint32_t lastSyncTime = 0;
-  const uint32_t SYNC_INTERVAL_MS = 100;  // 10Hz updates
+  const uint32_t SYNC_INTERVAL_MS = 100;  // 10Hz to avoid blocking animation
 
   uint32_t now = millis();
   
-  // Rate limit
+  // Rate limit to prevent blocking main loop
   if ((now - lastSyncTime) < SYNC_INTERVAL_MS) {
     return;
   }
   
-  // Calculate speed (0-99)
-  uint8_t speed = (speedSteps <= 1) ? 0 : (speedStep * 99) / (speedSteps - 1);
-  if (speed > 99) speed = 99;
-
-  // Map direction to position
-  uint8_t position = isMovingUp ? 99 : 0;
+  // Map sleeve percentage (0-100) directly to Keon position (0-99)
+  // FULL RANGE at all speeds, just like the animation!
+  uint8_t position = (uint8_t)(sleevePercentage * 0.99f);
+  if (position > 99) position = 99;
   
-  // Only send if state changed
-  if (position != lastPosition || speed != lastSpeed || isMovingUp != lastDirection) {
-    keonMove(position, speed);
+  // Keon speed: always 99 for instant response
+  // The TEMPO is controlled by animation frequency (speedStep affects animation Hz)
+  uint8_t keonSpeed = 99;
+  
+  // Only send if position changed (reduce BLE traffic)
+  int posDiff = abs((int)position - (int)lastPosition);
+  
+  if (posDiff >= 2) {  // Small threshold to reduce jitter
+    keonMove(position, keonSpeed);
     lastPosition = position;
-    lastSpeed = speed;
-    lastDirection = isMovingUp;
     lastSyncTime = now;
   }
 }

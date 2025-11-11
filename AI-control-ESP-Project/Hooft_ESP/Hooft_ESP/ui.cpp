@@ -1835,8 +1835,8 @@ void uiTick() {
   // Sync Keon to animation if connected
   if (keonConnected && !paused) {
     extern uint8_t g_speedStep;
-    bool isMovingUp = (velEMA < 0.0f);
-    keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, isMovingUp);
+    float sleevePercent = getSleevePercentage();
+    keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
   }
 
   if (parkToBottom && capY_draw < (float)CAP_Y_IN) {
@@ -1865,6 +1865,13 @@ void uiTick() {
     cv->fillScreen(CFG.COL_BG);
     drawSleeveFixedTop(capYnow, CFG.COL_TAN);
     drawRodFromCap_Vinside_NoSeam(capYnow, DRAW_BASELINE_Y, rodCol, 0xE946);
+    
+    // Draw vibe and suction indicators
+    drawVibeLightning(true);   // Left side - bottom half
+    drawVibeLightning(false);  // Right side - bottom half
+    drawSuctionSymbol(true);   // Left side - top half
+    drawSuctionSymbol(false);  // Right side - top half
+    
     cv->flush();
     drawVacArrowHeader(goingUp);
   }
