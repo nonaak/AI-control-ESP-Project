@@ -60,4 +60,23 @@ https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/keon_ble.cpp
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/keon_ble.h
 
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/AI_OVERRIDE_SYSTEM_SUMMARY.md
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/CHANNEL_FIX.md
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/COMPILE_FIXES.md
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/ESP_NOW_HoofdESP_TODO.txt
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/readme_project.md
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/KEON_SIMPLE_SYNC_README.md
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/LED_CONTROL_SUMMARY.md
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/LIBRARIES_NEEDED.txt
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/README_ESP_NOW.md
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/README_KEON_SYNC_DEBUG.md
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/readme_project.md
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/README_SYMBOLS_FIXED.md
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/README_WORKING_KEON.md
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP/
+
+
+
+
+
 

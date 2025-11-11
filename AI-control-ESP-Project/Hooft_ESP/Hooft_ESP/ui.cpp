@@ -1829,14 +1829,27 @@ void uiTick() {
   prevArrowFull = goingUp;
 
   // ========== KEON UPDATE (NEW) ==========
-  // Check Keon connection (auto-reconnect if needed)
+  // Check connection status (lightweight)
   keonCheckConnection();
   
-  // Sync Keon to animation if connected
-  if (keonConnected && !paused) {
-    extern uint8_t g_speedStep;
-    float sleevePercent = getSleevePercentage();
-    keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
+  // Only sync Keon when animation is actually running
+  if (keonConnected) {
+    if (paused) {
+      // Animation paused → Keon should be at bottom and still
+      static bool hasParked = false;
+      if (!hasParked) {
+        keonParkToBottom();
+        hasParked = true;
+      }
+    } else {
+      // Animation running → Sync Keon to exact sleeve position
+      static bool hasParked = false;
+      hasParked = false;  // Reset flag when unpaused
+      
+      extern uint8_t g_speedStep;
+      float sleevePercent = getSleevePercentage();
+      keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
+    }
   }
 
   if (parkToBottom && capY_draw < (float)CAP_Y_IN) {

@@ -125,6 +125,7 @@ bool keonMoveFast(uint8_t position) {
  */
 void keonParkToBottom() {
   if (!keonConnected) return;
+  Serial.println("[KEON] Parking to bottom (paused)");
   keonMove(0, 0);  // Bottom position, speed 0
 }
 
@@ -273,12 +274,22 @@ void keonReconnect() {
  * - Keon follows sleeve position exactly (0-99 full range)
  * - Tempo is determined by animation speed (slow → fast)
  * - Just like the on-screen animation!
+ * 
+ * IMPORTANT: This should ONLY be called when animation is running!
  */
 void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, float sleevePercentage) {
   if (!keonConnected) return;
+  
+  // Extra safety: Don't sync if paused (this should never happen, but just in case)
+  extern bool paused;
+  if (paused) {
+    Serial.println("[KEON SYNC] ERROR: Called while paused!");
+    return;
+  }
 
   static uint8_t lastPosition = 50;
   static uint32_t lastSyncTime = 0;
+  static uint32_t lastDebugTime = 0;
   const uint32_t SYNC_INTERVAL_MS = 100;  // 10Hz to avoid blocking animation
 
   uint32_t now = millis();
@@ -304,6 +315,13 @@ void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, float sleevePerc
     keonMove(position, keonSpeed);
     lastPosition = position;
     lastSyncTime = now;
+    
+    // Debug output every 2 seconds
+    if (now - lastDebugTime > 2000) {
+      Serial.printf("[KEON SYNC] Pos:%u Speed:%u SleevePercent:%.1f speedStep:%u\n", 
+                    position, keonSpeed, sleevePercentage, speedStep);
+      lastDebugTime = now;
+    }
   }
 }
 
