@@ -1,4 +1,4 @@
-# HoofdESP LED Control Implementatie ✅ COMPLEET
+# HoofdESP LED Control Implementatie ✅ COMPLEET. LED IS EEN TRILL MOTOR!!!
 
 ## Overzicht
 De HoofdESP code is succesvol uitgebreid om M5Atom LED control te ondersteunen via ESP-NOW communicatie. Nu worden de LED statussen automatisch doorgestuurd naar de M5Atom.

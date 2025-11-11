@@ -7,7 +7,7 @@ void setup() {
   uiInit();
   
   // Initialize ESP-NOW communication
-  initESPNow();
+  initESPNow(); // mss uitzetten om te kijken of er geen ruzie is met keon en esp-now
   
   Serial.println("[SYSTEM] HoofdESP ready - ESP-NOW system online");
   Serial.println("[SYSTEM] MAC: E4:65:B8:7A:85:E4 - Channel: 4");
