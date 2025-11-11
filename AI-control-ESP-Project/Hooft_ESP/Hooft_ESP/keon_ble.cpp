@@ -236,17 +236,20 @@ bool keonIsConnected() {
 /**
  * Check connection state and attempt reconnect if needed
  * CALL THIS IN YOUR MAIN LOOP!
+ * 
+ * AUTO-RECONNECT IS DISABLED to prevent ESP freezing!
+ * User must manually connect via menu.
  */
 void keonCheckConnection() {
-  if (!keonConnected) {
-    uint32_t now = millis();
-    
-    // Try reconnect every 5 seconds
-    if ((now - lastKeonReconnectAttempt) > KEON_RECONNECT_INTERVAL_MS) {
-      Serial.println("[KEON] Attempting auto-reconnect...");
-      keonConnect();
-    }
+  // Check if still connected
+  if (keonConnected && keonClient != nullptr && !keonClient->isConnected()) {
+    Serial.println("[KEON] Connection lost!");
+    keonConnected = false;
+    keonTxCharacteristic = nullptr;
   }
+  
+  // AUTO-RECONNECT DISABLED - prevents ESP freezing with ESP-NOW
+  // User must manually reconnect via menu
 }
 
 /**
