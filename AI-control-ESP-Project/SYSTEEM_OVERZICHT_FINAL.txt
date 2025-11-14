@@ -4367,3 +4367,5 @@ En deze documentatie is je roadmap. 🗺️
                         [Versie: 1.0 - Implementation Ready]
                                     
 ═══════════════════════════════════════════════════════════════════════════════
+
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/SYSTEEM_OVERZICHT_FINAL.txt
