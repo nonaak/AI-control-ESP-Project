@@ -11,10 +11,6 @@
 #include "vacuum.h"
 #include "display.h"
 #include "settings.h"
-#include "keon_ble.h"  // NEW: Keon BLE support
-
-// ========== KEON SYNC (NEW) ==========
-// Keon sync happens in keonSyncToAnimation() called from uiTick()
 
 // --------- C-knop events ----------
 enum CEvent : uint8_t { CE_NONE=0, CE_SHORT=1, CE_LONG=2 };
@@ -43,9 +39,10 @@ enum ZEvent : uint8_t { ZE_NONE=0, ZE_SHORT=1, ZE_LONG=2 };
 static inline ZEvent pollZEvent(bool zNow){
   static bool     zPrev=false;
   static uint32_t t0=0, lastEdge=0;
-  const uint16_t LONG_MS=3000, DEB_MS=35;
+  const uint16_t LONG_MS=3000, DEB_MS=35;  // 3 seconden voor lange druk
   uint32_t now=millis();
   if (zNow!=zPrev && (now-lastEdge)<DEB_MS) {
+    // Debounce - ignore
   } else if (zNow!=zPrev){
     lastEdge = now;
     if (zNow) {
@@ -68,6 +65,7 @@ static inline ZEvent pollZEvent(bool zNow){
   return ZE_NONE;
 }
 
+// Legacy Z-knop edge functie (behouden voor compatibiliteit)
 static inline bool pollZEdge(bool zNow){
   ZEvent ze = pollZEvent(zNow);
   return (ze == ZE_SHORT);
@@ -80,10 +78,11 @@ static inline ZClickType pollZClick(bool zNow){
   static uint32_t firstClickTime = 0;
   static bool waitingForSecond = false;
   static uint32_t lastEdge = 0;
-  const uint16_t DOUBLE_CLICK_MS = CFG.doubleClickTiming;
+  const uint16_t DOUBLE_CLICK_MS = CFG.doubleClickTiming;  // Configureerbaar in config.h
   const uint16_t DEB_MS = 35;
   uint32_t now = millis();
   
+  // Debounce
   if (zNow != zPrev && (now - lastEdge) < DEB_MS) {
     return Z_NONE;
   }
@@ -91,18 +90,21 @@ static inline ZClickType pollZClick(bool zNow){
   if (zNow != zPrev) {
     lastEdge = now;
     
-    if (!zNow) {
+    if (!zNow) {  // Button released (click detected)
       if (!waitingForSecond) {
+        // First click
         firstClickTime = now;
         waitingForSecond = true;
         Serial.println("[Z-CLICK] First click detected, waiting for second...");
       } else {
+        // Second click binnen tijd
         if ((now - firstClickTime) <= DOUBLE_CLICK_MS) {
           waitingForSecond = false;
           Serial.println("[Z-VIBE] Vibe detected!");
           zPrev = zNow;
           return Z_VIBE;
         } else {
+          // Te laat voor double click, nieuwe eerste click
           firstClickTime = now;
           Serial.println("[Z-CLICK] Second click too late, treating as new first click");
         }
@@ -111,6 +113,7 @@ static inline ZClickType pollZClick(bool zNow){
     zPrev = zNow;
   }
   
+  // Check timeout voor single click
   if (waitingForSecond && (now - firstClickTime) > DOUBLE_CLICK_MS) {
     waitingForSecond = false;
     Serial.println("[Z-CLICK] Single click confirmed (timeout)");
@@ -121,16 +124,21 @@ static inline ZClickType pollZClick(bool zNow){
 }
 
 // ================== Menu text helpers ==================
+// Helper function to print text with clipping to avoid overlap with animation
 void printClippedText(const char* text, int maxWidth = 0) {
-  if (maxWidth <= 0) maxWidth = R_WIN_W - 25;
+  if (maxWidth <= 0) maxWidth = R_WIN_W - 25; // Default max width with margin
   
   String str = String(text);
+  
+  // Check if text fits - rough estimation (6 pixels per char for font size 1)
   int estimatedWidth = str.length() * 6;
   
   if (estimatedWidth <= maxWidth) {
+    // Text fits - print normally
     gfx->print(text);
   } else {
-    int maxChars = (maxWidth - 18) / 6;
+    // Text too long - truncate with "..."
+    int maxChars = (maxWidth - 18) / 6;  // Reserve space for "..."
     if (maxChars > 3) {
       String truncated = str.substring(0, maxChars) + "...";
       gfx->print(truncated);
@@ -140,6 +148,7 @@ void printClippedText(const char* text, int maxWidth = 0) {
   }
 }
 
+// Helper function to print formatted text with clipping
 void printfClipped(const char* format, ...) {
   char buffer[128];
   va_list args;
@@ -163,16 +172,17 @@ bool  paused   = true;
 static bool  parkToBottom = false;
 static float capY_draw    = 0.0f;
 
+bool keonConnected   = false;
 bool solaceConnected = false;
 bool motionConnected = false;
 bool bodyConnected   = false;
 
-// NOTE: keonConnected is defined in keon_ble.cpp!
-// We only use extern declaration in ui.h
-
+// Vibe status voor M5StickC Plus (bit 3 in ESP-NOW flags)
 bool vibeState = false;
 
+// Sleeve percentage voor Body_ESP synchronisatie
 float getSleevePercentage() {
+  // Bereken sleeve positie percentage gebaseerd op capY_draw
   const int BL = L_CANVAS_H - 4;
   const int MIN_ROD_VIS_IN = max(2, (int)round(12*1.25f) - 4);
   const int CAP_Y_OUT_BASE = 2;
@@ -183,39 +193,38 @@ float getSleevePercentage() {
   int CAP_Y_IN  = (int)round(CAP_Y_MID + (CAP_Y_IN_BASE  - CAP_Y_MID) * RANGE_SCALE);
   int CAP_Y_OUT = (int)round(CAP_Y_MID + (CAP_Y_OUT_BASE - CAP_Y_MID) * RANGE_SCALE);
   
+  // Huidige sleeve positie (uit animatie of parking)
   float s = 0.5f * (sinf(phase) + 1.0f);
   float ease = schlick_gain(CFG.easeGain, s);
   int capY_phase = (int)round((float)CAP_Y_IN + ease*(float)(CAP_Y_OUT - CAP_Y_IN));
   int capY = parkToBottom ? (int)round(capY_draw) : (!paused ? capY_phase : (int)round(capY_draw));
   
+  // Converteer naar percentage: CAP_Y_IN = 0%, CAP_Y_OUT = 100%
   float percentage = ((float)(CAP_Y_IN - capY)) / (float)(CAP_Y_IN - CAP_Y_OUT) * 100.0f;
-  return max(0.0f, min(100.0f, percentage));
+  return max(0.0f, min(100.0f, percentage));  // Clamp 0-100%
 }
 
+// Suction status - currently tied to zuigen state
 bool suctionState = false;
 
+// Connection popup variables
 static bool connectionPopupOpen = false;
-static int connectionDeviceIdx = -1; // 0=Keon (NEW), 1=Solace
-static int connectionChoiceIdx = 0;
+static int connectionDeviceIdx = -1; // 0=Keon, 1=Solace
+static int connectionChoiceIdx = 0; // 0=Ja, 1=Nee
 
+// Nunchuk help popup variables
 static bool nunchukHelpPopupOpen = false;
 
+// Connection attempt tracking
 static bool connectionInProgress = false;
 static uint32_t connectionStartTime = 0;
-static const uint32_t CONNECTION_TIMEOUT_MS = 5000;
+static const uint32_t CONNECTION_TIMEOUT_MS = 5000; // 5 second timeout
 
-// ========== KEON CONNECTION (NEW) ==========
+// Non-blocking connection attempt functions
 static void startKeonConnection() {
   Serial.println("[CONNECTION] Starting Keon connection attempt...");
   connectionInProgress = true;
   connectionStartTime = millis();
-  
-  // Start actual BLE connection
-  if (keonConnect()) {
-    keonConnected = true;
-    connectionInProgress = false;
-    Serial.println("[KEON] Connected successfully!");
-  }
 }
 
 static bool checkKeonConnectionProgress() {
@@ -223,34 +232,42 @@ static bool checkKeonConnectionProgress() {
   
   uint32_t elapsed = millis() - connectionStartTime;
   
+  // Simulate connection process stages
   if (elapsed < 1000) {
+    // Still connecting...
     return false;
   } else if (elapsed < 1200) {
+    // Connection attempt completed
     connectionInProgress = false;
     
-    if (keonIsConnected()) {
-      keonConnected = true;
-      Serial.println("[KEON] Connection handshake successful");
+    // Simulate success/failure (70% success rate)
+    bool success = (random(100) < 70);
+    
+    if (success) {
+      Serial.println("[CONNECTION] Keon handshake successful");
+      Serial.println("[CONNECTION] Keon connected successfully");
       return true;
     } else {
-      Serial.println("[KEON] Connection failed - device not responding");
+      Serial.println("[CONNECTION] Keon handshake failed");
+      Serial.println("[CONNECTION] Keon connection failed - device not responding");
       return false;
     }
   }
   
-  return false;
+  return false; // Still in progress
 }
 
 static void disconnectKeon() {
   if (keonConnected) {
     Serial.println("[CONNECTION] Disconnecting from Keon...");
-    keonDisconnect();
+    // Send disconnect command to device
+    Serial.println("[CONNECTION] Sending disconnect signal to Keon");
+    delay(200); // Simulate disconnect time
     keonConnected = false;
     Serial.println("[CONNECTION] Keon disconnected");
   }
 }
 
-// ========== SOLACE CONNECTION (KEPT) ==========
 static void startSolaceConnection() {
   Serial.println("[CONNECTION] Starting Solace connection attempt...");
   connectionInProgress = true;
@@ -262,11 +279,15 @@ static bool checkSolaceConnectionProgress() {
   
   uint32_t elapsed = millis() - connectionStartTime;
   
+  // Simulate connection process stages (Solace takes slightly longer)
   if (elapsed < 1200) {
+    // Still connecting...
     return false;
   } else if (elapsed < 1400) {
+    // Connection attempt completed
     connectionInProgress = false;
     
+    // Simulate success/failure (75% success rate for Solace)
     bool success = (random(100) < 75);
     
     if (success) {
@@ -280,19 +301,21 @@ static bool checkSolaceConnectionProgress() {
     }
   }
   
-  return false;
+  return false; // Still in progress
 }
 
 static void disconnectSolace() {
   if (solaceConnected) {
     Serial.println("[CONNECTION] Disconnecting from Solace...");
+    // Send disconnect command to device
     Serial.println("[CONNECTION] Sending disconnect signal to Solace");
-    delay(200);
+    delay(200); // Simulate disconnect time
     solaceConnected = false;
     Serial.println("[CONNECTION] Solace disconnected");
   }
 }
 
+// Nunchuk
 static Nunchuk nchuk;
 static bool    nkReady = false;
 
@@ -310,7 +333,6 @@ static void setMenuFontTitle(){
   gfx->setTextSize(2);
 #endif
 }
-
 static void setMenuFontItem(){
 #if USE_ADAFRUIT_FONTS
   gfx->setFont(&FONT_ITEM);
@@ -325,9 +347,11 @@ static void setMenuFontItem(){
 enum ColorItemType { C_RGB565, C_U8TRIPLE };
 struct ColorItem { const char *label; ColorItemType type; uint16_t *p565; uint8_t *pr,*pg,*pb; };
 
-uint16_t g_targetStrokes = 30;
-float    g_lubeHold_s    = 0.5f;
-float    g_startLube_s   = 0.5f;
+uint16_t g_targetStrokes = 30;  // Removed static for ESP-NOW access
+float    g_lubeHold_s    = 0.5f;  // Made extern for settings.cpp
+float    g_startLube_s   = 0.5f;  // Made extern for settings.cpp
+
+// NOTE: Persistent settings are now handled by settings.h/settings.cpp
 
 static ColorItem COLORS[] = {
   {"Frame buiten",        C_RGB565,   &CFG.COL_FRAME2,  nullptr,nullptr,nullptr},
@@ -370,7 +394,6 @@ static void applyTempToTarget_globalIndex(int gi){
   if (ci.type == C_RGB565) *ci.p565 = u8_to_RGB565(tempR,tempG,tempB);
   else { *ci.pr = tempR; *ci.pg = tempG; *ci.pb = tempB; }
 }
-
 static void beginColorEdit_globalIndex(int gi){
   int idx = toColorIndex(gi);
   if (idx < 0 || idx >= COLORS_COUNT) return;
@@ -399,12 +422,10 @@ static void beginColorEdit_globalIndex(int gi){
 
   applyTempToTarget_globalIndex(editingGlobalIdx);
 }
-
 static void commitColorEdit_globalIndex(int gi){ 
   applyTempToTarget_globalIndex(gi); 
-  saveAllSettings();
+  saveAllSettings(); // Save color changes to flash
 }
-
 static void cancelColorEdit_globalIndex(int gi){
   int idx = toColorIndex(gi);
   if (idx < 0 || idx >= COLORS_COUNT) return;
@@ -412,7 +433,6 @@ static void cancelColorEdit_globalIndex(int gi){
   if (backupIs565 && ci.type==C_RGB565) *ci.p565 = backup565;
   else if (!backupIs565 && ci.type==C_U8TRIPLE){ *ci.pr = backupR; *ci.pg = backupG; *ci.pb = backupB; }
 }
-
 static void resetColorsToDefault(){
   CFG.COL_BG       = DEF_COL_BG;
   CFG.COL_FRAME    = DEF_COL_FRAME;
@@ -426,7 +446,7 @@ static void resetColorsToDefault(){
   CFG.SPEEDBAR_BORDER = DEF_SPEED_BORDER;
   CFG.COL_BRAND    = DEF_COL_BRAND;
   CFG.COL_MENU_PINK= DEF_MENU_PINK;
-  saveAllSettings();
+  saveAllSettings(); // Save color reset to flash
 }
 
 static int colorsVisibleRows(){
@@ -436,7 +456,6 @@ static int colorsVisibleRows(){
   int usable = (R_WIN_H - (topY - R_WIN_Y)) - bottomHint;
   int vis = usable / LH; if (vis < 1) vis = 1; return vis;
 }
-
 static void ensureColorsScrollVisible(){
   int vis = colorsVisibleRows();
   int total = colorsTotalItems();
@@ -492,8 +511,9 @@ static void drawPalettePopup(){
 }
 
 static void setMenuTitleAndItems(){
+  // "INSTELLINGEN" en "MOTION BLEND" kleiner (item-font), exact zoals gevraagd
   if (currentPage == PAGE_SETTINGS || currentPage == PAGE_MOTION || currentPage == PAGE_AUTO_VACUUM || currentPage == PAGE_SMERING) setMenuFontItem();
-  else setMenuFontTitle();
+  else                              setMenuFontTitle();
 
   gfx->setTextColor(0xFFFF, CFG.COL_BG);
   gfx->setCursor(R_WIN_X+20, R_WIN_Y+36);
@@ -563,8 +583,11 @@ static void drawVacuumEditPopup(){
   gfx->drawRoundRect(bx+1, by+1, bw-2, bh-2, 5, CFG.COL_FRAME);
 
   setMenuFontItem(); gfx->setTextColor(0xFFFF, CFG.COL_BG);
-  const char* label = "Target Vacuum"; 
+  const char* label;
   char value[32];
+  
+  // Alleen Vacuum Level edit nog mogelijk
+  label = "Target Vacuum"; 
   snprintf(value, sizeof(value), "T:%.0f", abs(CFG.vacuumTargetMbar));
 
   gfx->setCursor(bx+10, by+17); gfx->print(label);
@@ -691,15 +714,18 @@ static void drawConnectionPopup(){
   const char* deviceName = (connectionDeviceIdx == 0) ? "Keon" : "Solace";
   bool isConnected = (connectionDeviceIdx == 0) ? keonConnected : solaceConnected;
   
+  // Center popup on screen
   int bx = R_WIN_X + 20;
   int by = R_WIN_Y + 80;
   int bw = R_WIN_W - 40;
-  int bh = connectionInProgress ? 100 : 80;
+  int bh = connectionInProgress ? 100 : 80;  // Larger popup if connecting
   
+  // Draw popup background
   gfx->fillRoundRect(bx, by, bw, bh, 8, CFG.COL_BG);
   gfx->drawRoundRect(bx, by, bw, bh, 8, CFG.COL_FRAME2);
   gfx->drawRoundRect(bx+1, by+1, bw-2, bh-2, 7, CFG.COL_FRAME);
   
+  // Title
   setMenuFontItem();
   gfx->setTextColor(0xFFFF, CFG.COL_BG);
   gfx->setCursor(bx + 10, by + 20);
@@ -711,12 +737,15 @@ static void drawConnectionPopup(){
   gfx->print(deviceName);
   gfx->print("?");
   
+  // Show connection status or options
   if (connectionInProgress) {
+    // Show connection progress
     setMenuFontItem();
     gfx->setTextColor(0xFFFF, CFG.COL_BG);
     gfx->setCursor(bx + 10, by + 45);
     gfx->print("Verbinden...");
     
+    // Show animated dots
     static uint32_t lastDotUpdate = 0;
     static int dotCount = 0;
     if (millis() - lastDotUpdate > 300) {
@@ -729,13 +758,15 @@ static void drawConnectionPopup(){
       gfx->print(".");
     }
     
+    // Connection timeout check
     if (millis() - connectionStartTime > CONNECTION_TIMEOUT_MS) {
       connectionInProgress = false;
-      gfx->setTextColor(0xF800, CFG.COL_BG);
+      gfx->setTextColor(0xF800, CFG.COL_BG); // Red for failed
       gfx->setCursor(bx + 10, by + 85);
       gfx->print("Verbinding mislukt!");
     }
   } else {
+    // Show normal options
     const int optY = by + 40;
     const int optSpacing = 60;
     
@@ -751,6 +782,7 @@ static void drawConnectionPopup(){
     }
   }
   
+  // Help text
   gfx->setFont(nullptr); gfx->setTextSize(1);
   gfx->setTextColor(0x8410, CFG.COL_BG);
   gfx->setCursor(bx + 10, by + bh - 12);
@@ -764,21 +796,25 @@ static void drawConnectionPopup(){
 static void drawNunchukHelpPopup(){
   if (!nunchukHelpPopupOpen) return;
   
+  // Center popup op scherm
   int bx = R_WIN_X + 10;
   int by = R_WIN_Y + 30;
   int bw = R_WIN_W - 20;
   int bh = R_WIN_H - 60;
   
+  // Popup achtergrond
   gfx->fillRoundRect(bx, by, bw, bh, 8, CFG.COL_BG);
   gfx->drawRoundRect(bx, by, bw, bh, 8, CFG.COL_FRAME2);
   gfx->drawRoundRect(bx+1, by+1, bw-2, bh-2, 7, CFG.COL_FRAME);
   
+  // Title - kleinere font
   gfx->setFont(nullptr);
   gfx->setTextSize(2);
   gfx->setTextColor(CFG.COL_BRAND, CFG.COL_BG);
   gfx->setCursor(bx + 10, by + 20);
   gfx->print("Nunchuk Knoppen");
   
+  // Help tekst - gebruik kleinere font
   gfx->setFont(nullptr);
   gfx->setTextSize(1);
   gfx->setTextColor(0xFFFF, CFG.COL_BG);
@@ -815,13 +851,12 @@ static void drawNunchukHelpPopup(){
   gfx->setCursor(bx + 20, textY); textY += lineH;
   gfx->print("- Lang: Animatie/Menu wissel");
   
+  // Help tekst onderaan
   gfx->setFont(nullptr); gfx->setTextSize(1);
   gfx->setTextColor(0x8410, CFG.COL_BG);
   gfx->setCursor(bx + 10, by + bh - 12);
   gfx->print("C: sluiten");
 }
-
-// ========== PAGE DRAWING FUNCTIONS ==========
 
 static void drawColorsPage(){
   gfx->fillRect(R_WIN_X, R_WIN_Y, R_WIN_W, R_WIN_H, CFG.COL_BG);
@@ -886,43 +921,50 @@ static void drawESPNowPage(){
   int y = R_WIN_Y + 60;
   const int LH = 20;
   
+  // Menu items
   for (int i=0; i<1; i++){
     bool sel = (uiMode==MODE_MENU && i==menuIdx);
     uint16_t col = sel ? 0x07E0 : CFG.COL_MENU_PINK;
     gfx->setTextColor(col, CFG.COL_BG);
     gfx->setCursor(R_WIN_X+20, y);
-    gfx->print("< Terug");
+    
+    switch(i){
+      case 0: gfx->print("< Terug"); break;
+    }
     y += LH;
   }
   
-  y += 10;
-  gfx->setTextColor(0x8410, CFG.COL_BG);
+  // Real-time telemetrie sectie
+  y += 10; // Extra ruimte
+  gfx->setTextColor(0x8410, CFG.COL_BG); // Grijze kleur voor telemetrie
   gfx->setCursor(R_WIN_X+20, y);
   printClippedText("== ESP Status ==");
   y += LH;
   
+  // Connection status - ESP-NOW modules
   gfx->setCursor(R_WIN_X+20, y);
-  uint16_t pumpColor = pumpUnit_connected ? 0x07E0 : 0xF800;
+  uint16_t pumpColor = pumpUnit_connected ? 0x07E0 : 0xF800; // Groen/Rood
   gfx->setTextColor(pumpColor, CFG.COL_BG);
   gfx->printf("Pump Unit: %s", pumpUnit_connected ? "ONLINE" : "OFFLINE");
   y += LH;
   
   gfx->setCursor(R_WIN_X+20, y);
-  uint16_t bodyColor = bodyESP_connected ? 0x07E0 : 0xF800;
+  uint16_t bodyColor = bodyESP_connected ? 0x07E0 : 0xF800; // Groen/Rood
   gfx->setTextColor(bodyColor, CFG.COL_BG);
   gfx->printf("Body ESP: %s", bodyESP_connected ? "ONLINE" : "OFFLINE");
   y += LH;
   
   gfx->setCursor(R_WIN_X+20, y);
-  uint16_t atomColor = motionConnected ? 0x07E0 : 0xF800;
+  uint16_t atomColor = motionConnected ? 0x07E0 : 0xF800; // Groen/Rood
   gfx->setTextColor(atomColor, CFG.COL_BG);
   gfx->printf("M5 Atom: %s", motionConnected ? "ONLINE" : "OFFLINE");
   y += LH;
   
+  // Motion sync info
   y += 10;
   gfx->setTextColor(0x8410, CFG.COL_BG);
   gfx->setCursor(R_WIN_X+20, y);
-  printClippedText("== Motion Control ==");
+  printClippedText("== ESP Status ==");
   y += LH;
   
   gfx->setCursor(R_WIN_X+20, y);
@@ -939,24 +981,30 @@ static void drawESPNowPage(){
   gfx->printf("Animation Speed: %d/%d", g_speedStep, CFG.SPEED_STEPS-1);
   y += LH;
   
+  // Hardware status sectie
   y += 10;
   gfx->setTextColor(0x8410, CFG.COL_BG);
   gfx->setCursor(R_WIN_X+20, y);
-  printClippedText("== Hardware ==");
+  printClippedText("== Motion Control ==");
   y += LH;
   
+  // Vacuum reading
   gfx->setCursor(R_WIN_X+20, y);
-  float currentVacuumMbar = currentVacuumReading / 0.75f;
+  float currentVacuumMbar = currentVacuumReading / 0.75f;  // Convert cmHg to mbar (1 mbar = 0.75 cmHg)
   gfx->printf("Vacuum: %.0f mbar", abs(currentVacuumMbar));
   y += LH;
   
+  // Pump status
   gfx->setCursor(R_WIN_X+20, y);
   gfx->printf("Vac Pump: %s", vacuumPumpStatus ? "AAN" : "UIT");
   y += LH;
   
+  // Lube pump status
   gfx->setCursor(R_WIN_X+20, y);
   gfx->printf("Lube Pump: %s", lubePumpStatus ? "AAN" : "UIT");
   y += LH;
+  
+  // Zuigen mode status - REMOVED to prevent overlap with animation
   
   gfx->setFont(nullptr); gfx->setTextSize(1); gfx->setTextColor(0x8410, CFG.COL_BG);
   gfx->setCursor(R_WIN_X+20, R_WIN_Y + R_WIN_H - 10);
@@ -974,6 +1022,7 @@ static void drawVacuumPage(){
   int y = R_WIN_Y + 60;
   const int LH = 20;
   
+  // Menu items
   for (int i=0; i<2; i++){
     bool sel = (uiMode==MODE_MENU && i==menuIdx);
     uint16_t col = sel ? 0x07E0 : CFG.COL_MENU_PINK;
@@ -987,6 +1036,7 @@ static void drawVacuumPage(){
     y += LH;
   }
   
+  // Status info - simplified
   y += 10;
   gfx->setTextColor(0x8410, CFG.COL_BG);
   gfx->setCursor(R_WIN_X+20, y);
@@ -997,6 +1047,7 @@ static void drawVacuumPage(){
   gfx->setCursor(R_WIN_X+20, R_WIN_Y + R_WIN_H - 10);
   printClippedText("Y:sel Z:edit C:menu");
   
+  // Toon edit popup als we in edit mode zijn
   drawVacuumEditPopup();
 }
 
@@ -1011,6 +1062,7 @@ static void drawAutoVacuumPage(){
   int y = R_WIN_Y + 60;
   const int LH = 20;
   
+  // Menu items
   for (int i=0; i<3; i++){
     bool sel = (uiMode==MODE_MENU && i==menuIdx);
     uint16_t col = sel ? 0x07E0 : CFG.COL_MENU_PINK;
@@ -1025,6 +1077,7 @@ static void drawAutoVacuumPage(){
     y += LH;
   }
   
+  // Status info
   y += 10;
   gfx->setTextColor(0x8410, CFG.COL_BG);
   gfx->setCursor(R_WIN_X+20, y);
@@ -1034,7 +1087,7 @@ static void drawAutoVacuumPage(){
   gfx->setCursor(R_WIN_X+20, y);
   extern uint8_t g_speedStep;
   bool speedDisabled = (g_speedStep >= CFG.autoVacuumSpeedThreshold);
-  uint16_t statusColor = speedDisabled ? 0xF800 : 0x07E0;
+  uint16_t statusColor = speedDisabled ? 0xF800 : 0x07E0; // Rood als uitgeschakeld door snelheid
   gfx->setTextColor(statusColor, CFG.COL_BG);
   
   if (!CFG.vacuumAutoMode) {
@@ -1058,6 +1111,7 @@ static void drawAutoVacuumPage(){
   gfx->setCursor(R_WIN_X+20, R_WIN_Y + R_WIN_H - 10);
   printClippedText("Y:sel Z:edit C:menu");
   
+  // Toon edit popup als we in edit mode zijn
   drawAutoVacuumEditPopup();
 }
 
@@ -1072,6 +1126,7 @@ static void drawSmeringPage(){
   int y = R_WIN_Y + 60;
   const int LH = 20;
   
+  // Menu items
   for (int i=0; i<4; i++){
     bool sel = (uiMode==MODE_MENU && i==menuIdx);
     uint16_t col = sel ? 0x07E0 : CFG.COL_MENU_PINK;
@@ -1087,6 +1142,7 @@ static void drawSmeringPage(){
     y += LH;
   }
   
+  // Status info
   y += 10;
   gfx->setTextColor(0x8410, CFG.COL_BG);
   gfx->setCursor(R_WIN_X+20, y);
@@ -1115,6 +1171,7 @@ static void drawSmeringPage(){
   gfx->setCursor(R_WIN_X+20, R_WIN_Y + R_WIN_H - 10);
   printClippedText("Y:sel Z:edit C:menu");
   
+  // Toon edit popup als we in edit mode zijn
   drawSmeringEditPopup();
 }
 
@@ -1129,6 +1186,7 @@ static void drawMotionPage(){
   int y = R_WIN_Y + 60;
   const int LH = 20;
   
+  // Menu items
   for (int i=0; i<5; i++){
     bool sel = (uiMode==MODE_MENU && i==menuIdx);
     uint16_t col = sel ? 0x07E0 : CFG.COL_MENU_PINK;
@@ -1145,6 +1203,7 @@ static void drawMotionPage(){
     y += LH;
   }
   
+  // Motion status info
   y += 10;
   gfx->setTextColor(0x8410, CFG.COL_BG);
   gfx->setCursor(R_WIN_X+20, y);
@@ -1169,7 +1228,7 @@ static void drawMotionPage(){
     printfClipped("Anim: %d/%d (%.0f%%+%.0f%%)", g_speedStep, CFG.SPEED_STEPS-1,
                 CFG.userSpeedWeight, CFG.motionSpeedWeight);
   } else {
-    gfx->setTextColor(0xFFE0, CFG.COL_BG);
+    gfx->setTextColor(0xFFE0, CFG.COL_BG); // Geel voor waarschuwing
     gfx->setCursor(R_WIN_X+20, y);
     printClippedText("Motion blend uit");
   }
@@ -1178,6 +1237,7 @@ static void drawMotionPage(){
   gfx->setCursor(R_WIN_X+20, R_WIN_Y + R_WIN_H - 10);
   printClippedText("Y:sel Z:edit C:menu");
   
+  // Toon edit popup als we in edit mode zijn
   drawMotionEditPopup();
 }
 
@@ -1206,8 +1266,8 @@ static void drawRightMenu(){
       gfx->setCursor(R_WIN_X+20, y);
 
       switch(i){
-        case 0: gfx->print("Keon"); drawStatusDot(DOT_X, y-8, keonConnected ? CFG.DOT_GREEN : CFG.DOT_RED, 4); break;  // NEW: Keon
-        case 1: gfx->print("Solace"); drawStatusDot(DOT_X, y-8, solaceConnected ? CFG.DOT_GREEN : CFG.DOT_RED, 4); break;  // KEPT: Solace
+        case 0: gfx->print("Keon"); drawStatusDot(DOT_X, y-8, keonConnected ? CFG.DOT_GREEN : CFG.DOT_RED, 4); break;
+        case 1: gfx->print("Solace"); drawStatusDot(DOT_X, y-8, solaceConnected ? CFG.DOT_GREEN : CFG.DOT_RED, 4); break;
         case 2: gfx->print("Motion"); drawStatusDot(DOT_X, y-8, motionConnected ? CFG.DOT_GREEN : CFG.DOT_RED, 4); break;
         case 3: gfx->print("ESP Status"); drawStatusDot(DOT_X, y-8, (pumpUnit_connected && bodyESP_connected && motionConnected) ? CFG.DOT_GREEN : CFG.DOT_RED, 4); break;
         case 4: gfx->print("Smering"); break;
@@ -1243,10 +1303,7 @@ static void drawRightMenu(){
   }
 }
 
-// PART 2 COMPLETE - Continue with part 3...
-
-// ========== MENU CONTROL ==========
-
+// ---------------- Menu besturing ----------------
 static void handleMenuY_colors(int jy){
   static uint32_t lastNav=0;
   const uint16_t NAV_MS=120;
@@ -1264,7 +1321,6 @@ static void handleMenuY_colors(int jy){
     if (moved){ lastNav=now; }
   }
 }
-
 static void handlePaletteX(int jx){
   static uint32_t lastNavX=0;
   const uint16_t NAV_MS=120;
@@ -1285,7 +1341,6 @@ static void handlePaletteX(int jx){
     drawRightMenu();
   }
 }
-
 static void handleMenuY(int jy){
   if (uiMode != MODE_MENU) return;
   if (currentPage == PAGE_COLORS){ handleMenuY_colors(jy); return; }
@@ -1296,7 +1351,7 @@ static void handleMenuY(int jy){
   if (now - lastNav < NAV_MS) return;
 
   const int JY_LO_M=70, JY_HI_M=180;
-  int maxIdx = (currentPage==PAGE_MAIN ? 7 : (currentPage==PAGE_SETTINGS ? 4 : (currentPage==PAGE_VACUUM ? 1 : (currentPage==PAGE_MOTION ? 4 : (currentPage==PAGE_ESPNOW ? 0 : (currentPage==PAGE_AUTO_VACUUM ? 2 : (currentPage==PAGE_SMERING ? 3 : 2)))))));
+  int maxIdx = (currentPage==PAGE_MAIN ? 7 : (currentPage==PAGE_SETTINGS ? 5 : (currentPage==PAGE_VACUUM ? 1 : (currentPage==PAGE_MOTION ? 4 : (currentPage==PAGE_ESPNOW ? 0 : (currentPage==PAGE_AUTO_VACUUM ? 2 : (currentPage==PAGE_SMERING ? 3 : 2)))))));
 
   if (!menuEdit) {
     if (jy > JY_HI_M && menuIdx > 0) { menuIdx--; drawRightMenu(); lastNav=now; return; }
@@ -1304,19 +1359,22 @@ static void handleMenuY(int jy){
   } else if (currentPage == PAGE_SMERING) {
     bool changed=false;
     if (menuIdx == 1) {
+      // Pushes/Lube target instelling
       bool strokesChanged = false;
       if (jy > JY_HI_M && g_targetStrokes < 999) { g_targetStrokes++; changed=true; strokesChanged=true; }
       if (jy < JY_LO_M && g_targetStrokes > 1)   { g_targetStrokes--; changed=true; strokesChanged=true; }
       
       if (strokesChanged) saveLubeSettings();
       
+      // Reset punch counter met lange Y joystick press naar beneden
       static uint32_t longPressStart = 0;
-      if (jy < JY_LO_M - 50) {
+      if (jy < JY_LO_M - 50) {  // Extra ver naar beneden
         if (longPressStart == 0) longPressStart = now;
-        else if (now - longPressStart > 3000) {
+        else if (now - longPressStart > 3000) {  // 3 seconden
           extern uint32_t punchCount;
           punchCount = 0;
           Serial.println("[RESET] Punch counter reset to 0");
+          // Note: punch counter is not saved - only settings are persistent
           changed = true;
           longPressStart = 0;
         }
@@ -1331,8 +1389,9 @@ static void handleMenuY(int jy){
       
       if (lubeChanged) saveLubeSettings();
       
+      // Als Lubrication tijd verhoogd wordt, trigger normale lube shot
       if (changed && g_lubeHold_s > prevLubeHold) {
-        extern void triggerLubeShot(float seconds);
+        extern void triggerLubeShot(float seconds); // Forward declaration  
         triggerLubeShot(g_lubeHold_s);
         Serial.printf("[UI] Lube shot geactiveerd voor %.1fs\n", g_lubeHold_s);
       }
@@ -1345,8 +1404,9 @@ static void handleMenuY(int jy){
       
       if (startLubeChanged) saveLubeSettings();
       
+      // Als Start-Lubric tijd verhoogd wordt, trigger lube pump
       if (changed && g_startLube_s > prevStartLube) {
-        extern void triggerStartLube(float seconds);
+        extern void triggerStartLube(float seconds); // Forward declaration  
         triggerStartLube(g_startLube_s);
         Serial.printf("[UI] Start-Lubric geactiveerd voor %.1fs\n", g_startLube_s);
       }
@@ -1360,51 +1420,59 @@ static void handleMenuY(int jy){
   } else if (currentPage == PAGE_VACUUM) {
     bool changed=false;
     if (menuIdx == 1) {
-      float vacLevel = abs(CFG.vacuumTargetMbar);
+      // Vacuum Level (1 tot 1000, stap 1 - intern opgeslagen als negatieve mbar)
+      float vacLevel = abs(CFG.vacuumTargetMbar);  // Converteer naar positieve waarde voor display
       if (jy > JY_HI_M && vacLevel < 1000.0f) { vacLevel += 1.0f; changed=true; }
       if (jy < JY_LO_M && vacLevel > 1.0f) { vacLevel -= 1.0f; changed=true; }
-      if (changed) CFG.vacuumTargetMbar = -vacLevel;
+      if (changed) CFG.vacuumTargetMbar = -vacLevel;  // Opslaan als negatieve waarde
     }
     
     if (changed) { 
       drawVacuumEditPopup(); 
       Serial.printf("[UI] Vacuum level changed to: %.1f mbar, saving...\n", CFG.vacuumTargetMbar);
-      saveAllSettings();
+      saveAllSettings(); // Save vacuum settings to flash
     }
     lastNav = now;
   } else if (currentPage == PAGE_MOTION) {
     bool changed=false;
     if (menuIdx == 1) {
+      // Motion Blend toggle
       if (jy > JY_HI_M || jy < JY_LO_M) { CFG.motionBlendEnabled = !CFG.motionBlendEnabled; changed=true; }
     } else if (menuIdx == 2) {
+      // Nunchuk Weight (0 tot 100%, stap 5%)
       if (jy > JY_HI_M) { CFG.userSpeedWeight += 5.0f; if (CFG.userSpeedWeight > 100.0f) CFG.userSpeedWeight=100.0f; changed=true; }
       if (jy < JY_LO_M) { CFG.userSpeedWeight -= 5.0f; if (CFG.userSpeedWeight < 0.0f) CFG.userSpeedWeight=0.0f; changed=true; }
     } else if (menuIdx == 3) {
+      // Motion Sensor Weight (0 tot 100%, stap 5%)
       if (jy > JY_HI_M) { CFG.motionSpeedWeight += 5.0f; if (CFG.motionSpeedWeight > 100.0f) CFG.motionSpeedWeight=100.0f; changed=true; }
       if (jy < JY_LO_M) { CFG.motionSpeedWeight -= 5.0f; if (CFG.motionSpeedWeight < 0.0f) CFG.motionSpeedWeight=0.0f; changed=true; }
     } else if (menuIdx == 4) {
+      // Direction Sync toggle
       if (jy > JY_HI_M || jy < JY_LO_M) { CFG.motionDirectionSync = !CFG.motionDirectionSync; changed=true; }
     }
     
     if (changed) { 
       drawMotionEditPopup();
-      saveAllSettings();
+      saveAllSettings(); // Save motion blend settings to flash
     }
     lastNav = now;
   } else if (currentPage == PAGE_AUTO_VACUUM) {
     bool changed=false;
     if (menuIdx == 1) {
+      // Auto Vacuum toggle
       if (jy > JY_HI_M || jy < JY_LO_M) { 
         CFG.vacuumAutoMode = !CFG.vacuumAutoMode; 
         changed=true; 
         Serial.printf("[VACUUM] Auto Vacuum %s\n", CFG.vacuumAutoMode ? "INGESCHAKELD" : "UITGESCHAKELD");
       }
     } else if (menuIdx == 2) {
+      // Speed Threshold (1 tot CFG.SPEED_STEPS-1)
       if (jy > JY_HI_M && CFG.autoVacuumSpeedThreshold < (CFG.SPEED_STEPS-1)) { 
         CFG.autoVacuumSpeedThreshold++; changed=true; 
       }
       if (jy < JY_LO_M && CFG.autoVacuumSpeedThreshold > 1) { 
-        CFG.autoVacuumSpeedThreshold--; changed=true; }
+        CFG.autoVacuumSpeedThreshold--; changed=true; 
+      }
       if (changed) {
         Serial.printf("[AUTO-VACUUM] Speed threshold set to %d (>= this speed disables auto vacuum)\n", CFG.autoVacuumSpeedThreshold);
       }
@@ -1412,14 +1480,15 @@ static void handleMenuY(int jy){
     
     if (changed) { 
       drawAutoVacuumEditPopup();
-      saveAllSettings();
+      saveAllSettings(); // Save auto vacuum settings to flash
     }
     lastNav = now;
   }
 }
 
-uint8_t g_speedStep = 0;
-static bool upArmed = true, downArmed = true;
+// ---------------- Nunchuk speed-steps ----------------
+uint8_t g_speedStep = 0;  // Removed static for ESP-NOW access
+static bool    upArmed = true, downArmed = true;
 static const int JY_MID_LOW  = 110;
 static const int JY_MID_HIGH = 146;
 
@@ -1430,24 +1499,37 @@ static void updateSpeedStepWithJoystick(int jy){
   else if (jy >= JY_MID_LOW && jy <= JY_MID_HIGH) { upArmed = downArmed = true; }
 }
 
+// ---------------- Animatie status ----------------
 static const float TAU = 6.2831853f;
 static uint32_t lastUs = 0;
 float    phase=0.0f;
-float    velEMA=0.0f;
+float    velEMA=0.0f;  // Made global for crispy unpause reset
 static int      prevCapY = INT_MIN;
 
+// ---------------- Setup/Loop wrappers ----------------
 void uiInit() {
   Serial.begin(115200); delay(30);
   
+  // Test flash storage first (can be disabled if it causes issues)
+  #define ENABLE_FLASH_TEST 0
+  #if ENABLE_FLASH_TEST
+  testFlashStorage();
+  #else
+  Serial.println("[INIT] Flash test skipped - proceeding with settings load");
+  #endif
+  
+  // Load persistent settings
+  Serial.println("[INIT] About to call loadAllSettings()...");
   loadAllSettings();
+  Serial.printf("[INIT] After loadAllSettings(), vacuumTargetMbar = %.1f\n", CFG.vacuumTargetMbar);
 
   gfx->begin();
   gfx->fillScreen(CFG.COL_BG);
-
-  if (LCD_BL >= 0) {
-    pinMode(LCD_BL, OUTPUT);
-    digitalWrite(LCD_BL, HIGH);
-  }
+// Backlight aan (LCD_BL is een const int, dus geen #ifdef gebruiken)
+if (LCD_BL >= 0) {
+  pinMode(LCD_BL, OUTPUT);
+  digitalWrite(LCD_BL, HIGH);
+}
 
   cv->begin();
   cv->fillScreen(CFG.COL_BG); cv->flush();
@@ -1462,14 +1544,15 @@ void uiInit() {
   nchuk.begin();
   for (int i=0;i<10 && !nkReady;i++){ nkReady = nchuk.connect(); if (!nkReady) delay(50); }
   
+  // Initialize vacuum system
   vacuumInit();
-  keonInit();  // NEW: Initialize Keon BLE
 
   drawLeftFrame();
   drawRightMenu();
   phase = -1.5707963f;
 
   int CAP_Y_IN, CAP_Y_OUT, DRAW_BASELINE_Y;
+  // zelfde berekening als monolith:
   const int BL = L_CANVAS_H - 4;
   const int MIN_ROD_VIS_IN = max(2, (int)round(12*1.25f) - 4);
   const int CAP_Y_OUT_BASE = 2;
@@ -1498,9 +1581,6 @@ void uiInit() {
 }
 
 void uiTick() {
-  // Guard: Skip one frame after popup closes to prevent residual C-events
-  static bool skipCEventThisFrame = false;
-
   bool cNow=false, zNow=false;
   int jy=128, jx=128;
 
@@ -1510,6 +1590,7 @@ void uiTick() {
     jx = nchuk.joyX(); jy = nchuk.joyY();
     cNow = nchuk.buttonC(); zNow = nchuk.buttonZ();
     
+    // Debug nunchuk button status (alleen als er een knop ingedrukt is)
     static bool lastZNow = false;
     if (zNow != lastZNow) {
       Serial.printf("[NUNCHUK] Z button: %s\n", zNow ? "PRESSED" : "RELEASED");
@@ -1524,34 +1605,35 @@ void uiTick() {
     }
   }
 
-  //CEvent cev = pollCEvent(cNow);
-
-  CEvent cev = skipCEventThisFrame ? CE_NONE : pollCEvent(cNow);
-  skipCEventThisFrame = false;  // Reset after use
-
-  ZEvent zev = pollZEvent(zNow);
-  ZClickType zClick = pollZClick(zNow);
+  CEvent cev = pollCEvent(cNow);
+  ZEvent zev = pollZEvent(zNow);  // Keep for legacy menu navigation
+  ZClickType zClick = pollZClick(zNow);  // New click detection
   
+  // Debug Z-click events
   if (zClick != Z_NONE) {
     Serial.printf("[Z-VIBE] Click type: %s\n", 
                   (zClick == Z_SINGLE) ? "SINGLE" : (zClick == Z_VIBE) ? "VIBE" : "NONE");
   }
   
+  // Vibe toggle op dubbele klik
   if (zClick == Z_VIBE) {
     vibeState = !vibeState;
     Serial.printf("[Z-VIBE] Vibe toggle: %s -> sending bit 3 to M5StickC Plus\n", 
                   vibeState ? "ON" : "OFF");
+    // De vibeState wordt automatisch verzonden via de reguliere ESP-NOW updates in sendM5AtomPumpColors()
   }
   
-  bool zEdge = (zev == ZE_SHORT);
+  bool zEdge = (zev == ZE_SHORT);  // Legacy compatibility voor menu navigatie
 
+  // Handle popups FIRST before any other C button logic
+  // Handle Nunchuk Help popup first
   if (nunchukHelpPopupOpen) {
-    if (cev == CE_SHORT) {
+    if (cev == CE_SHORT) { // C button - close popup
       nunchukHelpPopupOpen = false;
       drawRightMenu();
-      return;
+      return; // Stop processing other C button actions
     }
-    return;
+    return; // Don't process other menu logic while popup is open
   }
   
   if (paletteOpen && cev==CE_SHORT){
@@ -1566,16 +1648,18 @@ void uiTick() {
     if (!paused) parkToBottom = true;
     else { 
       paused = false; parkToBottom = false; 
+      // CRISPY FIX: Reset velEMA voor onmiddellijke auto vacuum response na unpause
       velEMA = 0.0f;
       Serial.println("[UNPAUSE] velEMA reset for crispy auto vacuum response");
     }
   }
 
-  // Check connection progress
+  // Check connection progress if popup is open
   if (connectionPopupOpen && connectionInProgress) {
     if (connectionDeviceIdx == 0) {
+      // Check Keon connection progress
       bool result = checkKeonConnectionProgress();
-      if (!connectionInProgress) {
+      if (!connectionInProgress) { // Connection attempt finished
         keonConnected = result;
         connectionPopupOpen = false;
         connectionDeviceIdx = -1;
@@ -1584,8 +1668,9 @@ void uiTick() {
         return;
       }
     } else if (connectionDeviceIdx == 1) {
+      // Check Solace connection progress
       bool result = checkSolaceConnectionProgress();
-      if (!connectionInProgress) {
+      if (!connectionInProgress) { // Connection attempt finished
         solaceConnected = result;
         connectionPopupOpen = false;
         connectionDeviceIdx = -1;
@@ -1594,24 +1679,31 @@ void uiTick() {
         return;
       }
     }
+    // Redraw popup to show progress
     drawRightMenu();
   }
   
+  
+  // Handle connection popup
   if (connectionPopupOpen) {
     if (zEdge) {
-      if (connectionChoiceIdx == 0) {
+      if (connectionChoiceIdx == 0) { // "Ja" selected
         if (connectionDeviceIdx == 0) {
           if (keonConnected) {
             disconnectKeon();
           } else {
+            // Start non-blocking connection attempt
             startKeonConnection();
+            // Don't close popup yet - wait for connection result
             return;
           }
         } else if (connectionDeviceIdx == 1) {
           if (solaceConnected) {
             disconnectSolace();
           } else {
+            // Start non-blocking connection attempt
             startSolaceConnection();
+            // Don't close popup yet - wait for connection result
             return;
           }
         }
@@ -1620,32 +1712,29 @@ void uiTick() {
       connectionDeviceIdx = -1;
       connectionChoiceIdx = 0;
       drawRightMenu();
-      skipCEventThisFrame = true;
-      return;
-    } else if (cev == CE_SHORT) {
+    } else if (cev == CE_SHORT) { // C button - cancel
       connectionPopupOpen = false;
       connectionDeviceIdx = -1;
       connectionChoiceIdx = 0;
       drawRightMenu();
-      skipCEventThisFrame = true;
-      return;
     } else {
+      // Handle JX input for popup navigation
       static uint32_t lastPopupNav = 0;
       const uint16_t POPUP_NAV_MS = 200;
       uint32_t now = millis();
       if (now - lastPopupNav >= POPUP_NAV_MS) {
         if (jx < JX_LO && connectionChoiceIdx == 1) {
-          connectionChoiceIdx = 0;
+          connectionChoiceIdx = 0; // Move to "Ja"
           lastPopupNav = now;
           drawRightMenu();
         } else if (jx > JX_HI && connectionChoiceIdx == 0) {
-          connectionChoiceIdx = 1;
+          connectionChoiceIdx = 1; // Move to "Nee"
           lastPopupNav = now;
           drawRightMenu();
         }
       }
     }
-    return;
+    return; // Don't process other menu logic while popup is open
   }
 
   if (uiMode==MODE_MENU) {
@@ -1662,68 +1751,76 @@ void uiTick() {
         }
       } else if (!menuEdit) {
         if (currentPage == PAGE_MAIN) {
-          if (menuIdx == 0) {
+          if (menuIdx == 0) { // Keon
             connectionPopupOpen = true;
-            connectionDeviceIdx = 0;  // Keon
+            connectionDeviceIdx = 0;
             connectionChoiceIdx = 0;
             drawRightMenu();
-          } else if (menuIdx == 1) {
+          } else if (menuIdx == 1) { // Solace
             connectionPopupOpen = true;
-            connectionDeviceIdx = 1;  // Solace
+            connectionDeviceIdx = 1;
             connectionChoiceIdx = 0;
             drawRightMenu();
-          } else if (menuIdx == 3) { currentPage = PAGE_ESPNOW; menuIdx = 0; drawRightMenu(); }
-          else if (menuIdx == 4) { currentPage = PAGE_SMERING; menuIdx = 0; drawRightMenu(); }
-          else if (menuIdx == 5) { currentPage = PAGE_VACUUM; menuIdx = 0; drawRightMenu(); }
-          else if (menuIdx == 6) { currentPage = PAGE_AUTO_VACUUM; menuIdx = 0; drawRightMenu(); }
+          } else if (menuIdx == 3) { currentPage = PAGE_ESPNOW; menuIdx = 0; drawRightMenu(); }  // ESP Status
+          else if (menuIdx == 4) { currentPage = PAGE_SMERING; menuIdx = 0; drawRightMenu(); }  // Smering
+          else if (menuIdx == 5) { currentPage = PAGE_VACUUM; menuIdx = 0; drawRightMenu(); }  // Zuigen
+          else if (menuIdx == 6) { currentPage = PAGE_AUTO_VACUUM; menuIdx = 0; drawRightMenu(); }  // Auto Vacuum
           else if (menuIdx == 7) { currentPage = PAGE_SETTINGS; menuIdx = 1; drawRightMenu(); }
         } else if (currentPage == PAGE_SETTINGS) {
           if (menuIdx == 0) { currentPage = PAGE_MAIN; menuIdx = 7; drawRightMenu(); }
-          else if (menuIdx == 1) { currentPage = PAGE_MOTION; menuIdx = 0; drawRightMenu(); }
-          else if (menuIdx == 2) { currentPage = PAGE_COLORS; menuIdx = 0; colorEdit=false; colorScroll=0; drawRightMenu(); }
+          else if (menuIdx == 1) { currentPage = PAGE_MOTION; menuIdx = 0; drawRightMenu(); }  // Motion Blend
+          else if (menuIdx == 2) { currentPage = PAGE_COLORS; menuIdx = 0; colorEdit=false; colorScroll=0; drawRightMenu(); }  // Kleuren
           else if (menuIdx == 3) {
+            // Open Nunchuk Help popup
             nunchukHelpPopupOpen = true;
             drawRightMenu();
           }
           else if (menuIdx == 4) {
+            // Reset alle instellingen naar standaard
             Serial.println("[SETTINGS] Resetting all settings to default values...");
             resetAllSettingsToDefault();
             Serial.println("[SETTINGS] All settings have been reset to default");
             drawRightMenu();
           }
         } else if (currentPage == PAGE_SMERING) {
-          if (menuIdx == 0) { currentPage = PAGE_MAIN; menuIdx = 4; drawRightMenu(); }
+          if (menuIdx == 0) { currentPage = PAGE_MAIN; menuIdx = 4; drawRightMenu(); }  // Terug naar main menu Smering item
           else if (menuIdx == 1 || menuIdx == 2 || menuIdx == 3) { menuEdit = true; drawRightMenu(); }
         } else if (currentPage == PAGE_VACUUM) {
-          if (menuIdx == 0) { currentPage = PAGE_MAIN; menuIdx = 5; drawRightMenu(); }
+          if (menuIdx == 0) { currentPage = PAGE_MAIN; menuIdx = 5; drawRightMenu(); }  // Terug naar main menu Zuigen item
           else if (menuIdx == 1) { menuEdit = true; drawRightMenu(); }
         } else if (currentPage == PAGE_MOTION) {
-          if (menuIdx == 0) { currentPage = PAGE_SETTINGS; menuIdx = 1; drawRightMenu(); }
+          if (menuIdx == 0) { currentPage = PAGE_SETTINGS; menuIdx = 2; drawRightMenu(); }
           else if (menuIdx == 1 || menuIdx == 2 || menuIdx == 3 || menuIdx == 4) { menuEdit = true; drawRightMenu(); }
         } else if (currentPage == PAGE_ESPNOW) {
-          if (menuIdx == 0) { currentPage = PAGE_MAIN; menuIdx = 3; drawRightMenu(); }
+          if (menuIdx == 0) { currentPage = PAGE_MAIN; menuIdx = 3; drawRightMenu(); }  // Terug naar main menu ESP Status item
         } else if (currentPage == PAGE_AUTO_VACUUM) {
-          if (menuIdx == 0) { currentPage = PAGE_MAIN; menuIdx = 6; drawRightMenu(); }
+          if (menuIdx == 0) { currentPage = PAGE_MAIN; menuIdx = 6; drawRightMenu(); }  // Terug naar main menu Auto Vacuum item
           else if (menuIdx == 1 || menuIdx == 2) { menuEdit = true; drawRightMenu(); }
         }
       } else {
+        // Verlaten van menu edit mode met Z-knop
         if (currentPage == PAGE_SMERING && menuIdx == 2) {
+          // Normale Lube: trigger lube shot bij Z-knop (verlaten edit)
           extern void triggerLubeShot(float seconds);
           triggerLubeShot(g_lubeHold_s);
           Serial.printf("[UI] Lube shot Z-knop: Lube geactiveerd voor %.1fs\n", g_lubeHold_s);
         } else if (currentPage == PAGE_SMERING && menuIdx == 3) {
+          // Start-Lubric: trigger lube bij Z-knop (verlaten edit)
           extern void triggerStartLube(float seconds);
           triggerStartLube(g_startLube_s);
           Serial.printf("[UI] Start-Lubric Z-knop: Lube geactiveerd voor %.1fs\n", g_startLube_s);
         } else if (currentPage == PAGE_VACUUM) {
+          // Save vacuum settings when exiting edit mode
           Serial.printf("[UI] Exiting vacuum edit mode, vacuumTargetMbar: %.1f mbar, saving...\n", CFG.vacuumTargetMbar);
           saveAllSettings();
           Serial.println("[UI] Vacuum settings saved on edit exit");
         } else if (currentPage == PAGE_AUTO_VACUUM) {
+          // Save auto vacuum settings when exiting edit mode
           Serial.printf("[UI] Exiting auto vacuum edit mode, autoVacuumSpeedThreshold: %d, saving...\n", CFG.autoVacuumSpeedThreshold);
           saveAllSettings();
           Serial.println("[UI] Auto vacuum settings saved on edit exit");
         } else if (currentPage == PAGE_SMERING) {
+          // Save smering settings when exiting edit mode
           Serial.println("[UI] Exiting smering edit mode, saving...");
           saveAllSettings();
           Serial.println("[UI] Smering settings saved on edit exit");
@@ -1750,6 +1847,8 @@ void uiTick() {
     }
   }
 
+  // ================= ANIMATIE EERST =================
+  // We need to calculate animation first to get updated phase for auto vacuum
   updateSpeedStepWithJoystick(jy);
   drawSpeedBarTop(g_speedStep, CFG.SPEED_STEPS);
 
@@ -1757,6 +1856,7 @@ void uiTick() {
   float dt = (nowUs - lastUs) / 1e6f;
   lastUs = nowUs;
 
+  // Calculate step01 for animation speed and rod color
   float step01 = (CFG.SPEED_STEPS<=1)?0.0f : (float)g_speedStep/(float)(CFG.SPEED_STEPS-1);
   float instF = CFG.MIN_SPEED_HZ + step01 * (CFG.MAX_SPEED_HZ - CFG.MIN_SPEED_HZ);
 
@@ -1765,9 +1865,15 @@ void uiTick() {
     if (phase > TAU) phase -= TAU;
   }
   
+  // ================= AUTO VACUUM LOGIC (after animation) =================
+  // BACK TO SIMPLE velEMA method - this actually worked before!
+  // We need to calculate velEMA first from the actual animation movement
+  
+  // Animation rendering (moved from later in code)
   float s = 0.5f * (sinf(phase) + 1.0f);
   float ease = schlick_gain(CFG.easeGain, s);
   
+  // Calculate actual animation position
   const int BL = L_CANVAS_H - 4;
   const int MIN_ROD_VIS_IN = max(2, (int)round(12*1.25f) - 4);
   const int CAP_Y_OUT_BASE = 2;
@@ -1781,25 +1887,51 @@ void uiTick() {
   int capY_phase = (int)round((float)CAP_Y_IN + ease*(float)(CAP_Y_OUT - CAP_Y_IN));
   int capY = parkToBottom ? (int)round(capY_draw) : (!paused ? capY_phase : (int)round(capY_draw));
   
+  // Calculate velocity from actual animation
+  extern int prevCapY;
+  extern float velEMA;
   float vel = 0.0f; 
   if (prevCapY != INT_MIN) vel = (float)(capY - prevCapY);
   prevCapY = capY;
   velEMA = (1.0f - CFG.velEMAalpha)*velEMA + CFG.velEMAalpha*vel;
   
+  // SIMPLE: Use velocity for direction (like it worked before)
   bool goingUp = (velEMA < 0.0f);
   
+  
+  // DEBUG: Track goingUp state changes and system state
+  static bool prevGoingUp = false;
+  static uint32_t lastDebugTime = 0;
+  static uint32_t lastStatusTime = 0;
+  
+  // Show status every 10 seconds (reduced spam)
+  if (millis() - lastStatusTime > 10000) {
+    const char* modeStr = (uiMode == MODE_ANIM) ? "ANIM" : "MENU";
+    const char* stateStr = paused ? "PAUSED" : "RUNNING";
+    extern uint32_t punchCount;
+    Serial.printf("[STATUS] %s/%s, pushCount=%u, speedStep=%d\n", 
+                  modeStr, stateStr, punchCount, g_speedStep);
+    lastStatusTime = millis();
+  }
+  
+  // Removed frequent debug to reduce spam
+  prevGoingUp = goingUp;
+  
+  // PUSH COUNTING - Faster edge detection for crispy response
   static bool prevArrowFull = false;
   static uint32_t lastEdgeTime = 0;
-  const uint32_t EDGE_DEBOUNCE_MS = 100;
+  const uint32_t EDGE_DEBOUNCE_MS = 100;  // Faster response (was 200ms)
   
-  bool arrowFullEdge = (goingUp && !prevArrowFull);
+  bool arrowFullEdge = (goingUp && !prevArrowFull);  // Rising edge: empty -> full
   uint32_t now = millis();
   
+  // Count pushes alleen wanneer niet gepauzeerd
   if (!paused && arrowFullEdge && (now - lastEdgeTime > EDGE_DEBOUNCE_MS)) {
     extern uint32_t punchCount;
     punchCount++;
     lastEdgeTime = now;
     
+    // Check if we need to trigger automatic lube
     if (punchCount > 0 && (punchCount % g_targetStrokes) == 0) {
       extern void triggerLubeShot(float seconds);
       triggerLubeShot(g_lubeHold_s);
@@ -1810,21 +1942,35 @@ void uiTick() {
     Serial.printf("[PUSH] Count: %u (Next lube at: %u), velEMA=%.3f\n", 
                   punchCount, ((punchCount / g_targetStrokes) + 1) * g_targetStrokes, velEMA);
     
+    // Update menu display if we're in menu mode (to show updated count)
     if (uiMode == MODE_MENU && (currentPage == PAGE_MAIN || currentPage == PAGE_SMERING)) {
       drawRightMenu();
     }
   }
   
+  // Auto vacuum (volgt animatie) alleen wanneer niet gepauzeerd
   static bool lastArrowFull = false;
   
   if (!paused) {
+    // Simple auto vacuum: based on velocity direction
     bool currentArrowState = goingUp;
     
+    // Only update actual vacuum control if auto vacuum is enabled
     extern bool pompUnitZuigActive;
     bool speedDisablesAutoVac = (g_speedStep >= CFG.autoVacuumSpeedThreshold);
     bool autoVacAllowed = CFG.vacuumAutoMode && !pompUnitZuigActive && !speedDisablesAutoVac;
     
+    // Debug speed threshold state changes
+    static bool prevSpeedDisabled = false;
+    if (speedDisablesAutoVac != prevSpeedDisabled) {
+      Serial.printf("[AUTO-VAC] Speed threshold %s: speed=%d, threshold=%d\n", 
+                    speedDisablesAutoVac ? "TRIGGERED" : "CLEARED", g_speedStep, CFG.autoVacuumSpeedThreshold);
+      prevSpeedDisabled = speedDisablesAutoVac;
+    }
+    
+    // Update arrowFull ONLY if auto vacuum is allowed
     if (autoVacAllowed) {
+      // Simple: arrowFull follows animation direction
       arrowFull = currentArrowState;
       
       if (arrowFull != lastArrowFull) {
@@ -1832,140 +1978,117 @@ void uiTick() {
         sendImmediateArrowUpdate();
         Serial.printf("[AUTO-VAC] arrow_full=%d, velEMA=%.3f\n", arrowFull, velEMA);
       }
+    } else {
+      // Auto vacuum disabled - don't update arrowFull, don't send vacuum commands
+      if (currentArrowState != lastArrowFull) { // Still track state changes for debug
+        if (!CFG.vacuumAutoMode) {
+          Serial.printf("[AUTO-VAC] SKIPPED (disabled): would be arrow_full=%d\n", currentArrowState);
+        } else if (pompUnitZuigActive) {
+          Serial.printf("[AUTO-VAC] SKIPPED (zuig active): would be arrow_full=%d\n", currentArrowState);
+        } else if (speedDisablesAutoVac) {
+          Serial.printf("[AUTO-VAC] SKIPPED (speed %d >= %d): would be arrow_full=%d\n", g_speedStep, CFG.autoVacuumSpeedThreshold, currentArrowState);
+        }
+      }
     }
     
-    lastArrowFull = arrowFull;
+    lastArrowFull = currentArrowState;  // Always track for edge detection
   }
+  // Voor pauze: arrowFull behoudt vorige waarde
   
-  prevArrowFull = goingUp;
-
-  // ========== KEON UPDATE (NEW) ==========
-  // Check connection status (lightweight)
-  keonCheckConnection();
+  prevArrowFull = goingUp;  // Remember state for next edge detection
   
-  // Only sync Keon when animation is actually running
-  if (keonConnected) {
-    if (paused) {
-      // Animation paused → Keon should be at bottom and still
-      static bool hasParked = false;
-      if (!hasParked) {
-        keonParkToBottom();
-        hasParked = true;
-      }
+  // Z button direct handling - zuigen reageert meteen op indrukken
+  bool allowVacuumControl = (uiMode == MODE_ANIM);
+  static bool prevZPressed = false;
+  static bool zToggleCommandSent = false;
+  
+  // Zuigen control met single click en cooldown
+  static uint32_t lastZuigenCommand = 0;
+  const uint32_t ZUIGEN_COOLDOWN_MS = 1000;  // 1 seconde cooldown
+  // Hergebruik bestaande 'now' variabele
+  
+  if (allowVacuumControl && zClick == Z_SINGLE) {
+    // Single click in animatie modus - check cooldown
+    if ((now - lastZuigenCommand) >= ZUIGEN_COOLDOWN_MS) {
+      Serial.println("[Z-SINGLE-CLICK] Sending TOGGLE_ZUIGEN command to Pump Unit");
+      extern void sendToggleZuigenCommand();
+      sendToggleZuigenCommand();
+      lastZuigenCommand = now;
     } else {
-      // Animation running → Sync Keon to exact sleeve position
-      static bool hasParked = false;
-      hasParked = false;  // Reset flag when unpaused
-      
-      extern uint8_t g_speedStep;
-      float sleevePercent = getSleevePercentage();
-      keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
+      uint32_t remaining = ZUIGEN_COOLDOWN_MS - (now - lastZuigenCommand);
+      Serial.printf("[Z-SINGLE-CLICK] Zuigen cooldown active, wait %lu ms\n", remaining);
     }
+  } else if (uiMode == MODE_MENU && zClick == Z_SINGLE) {
+    // Debug: Z-knop gedrukt in menu modus - geen zuig actie
+    Serial.println("[Z-SINGLE-CLICK] Pressed in MENU mode - using for navigation only");
   }
-
-  if (parkToBottom && capY_draw < (float)CAP_Y_IN) {
-    capY_draw += 0.5f;
-    if (capY_draw > (float)CAP_Y_IN) {
-      capY_draw = (float)CAP_Y_IN;
-      parkToBottom=false;
-      paused=true;
-      
-      // Park Keon to bottom when paused
-      if (keonConnected) {
-        keonParkToBottom();
-      }
-    }
-  } else if (!parkToBottom) {
-    capY_draw = (float)capY;
-  }
-
-  int capYnow = (int)round(capY_draw);
-  const int DRAW_BASELINE_Y = (int)round(CAP_Y_MID + (BL - CAP_Y_MID) * RANGE_SCALE);
   
+  // Zuigen logic is now entirely on Pump Unit - no local vacuumTick needed
+  
+  // Update ESP-NOW connection status indicators
+  bodyConnected = bodyESP_connected;
+  motionConnected = m5atom_connected;  // M5Atom connection status
+  // Note: keonConnected, solaceConnected blijven zoals ze zijn
+  
+  // Sync suctionState with pompUnitZuigActive for visual indicators
+  extern bool pompUnitZuigActive;
+  suctionState = pompUnitZuigActive;
+  
+  // ================= CONTINUE ANIMATIE RENDERING =================
+  // Animation calculations moved to auto vacuum section above
+  
+  // Handle parkToBottom special case
+  int DRAW_BASELINE_Y = (int)round(CAP_Y_MID + (BL - CAP_Y_MID) * RANGE_SCALE);
+  if (parkToBottom) {
+    float targetY=(float)CAP_Y_IN;
+    float rangeAbs=fabsf((float)CAP_Y_OUT - (float)CAP_Y_IN);
+    float vMag=max(28.0f, rangeAbs * instF * 1.6f);
+    float dir=(capY_draw < targetY) ? +1.0f : -1.0f;
+    capY_draw += dir * vMag * dt;
+    if ((dir > 0.0f && capY_draw >= targetY) || (dir < 0.0f && capY_draw <= targetY)) {
+      capY_draw=targetY; parkToBottom=false; paused=true; phase=-1.5707963f;
+    }
+    capY = (int)round(capY_draw);
+  } else {
+    if (!paused) capY_draw = (float)capY;
+  }
+  
+  int drawBase = DRAW_BASELINE_Y;
+  
+  // Visual arrow logic - using variables defined earlier
+
+  // Use step01 calculated earlier for rod color
   uint16_t rodCol = lerp_rgb565_u8(CFG.rodSlowR,CFG.rodSlowG,CFG.rodSlowB,
                                    CFG.rodFastR,CFG.rodFastG,CFG.rodFastB, step01);
+
+  cv->fillScreen(CFG.COL_BG);
+  drawSleeveFixedTop(capY, CFG.COL_TAN);
+  drawRodFromCap_Vinside_NoSeam(capY, drawBase, rodCol, 0xE946);
   
-  if (uiMode == MODE_ANIM) {
-    cv->fillScreen(CFG.COL_BG);
-    drawSleeveFixedTop(capYnow, CFG.COL_TAN);
-    drawRodFromCap_Vinside_NoSeam(capYnow, DRAW_BASELINE_Y, rodCol, 0xE946);
-    
-    // Draw vibe and suction indicators
-    drawVibeLightning(true);   // Left side - bottom half
-    drawVibeLightning(false);  // Right side - bottom half
-    drawSuctionSymbol(true);   // Left side - top half
-    drawSuctionSymbol(false);  // Right side - top half
-    
-    cv->flush();
-    drawVacArrowHeader(goingUp);
-  }
-    // ========== KEON SYNC (FIXED! v4) ==========
-  keonCheckConnection();
+  // Draw Vibe lightning effects when active (bottom half)
+  drawVibeLightning(true);  // Left side
+  drawVibeLightning(false); // Right side
   
-  if (keonConnected) {
-    if (paused || parkToBottom) {
-      // Paused → Park to bottom (has internal rate limiting)
-      keonMove(0, 0);
-    } else {
-      // Running → Sync to animation
-      float sleevePercent = getSleevePercentage();
-      keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
-    }
+  // Draw Suction symbols when active (top half)
+  drawSuctionSymbol(true);  // Left side )(
+  drawSuctionSymbol(false); // Right side )(
+  
+  cv->flush();
+
+  drawLeftFrame();
+  // Simple visual arrow based on animation direction
+  bool vacFilled = goingUp;
+  drawVacArrowHeader(vacFilled);
+  
+  // Debug: Show vacuum state when it changes
+  static bool lastVacFilled = false;
+  if (vacFilled != lastVacFilled) {
+    Serial.printf("[VISUAL ARROW] vacFilled: %d->%d (arrowFull=%d)\n", 
+                  lastVacFilled, vacFilled, arrowFull);
+    lastVacFilled = vacFilled;
   }
 
-  delay(1);
+  if (uiMode==MODE_MENU && menuEdit && currentPage==PAGE_MAIN) drawEditPopupInMenu();
+
+  delay(16);
 }
-   // ========== KEON SYNC (FIXED!) ==========
-  ///keonCheckConnection();
-  
-  //if (keonConnected) {
-    //if (paused || parkToBottom) {
-      // Paused → Park to bottom (has internal rate limiting)
-      //keonMove(0, 0);
-    //} else {
-      // Running → Sync to animation
-      //float sleevePercent = getSleevePercentage();
-      //keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
-    //}
-  //}
-
-  //delay(1);
-//}
-    // ========== KEON SYNC (FIXED! v2) ==========
-  //keonCheckConnection();
-  
-  //if (keonConnected) {
-    //if (paused || parkToBottom) {
-      //keonMove(0, 0);  // Park to bottom
-    //} else {
-      //float sleevePercent = getSleevePercentage();
-      //keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
-    //}
-  //}
-
-  //delay(1);
-//}
-    // ========== KEON SYNC (FIXED!) ==========
-  //keonCheckConnection();
-  
-  //if (keonConnected) {
-    //if (paused || parkToBottom) {
-      //static bool hasParked = false;
-      //if (!hasParked) {
-        //Serial.println("[KEON] Paused - parking");
-        //keonParkToBottom();
-        //hasParked = true;
-      //}
-    //} else {
-      //static bool hasParkedPrev = true;
-      //if (hasParkedPrev) {
-        //Serial.println("[KEON] Sync enabled");
-        //hasParkedPrev = false;
-      //}
-      //float sleevePercent = getSleevePercentage();
-      //keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
-    //}
-  //}
-  //delay(1);
-//}
-

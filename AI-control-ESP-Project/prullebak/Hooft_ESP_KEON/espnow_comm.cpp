@@ -263,29 +263,41 @@ void handleBodyESPMessage(const bodyESP_message_t &msg) {
     Serial.printf("[AI TEST] Trust %.1f -> Speed step %d, unpaused\n", msg.newTrust, g_speedStep);
   }
   else if (strcmp(msg.command, "AI_STRESS_START") == 0) {
-    Serial.printf("[AI STRESS] AI Stress Management start - trust: %.1f\n", msg.newTrust);
+    Serial.printf("[AI STRESS] AI Stress Management start - trust: %.1f, stressLevel: %d\n", msg.newTrust, msg.stressLevel);
     extern uint8_t g_speedStep;
     extern bool paused;
     float clampedTrust = max(0.0f, min(2.0f, msg.newTrust));
     g_speedStep = (uint8_t)(clampedTrust / 2.0f * 7.0f);
     paused = false;
     Serial.printf("[AI STRESS] Start vanaf speed step %d\n", g_speedStep);
+    
+    // Sync Keon with stress level
+    extern void syncKeonToStressLevel(uint8_t stressLevel);
+    syncKeonToStressLevel(msg.stressLevel);
   }
   else if (strcmp(msg.command, "AI_STRESS_ADJUST") == 0) {
-    Serial.printf("[AI STRESS] AI aanpassing - trust: %.1f\n", msg.newTrust);
+    Serial.printf("[AI STRESS] AI aanpassing - trust: %.1f, stressLevel: %d\n", msg.newTrust, msg.stressLevel);
     extern uint8_t g_speedStep;
     float clampedTrust = max(0.0f, min(2.0f, msg.newTrust));
     g_speedStep = (uint8_t)(clampedTrust / 2.0f * 7.0f);
     Serial.printf("[AI STRESS] Speed aangepast naar %d\n", g_speedStep);
+    
+    // Sync Keon with stress level
+    extern void syncKeonToStressLevel(uint8_t stressLevel);
+    syncKeonToStressLevel(msg.stressLevel);
   }
   else if (strcmp(msg.command, "AI_STRESS_RESUME") == 0) {
-    Serial.printf("[AI STRESS] AI resume na pauze - trust: %.1f\n", msg.newTrust);
+    Serial.printf("[AI STRESS] AI resume na pauze - trust: %.1f, stressLevel: %d\n", msg.newTrust, msg.stressLevel);
     extern uint8_t g_speedStep;
     extern bool paused;
     float clampedTrust = max(0.0f, min(2.0f, msg.newTrust));
     g_speedStep = (uint8_t)(clampedTrust / 2.0f * 7.0f);
     paused = false;
     Serial.printf("[AI STRESS] Resume naar speed %d, unpaused\n", g_speedStep);
+    
+    // Sync Keon with stress level
+    extern void syncKeonToStressLevel(uint8_t stressLevel);
+    syncKeonToStressLevel(msg.stressLevel);
   }
   else if (strcmp(msg.command, "AI_VIBE_ON") == 0) {
     Serial.println("[AI STRESS] AI activates VIBE - stress level 7 emergency!");
@@ -336,6 +348,10 @@ void handleBodyESPMessage(const bodyESP_message_t &msg) {
     if (g_speedStep > 0) g_speedStep--;  // Shift naar 0-based: 1->0, 2->1, ..., 7->6
     if (msg.stressLevel == 7) g_speedStep = 7;  // Stress 7 = MAX speed 7
     if (g_speedStep > 7) g_speedStep = 7;  // Safety cap
+    
+    // Sync Keon with stress level
+    extern void syncKeonToStressLevel(uint8_t stressLevel);
+    syncKeonToStressLevel(msg.stressLevel);
     
     // Update vibe status voor playback
     vibeState = msg.vibeOn;
@@ -1051,4 +1067,62 @@ void sendImmediateArrowUpdate() {
   } else {
     Serial.printf("[IMMEDIATE] FAILED: %d\n", result);
   }
+}
+
+// ===============================================================================
+// KEON ANIMATION SYNCHRONIZATION
+// ===============================================================================
+
+/**
+ * Sync Keon with stress level from Body ESP AI
+ * Called when PLAYBACK_STRESS or AI_STRESS_* commands received
+ */
+void syncKeonToStressLevel(uint8_t stressLevel) {
+  extern bool keonConnected;
+  extern void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, bool isMovingUp);
+  extern float velEMA;
+  
+  if (!keonConnected) return;
+  
+  // Map stress level (1-7 or 0-7) to speed (0-99)
+  // stressLevel 0 = no stress = speed 0
+  // stressLevel 7 = max stress = speed 99
+  uint8_t mappedSpeed = (stressLevel * 99) / 7;
+  if (mappedSpeed > 99) mappedSpeed = 99;
+  
+  // Determine direction from animation velocity
+  bool isMovingUp = (velEMA < 0.0f);  // Negative velocity = moving up
+  uint8_t position = isMovingUp ? 99 : 0;
+  
+  // Send to Keon directly
+  extern void keonMove(uint8_t position, uint8_t speed);
+  keonMove(position, mappedSpeed);
+  
+  Serial.printf("[KEON STRESS] Level %d -> Speed %d, Position %d\n", stressLevel, mappedSpeed, position);
+}
+
+/**
+ * Sync Keon with HoofdESP animation state
+ * Called from uiTick() to synchronize Keon movement with animation speed and direction
+ */
+void syncKeonToAnimation() {
+  // Import external variables
+  extern uint8_t g_speedStep;
+  extern Config CFG;
+  extern float velEMA;
+  extern bool paused;
+  extern bool keonConnected;
+  extern void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, bool isMovingUp);
+  
+  // Don't sync if Keon not connected
+  if (!keonConnected) return;
+  
+  // Don't sync if paused
+  if (paused) return;
+  
+  // Determine animation direction from velocity
+  bool isMovingUp = (velEMA < 0.0f);  // Negative velocity = moving up
+  
+  // Call Keon sync function with animation state
+  keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, isMovingUp);
 }

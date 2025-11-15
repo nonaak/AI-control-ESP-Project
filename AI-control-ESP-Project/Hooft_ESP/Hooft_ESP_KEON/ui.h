@@ -1,24 +1,29 @@
 #pragma once
 #include <Arduino.h>
 
+// ========== FORWARD DECLARATIONS ==========
 void uiInit();
 void uiTick();
 
-// Global variables accessible by ESP-NOW (declared in ui.cpp)
-extern uint8_t g_speedStep;      // Current speed step (0 to SPEED_STEPS-1)
-extern uint16_t g_targetStrokes; // Target stroke count
-extern float g_lubeHold_s;       // Lube hold time in seconds
-extern float g_startLube_s;      // Start-Lubric time in seconds
+// ========== GLOBAL STATE (exposed for ESP-NOW sync) ==========
+extern bool paused;
+extern float phase;
+extern bool arrowFull;
+extern bool vibeState;
 
-// Device connection status
+// ========== SPEED CONTROL (exposed for ESP-NOW) ==========
+extern uint8_t g_speedStep;  // Current speed step (0-7)
+
+// ========== KEON STATE (exposed for connection popup) ==========
 extern bool keonConnected;
 extern bool solaceConnected;
 extern bool motionConnected;
 extern bool bodyConnected;
 
-// Pause status (C-knop)
-extern bool paused;
+// ========== SMERING (exposed for vacuum.cpp) ==========
+extern uint16_t g_targetStrokes;
+extern float g_lubeHold_s;
+extern float g_startLube_s;
 
-// Sleeve synchronisatie
-extern float phase;  // Animatie fase voor sleeve berekening
-float getSleevePercentage();
+// ========== HELPER FUNCTIONS (exposed for ESP-NOW) ==========
+float getSleevePercentage();  // Get current sleeve position as percentage (0-100)
