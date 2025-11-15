@@ -243,12 +243,18 @@ void keonParkToBottom() {
 
 /**
  * Sync Keon movement with HoofdESP animation
- * Simple 1:1 mapping - Keon follows sleeve position exactly
+ * 
+ * Uses velocity-based direction mapping:
+ * - isMovingUp = true  (velEMA < 0) → Keon naar BOVEN (position 99)
+ * - isMovingUp = false (velEMA >= 0) → Keon naar BENEDEN (position 0)
+ * - Speed mapped from speedStep (0-7 → 0-99)
  */
-void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, float sleevePercentage) {
+void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, bool isMovingUp) {
   if (!keonConnected) return;
 
   static uint8_t lastPosition = 50;
+  static uint8_t lastSpeed = 0;
+  static bool lastDirection = false;
   static uint32_t lastSyncTime = 0;
   const uint32_t SYNC_INTERVAL_MS = 100;  // 10Hz to avoid blocking animation
 
@@ -259,21 +265,21 @@ void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, float sleevePerc
     return;
   }
   
-  // Map sleeve percentage (0-100) directly to Keon position (0-99)
-  // FULL RANGE at all speeds, just like the animation!
-  uint8_t position = (uint8_t)(sleevePercentage * 0.99f);
-  if (position > 99) position = 99;
+  // Map speedStep (0-7) to Keon speed (0-99)
+  uint8_t keonSpeed = (speedSteps <= 1) ? 0 : (speedStep * 99) / (speedSteps - 1);
+  if (keonSpeed > 99) keonSpeed = 99;
   
-  // Keon speed: always 99 for instant response
-  // The TEMPO is controlled by animation frequency (speedStep affects animation Hz)
-  uint8_t keonSpeed = 99;
+  // Map animation direction to Keon position
+  // isMovingUp = true  → position 99 (TOP)
+  // isMovingUp = false → position 0 (BOTTOM)
+  uint8_t position = isMovingUp ? 99 : 0;
   
-  // Only send if position changed (reduce BLE traffic)
-  int posDiff = abs((int)position - (int)lastPosition);
-  
-  if (posDiff >= 2) {  // Small threshold to reduce jitter
+  // Only send if state changed (position, speed, or direction)
+  if (position != lastPosition || keonSpeed != lastSpeed || isMovingUp != lastDirection) {
     keonMove(position, keonSpeed);
     lastPosition = position;
+    lastSpeed = keonSpeed;
+    lastDirection = isMovingUp;
     lastSyncTime = now;
   }
 }
