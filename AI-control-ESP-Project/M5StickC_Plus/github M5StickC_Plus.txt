@@ -35,3 +35,6 @@ ONTHOUD: Gebruiker is competent! Systemen hebben bugs!
 
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/M5StickC_Plus/M5StickC_Plus.ino
 
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/SYSTEEM_OVERZICHT_FINAL.txt
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/ESP_PROJECT_TODO_ALLES.txt
+

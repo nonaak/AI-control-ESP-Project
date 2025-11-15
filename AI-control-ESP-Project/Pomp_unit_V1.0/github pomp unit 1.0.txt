@@ -38,3 +38,6 @@ https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Pomp_unit_V1.0/readme_local.txt
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Pomp_unit_V1.0/text.md
 
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/SYSTEEM_OVERZICHT_FINAL.txt
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/ESP_PROJECT_TODO_ALLES.txt
+

@@ -1524,7 +1524,7 @@ if (LCD_BL >= 0) {
 }
 
   // // cv->begin() causes RGB panel slot conflict - commented for Jingcai RGB
-  // cv->begin();
+  cv->begin();
   cv->fillScreen(CFG.COL_BG); cv->flush();
 
   uiMode  = MODE_MENU;

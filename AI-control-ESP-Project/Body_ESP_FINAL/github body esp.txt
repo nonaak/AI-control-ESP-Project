@@ -90,3 +90,6 @@ https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/sensor_settings.h
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/system_settings_view.cpp
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/system_settings_view.h
+
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/SYSTEEM_OVERZICHT_FINAL.txt
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/ESP_PROJECT_TODO_ALLES.txt

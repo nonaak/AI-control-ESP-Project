@@ -43,4 +43,6 @@ https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Keon_ESP32_Controller_FINAL/README.md
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Keon_ESP32_Controller_FINAL/Keon_Characteristic_Tester/Keon_Characteristic_Tester.ino
 
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/SYSTEEM_OVERZICHT_FINAL.txt
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/ESP_PROJECT_TODO_ALLES.txt
 
