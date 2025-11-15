@@ -13,6 +13,9 @@
 #include "settings.h"
 #include "keon_ble.h"  // NEW: Keon BLE support
 
+// Forward declarations
+static void drawRightMenu();  // ← VOEG DEZE TOE!
+
 // ========== KEON SYNC (NEW) ==========
 // Keon sync happens in keonSyncToAnimation() called from uiTick()
 
@@ -210,13 +213,32 @@ static void startKeonConnection() {
   connectionInProgress = true;
   connectionStartTime = millis();
   
-  // Start actual BLE connection
   if (keonConnect()) {
     keonConnected = true;
     connectionInProgress = false;
+    
+    // Auto-close popup on success
+    connectionPopupOpen = false;
+    connectionDeviceIdx = -1;
+    connectionChoiceIdx = 0;
+    drawRightMenu();
+    
     Serial.println("[KEON] Connected successfully!");
   }
 }
+
+//static void startKeonConnection() {
+  //Serial.println("[CONNECTION] Starting Keon connection attempt...");
+  //connectionInProgress = true;
+  //connectionStartTime = millis();
+  
+  // Start actual BLE connection
+  //if (keonConnect()) {
+    //keonConnected = true;
+    //connectionInProgress = false;
+    //Serial.println("[KEON] Connected successfully!");
+  //}
+//}
 
 static bool checkKeonConnectionProgress() {
   if (!connectionInProgress) return false;
@@ -230,6 +252,13 @@ static bool checkKeonConnectionProgress() {
     
     if (keonIsConnected()) {
       keonConnected = true;
+      
+      // Auto-close popup
+      connectionPopupOpen = false;
+      connectionDeviceIdx = -1;
+      connectionChoiceIdx = 0;
+      drawRightMenu();  // ← VOEG DEZE 4 REGELS TOE!
+      
       Serial.println("[KEON] Connection handshake successful");
       return true;
     } else {
@@ -240,6 +269,29 @@ static bool checkKeonConnectionProgress() {
   
   return false;
 }
+
+//static bool checkKeonConnectionProgress() {
+  //if (!connectionInProgress) return false;
+  
+  //uint32_t elapsed = millis() - connectionStartTime;
+  
+  //if (elapsed < 1000) {
+    //return false;
+  //} else if (elapsed < 1200) {
+    //connectionInProgress = false;
+    
+    //if (keonIsConnected()) {
+      //keonConnected = true;
+      //Serial.println("[KEON] Connection handshake successful");
+      //return true;
+    //} else {
+      //Serial.println("[KEON] Connection failed - device not responding");
+      //return false;
+    //}
+  //}
+  
+  //return false;
+//}
 
 static void disconnectKeon() {
   if (keonConnected) {
@@ -1500,6 +1552,7 @@ void uiInit() {
 void uiTick() {
   // Guard: Skip one frame after popup closes to prevent residual C-events
   static bool skipCEventThisFrame = false;
+  static bool keonSyncEnabled = false;
 
   bool cNow=false, zNow=false;
   int jy=128, jx=128;
@@ -1563,10 +1616,13 @@ void uiTick() {
     menuEdit = false; colorEdit=false; paletteOpen=false;
     drawRightMenu();
   } else if (cev==CE_SHORT && !paletteOpen){
-    if (!paused) parkToBottom = true;
-    else { 
+    if (!paused) {
+      parkToBottom = true;
+      keonSyncEnabled = false;
+    }else { 
       paused = false; parkToBottom = false; 
       velEMA = 0.0f;
+      keonSyncEnabled = true;
       Serial.println("[UNPAUSE] velEMA reset for crispy auto vacuum response");
     }
   }
@@ -1580,6 +1636,7 @@ void uiTick() {
         connectionPopupOpen = false;
         connectionDeviceIdx = -1;
         connectionChoiceIdx = 0;
+        skipCEventThisFrame = true;
         drawRightMenu();
         return;
       }
@@ -1590,6 +1647,7 @@ void uiTick() {
         connectionPopupOpen = false;
         connectionDeviceIdx = -1;
         connectionChoiceIdx = 0;
+        skipCEventThisFrame = true;
         drawRightMenu();
         return;
       }
@@ -1899,15 +1957,13 @@ void uiTick() {
     cv->flush();
     drawVacArrowHeader(goingUp);
   }
-    // ========== KEON SYNC (FIXED! v4) ==========
+  // ========== KEON SYNC (FIXED!) ==========
   keonCheckConnection();
   
   if (keonConnected) {
-    if (paused || parkToBottom) {
-      // Paused → Park to bottom (has internal rate limiting)
+    if (!keonSyncEnabled || paused || parkToBottom) {
       keonMove(0, 0);
     } else {
-      // Running → Sync to animation
       float sleevePercent = getSleevePercentage();
       keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
     }
@@ -1915,6 +1971,22 @@ void uiTick() {
 
   delay(1);
 }
+    // ========== KEON SYNC (FIXED! v4) ==========
+  //keonCheckConnection();
+  
+  //f (keonConnected) {
+    //if (paused || parkToBottom) {
+      // Paused → Park to bottom (has internal rate limiting)
+      //keonMove(0, 0);
+    //} else {
+      // Running → Sync to animation
+      //float sleevePercent = getSleevePercentage();
+      //keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
+    //}
+  //}
+
+  //delay(1);
+//}
    // ========== KEON SYNC (FIXED!) ==========
   ///keonCheckConnection();
   
