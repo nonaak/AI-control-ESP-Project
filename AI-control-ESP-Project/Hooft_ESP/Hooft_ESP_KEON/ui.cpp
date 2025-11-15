@@ -1735,6 +1735,13 @@ void uiTick() {
   }
 
   if (uiMode==MODE_MENU) {
+    // ============= Z-KNOP VACUUM TOGGLE IN ANIMATIE MODE =============
+    // Z-knop kort ingedrukt in animatie mode: toggle zuigen (alleen als niet gepauzeerd)
+    if (uiMode == MODE_ANIM && zev == ZE_SHORT && !paused) {
+      Serial.println("[UI] Z button pressed in animation mode - toggling vacuum");
+      sendToggleZuigenCommand();
+      return; // Don't process other logic this tick
+    }
     if (zEdge) {
       if (currentPage == PAGE_COLORS){
         if (!paletteOpen) {

@@ -16,7 +16,6 @@ uint8_t keonCurrentSpeed = 0;
 
 // Connection state tracking
 static uint32_t lastKeonCommand = 0;
-static uint32_t lastKeonReconnectAttempt = 0;
 static bool keonInitialized = false;
 
 // ===============================================================================
@@ -33,36 +32,41 @@ class KeonClientCallback : public BLEClientCallbacks {
 };
 
 // ===============================================================================
-// COMMAND SENDING
+// COMMAND SENDING (NO DELAYS!)
 // ===============================================================================
 
 /**
  * Send raw command to Keon (internal helper)
+ * NO DELAYS to prevent ESP-NOW crashes!
  */
 static bool keonSendCommand(uint8_t* data, size_t length) {
   if (!keonConnected || keonTxCharacteristic == nullptr) {
-    Serial.println("[KEON] ❌ Not connected - cannot send command");
     return false;
+  }
+
+  // Rate limiting via timestamp check ONLY
+  uint32_t now = millis();
+  if ((now - lastKeonCommand) < KEON_COMMAND_DELAY_MS) {
+    return false;  // Skip this command, too soon
   }
 
   // Send with response (more reliable)
   try {
     keonTxCharacteristic->writeValue(data, length, true);
-    lastKeonCommand = millis();
+    lastKeonCommand = now;
     return true;
   } catch (...) {
-    // Try without response
+    // Try without response as fallback
     try {
       keonTxCharacteristic->writeValue(data, length, false);
-      lastKeonCommand = millis();
+      lastKeonCommand = now;
       return true;
     } catch (...) {
       return false;
     }
   }
-
-  // Delay to prevent disconnect
-  delay(KEON_COMMAND_DELAY_MS);
+  
+  // NO delay() here! Would crash ESP-NOW!
 }
 
 // ===============================================================================
@@ -103,15 +107,15 @@ bool keonStop() {
  * Convenience functions
  */
 bool keonMoveSlow(uint8_t position) {
-  return keonMove(position, 33);  // 33% speed
+  return keonMove(position, 33);
 }
 
 bool keonMoveMedium(uint8_t position) {
-  return keonMove(position, 66);  // 66% speed
+  return keonMove(position, 66);
 }
 
 bool keonMoveFast(uint8_t position) {
-  return keonMove(position, 99);  // 99% speed
+  return keonMove(position, 99);
 }
 
 // ===============================================================================
@@ -129,6 +133,8 @@ void keonInit() {
 
 /**
  * Connect to Keon via BLE
+ * WARNING: This function BLOCKS for ~500ms-1s!
+ * Should ONLY be called from user menu action, NOT from loop!
  */
 bool keonConnect() {
   if (!keonInitialized) {
@@ -138,10 +144,12 @@ bool keonConnect() {
   keonClient = BLEDevice::createClient();
   keonClient->setClientCallbacks(new KeonClientCallback());
 
+  // BLOCKING connect (500ms-1s)
   if (!keonClient->connect(keonAddress)) {
     return false;
   }
 
+  // BLOCKING stabilization delay
   delay(500);
 
   BLERemoteService* pRemoteService = keonClient->getService(KEON_SERVICE_UUID);
@@ -154,7 +162,7 @@ bool keonConnect() {
 
   if (keonTxCharacteristic == nullptr) {
     std::map<std::string, BLERemoteCharacteristic*>* characteristics = pRemoteService->getCharacteristics();
-    if (characteristics != nullptr) {  // NULL check toegevoegd voor crash fix
+    if (characteristics != nullptr) {
       for (auto &entry : *characteristics) {
         BLERemoteCharacteristic* pChar = entry.second;
         if (pChar->canWrite() || pChar->canWriteNoResponse()) {
@@ -171,7 +179,6 @@ bool keonConnect() {
   }
 
   keonConnected = true;
-  lastKeonReconnectAttempt = millis();
   return true;
 }
 
@@ -181,7 +188,7 @@ bool keonConnect() {
 void keonDisconnect() {
   if (keonConnected && keonClient != nullptr) {
     keonStop();
-    delay(200);
+    delay(200);  // Allow stop command to be sent
     keonClient->disconnect();
     keonConnected = false;
     keonTxCharacteristic = nullptr;
@@ -196,15 +203,20 @@ bool keonIsConnected() {
 }
 
 /**
- * Check connection state and attempt reconnect if needed
+ * Check connection state - ULTRA LIGHTWEIGHT!
+ * NO AUTO-RECONNECT to prevent ESP crashes!
+ * User must manually reconnect via menu.
  */
 void keonCheckConnection() {
-  if (!keonConnected) {
-    uint32_t now = millis();
-    if ((now - lastKeonReconnectAttempt) > KEON_RECONNECT_INTERVAL_MS) {
-      keonConnect();
+  // Ultra-fast connection check (no blocking!)
+  if (keonConnected && keonClient != nullptr) {
+    if (!keonClient->isConnected()) {
+      keonConnected = false;
+      keonTxCharacteristic = nullptr;
     }
   }
+  
+  // NO auto-reconnect! Would crash ESP-NOW!
 }
 
 /**
@@ -223,55 +235,45 @@ void keonReconnect() {
 
 /**
  * Park Keon at bottom when paused
- * Called when C button triggers pause
  */
 void keonParkToBottom() {
   if (!keonConnected) return;
-  keonMove(0, 0);  // Bottom position, speed 0 (stopped)
+  keonMove(0, 0);  // Bottom position, speed 0
 }
 
 /**
  * Sync Keon movement with HoofdESP animation
- * Maps animation speed to Keon position and speed
- * 
- * Velocity/Direction Mapping (from velEMA):
- * - velEMA NEGATIVE (omhoog) → isMovingUp=true  → Keon naar BOVEN (99)
- * - velEMA POSITIVE (omlaag)  → isMovingUp=false → Keon naar BENEDEN (0)
- * - Speed follows HoofdESP animation speed step (0-7 → 0-99)
+ * Simple 1:1 mapping - Keon follows sleeve position exactly
  */
-void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, bool isMovingUp) {
+void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, float sleevePercentage) {
   if (!keonConnected) return;
 
-  // Static variables to track previous state
   static uint8_t lastPosition = 50;
-  static uint8_t lastSpeed = 0;
-  static bool lastDirection = false;
   static uint32_t lastSyncTime = 0;
-  const uint32_t SYNC_INTERVAL_MS = 100;  // Send sync every 100ms minimum
+  const uint32_t SYNC_INTERVAL_MS = 100;  // 10Hz to avoid blocking animation
 
   uint32_t now = millis();
   
-  // Rate limit to prevent command flooding
+  // Rate limit to prevent blocking main loop
   if ((now - lastSyncTime) < SYNC_INTERVAL_MS) {
     return;
   }
   
-  // Calculate speed as percentage (0-99)
-  // speedStep 0-7 → speed 0-99 lineair
-  uint8_t speed = (speedSteps <= 1) ? 0 : (speedStep * 99) / (speedSteps - 1);
-  if (speed > 99) speed = 99;
-
-  // Map animation direction (velEMA) to Keon position
-  // isMovingUp = true  (velEMA < 0, moving UP)    → position 99 (BOVEN)
-  // isMovingUp = false (velEMA >= 0, moving DOWN) → position 0 (BENEDEN)
-  uint8_t position = isMovingUp ? 99 : 0;
+  // Map sleeve percentage (0-100) directly to Keon position (0-99)
+  // FULL RANGE at all speeds, just like the animation!
+  uint8_t position = (uint8_t)(sleevePercentage * 0.99f);
+  if (position > 99) position = 99;
   
-  // Only send if state changed (position, speed, or direction)
-  if (position != lastPosition || speed != lastSpeed || isMovingUp != lastDirection) {
-    keonMove(position, speed);
+  // Keon speed: always 99 for instant response
+  // The TEMPO is controlled by animation frequency (speedStep affects animation Hz)
+  uint8_t keonSpeed = 99;
+  
+  // Only send if position changed (reduce BLE traffic)
+  int posDiff = abs((int)position - (int)lastPosition);
+  
+  if (posDiff >= 2) {  // Small threshold to reduce jitter
+    keonMove(position, keonSpeed);
     lastPosition = position;
-    lastSpeed = speed;
-    lastDirection = isMovingUp;
     lastSyncTime = now;
   }
 }
@@ -280,9 +282,6 @@ void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, bool isMovingUp)
 // DEBUG & UTILITY
 // ===============================================================================
 
-/**
- * Print Keon status information
- */
 void keonPrintStatus() {
-  // Debug status (minimal output)
+  // Minimal output
 }
