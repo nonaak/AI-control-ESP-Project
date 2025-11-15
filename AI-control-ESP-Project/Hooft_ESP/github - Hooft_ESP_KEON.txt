@@ -73,3 +73,6 @@ https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP_KEON/
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP_KEON/
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP_KEON/
+
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/TODO_KEON_INTEGRATION.md/
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Hooft_ESP/GESPREK_SAMENVATTING.md/
