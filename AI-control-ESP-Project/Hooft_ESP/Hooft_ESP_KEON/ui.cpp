@@ -213,42 +213,42 @@ float getSleevePercentage() {
 // Connection popup variables
 static bool connectionPopupOpen = false;
 static int connectionDeviceIdx = -1; // 0=Keon, 1=Solace
-static int connectionChoiceIdx = 0; // 0=Ja, 1=Nee
+//static int connectionChoiceIdx = 0; // 0=Ja, 1=Nee
 
 // Nunchuk help popup variables
 static bool nunchukHelpPopupOpen = false;
 
 // Connection attempt tracking
-static bool connectionInProgress = false;
-static uint32_t connectionStartTime = 0;
-static const uint32_t CONNECTION_TIMEOUT_MS = 5000; // 5 second timeout
+//static bool connectionInProgress = false;
+//static uint32_t connectionStartTime = 0;
+//static const uint32_t CONNECTION_TIMEOUT_MS = 5000; // 5 second timeout
 
 // Non-blocking connection attempt functions
-static void startKeonConnection() {
-  Serial.println("[CONNECTION] Starting Keon connection attempt...");
-  connectionInProgress = true;
-  connectionStartTime = millis();
+//static void startKeonConnection() {
+  //Serial.println("[CONNECTION] Starting Keon connection attempt...");
+  //connectionInProgress = true;
+  //connectionStartTime = millis();
   
   // Call real Keon connect in background
-  extern bool keonConnect();
-  keonConnect();
-}
+  //extern bool keonConnect();
+  //keonConnect();
+//}
 
-static bool checkKeonConnectionProgress() {
-  if (!connectionInProgress) return false;
+//static bool checkKeonConnectionProgress() {
+  //if (!connectionInProgress) return false;
   
-  uint32_t elapsed = millis() - connectionStartTime;
+  //uint32_t elapsed = millis() - connectionStartTime;
   
   // Give it time to connect
-  if (elapsed < KEON_CONNECTION_TIMEOUT_MS) {
-    return false;  // Still connecting
-  }
+  //if (elapsed < KEON_CONNECTION_TIMEOUT_MS) {
+    //return false;  // Still connecting
+  //}
   
   // Check result
-  connectionInProgress = false;
-  extern bool keonConnected;
-  return keonConnected;
-}
+  //connectionInProgress = false;
+  //extern bool keonConnected;
+  //return keonConnected;
+//}
 
 static void disconnectKeon() {
   if (keonConnected) {
