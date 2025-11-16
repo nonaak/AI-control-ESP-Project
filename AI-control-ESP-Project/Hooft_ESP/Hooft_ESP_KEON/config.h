@@ -9,7 +9,7 @@ struct Config {
   bool     START_PAUSED  = true;     // Start gepauzeerd (false = direct running)
 
   // === Animatie snelheid ===
-  float    MIN_SPEED_HZ  = 0.21f;    // 0.22f org Laagste animatie frequentie (Hz) - langzaamste snelheid
+  float    MIN_SPEED_HZ  = 0.2f;    // 0.22f org Laagste animatie frequentie (Hz) - langzaamste snelheid
   float    MAX_SPEED_HZ  = 1.00f;    // 1.17f Hoogste animatie frequentie (Hz) - snelste snelheid
   uint8_t  SPEED_STEPS   = 7;        // Aantal snelheidsstappen (1-20) - meer = fijnere controle
   float    ANIM_SPEED_FACTOR = 1.0f; // Animatie snelheid factor (hoger = snellere animatie)

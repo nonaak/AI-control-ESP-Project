@@ -285,42 +285,32 @@ void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, bool isMovingUp)
     Serial.println("[KEON SYNC] ERROR: Called while paused!");
     return;
   }
-
-  static bool lastDirection = false;
+  
+  static bool keonDirection = false;  // ← KEON's eigen direction!
   static uint32_t lastSyncTime = 0;
-  static uint32_t lastDebugTime = 0;
-
   uint32_t now = millis();
   
-  // Alleen updaten bij direction change
-  if (isMovingUp != lastDirection) {
-    
-    // Minimum tijd tussen strokes
-    if ((now - lastSyncTime) < 100) {
-      return;
-    }
-    
-    // Variabele stroke range: Level 0=vol, Level 6=kort
-    uint8_t posRange = 99 - ((speedStep * 60) / (speedSteps - 1)); // 99@L0 → 39@L6
-    
-    uint8_t targetPos;
-    if (isMovingUp) {
-      targetPos = posRange;  // L0:99, L6:39
-    } else {
-      targetPos = 100 - posRange;  // L0:1, L6:61
-    }
-    
-    // Speed altijd max voor snelle response
-    uint8_t keonSpeed = 99;
-    
-    keonMove(targetPos, keonSpeed);
-    
-    lastDirection = isMovingUp;
-    lastSyncTime = now;
-    
-    Serial.printf("[KEON] Level:%u Range:%u Pos:%u Speed:%u\n", 
-                  speedStep, posRange, targetPos, keonSpeed);
+  // Level 0 = langzaam (1000ms), Level 6 = snel (200ms)
+  uint32_t strokeInterval = 1000 - ((speedStep * 800) / (speedSteps - 1));
+  
+  // Alleen update op KEON's eigen timing, NIET op animatie direction!
+  if ((now - lastSyncTime) < strokeInterval) {
+    return;  // Nog niet tijd voor volgende stroke
   }
+  
+  // Toggle KEON's eigen direction
+  keonDirection = !keonDirection;
+  
+  // Volle stroke altijd
+  uint8_t targetPos = keonDirection ? 99 : 0;
+  uint8_t keonSpeed = 99;
+  
+  keonMove(targetPos, keonSpeed);
+  
+  lastSyncTime = now;
+  
+  Serial.printf("[KEON INDEPENDENT] L:%u Pos:%u Interval:%ums\n", 
+                speedStep, targetPos, strokeInterval);
 }
 
 
