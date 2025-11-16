@@ -1618,11 +1618,13 @@ void uiTick() {
   } else if (cev==CE_SHORT && !paletteOpen){
     if (!paused) {
       parkToBottom = true;
+      paused = true;
       Serial.println("[DEBUG] parkToBottom set to TRUE here! ui_cpp");
       keonSyncEnabled = false;
     }else { 
       paused = false; parkToBottom = false;
-      phase = 0.0f;
+      phase = -1.5707963f;
+      //phase = 0.0f;
       //capY_draw = (float)CAP_Y_IN; 
       velEMA = 0.0f;
       keonSyncEnabled = true;
@@ -1853,7 +1855,24 @@ void uiTick() {
   prevCapY = capY;
   velEMA = (1.0f - CFG.velEMAalpha)*velEMA + CFG.velEMAalpha*vel;
   
-  bool goingUp = (velEMA < 0.0f);
+  //bool goingUp = (velEMA < 0.0f);
+  //float vel = 0.0f; 
+  //if (prevCapY != INT_MIN) vel = (float)(capY - prevCapY);
+  //prevCapY = capY;
+  //velEMA = (1.0f - CFG.velEMAalpha)*velEMA + CFG.velEMAalpha*vel;
+  
+  // Direction detection met hysteresis (voorkomt jitter)
+  static bool lastGoingUp = false;
+  bool goingUp;
+  
+  if (velEMA < -1.0f) {
+    goingUp = true;   // Duidelijk naar boven
+  } else if (velEMA > 1.0f) {
+    goingUp = false;  // Duidelijk naar beneden  
+  } else {
+    goingUp = lastGoingUp;  // Te klein verschil → behoud richting
+  }
+  lastGoingUp = goingUp;
   
   static bool prevArrowFull = false;
   static uint32_t lastEdgeTime = 0;
@@ -1925,13 +1944,15 @@ void uiTick() {
       hasParked = false;  // Reset flag when unpaused
       
       extern uint8_t g_speedStep;
-      float sleevePercent = getSleevePercentage();
-      keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
+      //bool goingUp = (velEMA < 0.0f);  // Deze wordt al eerder berekend
+      keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, goingUp);
+      //float sleevePercent = getSleevePercentage();
+      //keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
     }
   }
 
-  if (parkToBottom && capY_draw < (float)CAP_Y_IN && paused) {
-  //if (parkToBottom && capY_draw < (float)CAP_Y_IN) {  
+  //if (parkToBottom && capY_draw < (float)CAP_Y_IN && paused) {
+  if (parkToBottom && capY_draw < (float)CAP_Y_IN) {  
     capY_draw += 0.5f;
     if (capY_draw > (float)CAP_Y_IN) {
       capY_draw = (float)CAP_Y_IN;

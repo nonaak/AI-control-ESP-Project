@@ -10,7 +10,7 @@ struct Config {
 
   // === Animatie snelheid ===
   float    MIN_SPEED_HZ  = 0.22f;    // Laagste animatie frequentie (Hz) - langzaamste snelheid
-  float    MAX_SPEED_HZ  = 3.00f;    // Hoogste animatie frequentie (Hz) - snelste snelheid
+  float    MAX_SPEED_HZ  = 1.17f;    // Hoogste animatie frequentie (Hz) - snelste snelheid
   uint8_t  SPEED_STEPS   = 7;        // Aantal snelheidsstappen (1-20) - meer = fijnere controle
   float    ANIM_SPEED_FACTOR = 1.0f; // Animatie snelheid factor (hoger = snellere animatie)
 

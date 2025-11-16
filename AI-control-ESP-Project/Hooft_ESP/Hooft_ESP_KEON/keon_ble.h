@@ -53,7 +53,8 @@ void keonParkToBottom();
 
 // Animation synchronization
 // Sync Keon to real sleeve position from animation
-void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, float sleevePercentage);
+//void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, float sleevePercentage);
+void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, bool isMovingUp);
 
 // Connection state check (call this in loop!)
 void keonCheckConnection();
