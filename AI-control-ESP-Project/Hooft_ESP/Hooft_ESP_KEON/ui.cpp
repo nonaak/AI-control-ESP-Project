@@ -1855,24 +1855,7 @@ void uiTick() {
   prevCapY = capY;
   velEMA = (1.0f - CFG.velEMAalpha)*velEMA + CFG.velEMAalpha*vel;
   
-  //bool goingUp = (velEMA < 0.0f);
-  //float vel = 0.0f; 
-  //if (prevCapY != INT_MIN) vel = (float)(capY - prevCapY);
-  //prevCapY = capY;
-  //velEMA = (1.0f - CFG.velEMAalpha)*velEMA + CFG.velEMAalpha*vel;
-  
-  // Direction detection met hysteresis (voorkomt jitter)
-  static bool lastGoingUp = false;
-  bool goingUp;
-  
-  if (velEMA < -1.0f) {
-    goingUp = true;   // Duidelijk naar boven
-  } else if (velEMA > 1.0f) {
-    goingUp = false;  // Duidelijk naar beneden  
-  } else {
-    goingUp = lastGoingUp;  // Te klein verschil → behoud richting
-  }
-  lastGoingUp = goingUp;
+  bool goingUp = (velEMA < 0.0f);
   
   static bool prevArrowFull = false;
   static uint32_t lastEdgeTime = 0;

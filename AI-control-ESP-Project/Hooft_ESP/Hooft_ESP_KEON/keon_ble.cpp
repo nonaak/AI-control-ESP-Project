@@ -277,7 +277,7 @@ void keonReconnect() {
  * 
  * IMPORTANT: This should ONLY be called when animation is running!
  */
- void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, bool isMovingUp) {
+void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, bool isMovingUp) {
   if (!keonConnected) return;
   
   extern bool paused;
@@ -295,18 +295,22 @@ void keonReconnect() {
   // Alleen updaten bij direction change
   if (isMovingUp != lastDirection) {
     
-    // Dynamische debounce op basis van animatie snelheid
-    // Bij hogere snelheid = kortere debounce
-    // MIN_SPEED = 0.22 Hz → ~2270ms per stroke → debounce 150ms
-    // MAX_SPEED = 1.17 Hz → ~427ms per stroke → debounce 50ms
-    float step01 = (speedSteps <= 1) ? 0.0f : (float)speedStep / (float)(speedSteps - 1);
-    uint32_t debounce = 150 - (uint32_t)(step01 * 100.0f);  // 150ms @ level 0, 50ms @ level 6
-    
-    if ((now - lastSyncTime) < debounce) {
+    // Minimum tijd tussen strokes
+    if ((now - lastSyncTime) < 100) {
       return;
     }
     
-    uint8_t targetPos = isMovingUp ? 99 : 0;
+    // Variabele stroke range: Level 0=vol, Level 6=kort
+    uint8_t posRange = 99 - ((speedStep * 60) / (speedSteps - 1)); // 99@L0 → 39@L6
+    
+    uint8_t targetPos;
+    if (isMovingUp) {
+      targetPos = posRange;  // L0:99, L6:39
+    } else {
+      targetPos = 100 - posRange;  // L0:1, L6:61
+    }
+    
+    // Speed altijd max voor snelle response
     uint8_t keonSpeed = 99;
     
     keonMove(targetPos, keonSpeed);
@@ -314,113 +318,11 @@ void keonReconnect() {
     lastDirection = isMovingUp;
     lastSyncTime = now;
     
-    // Debug output
-    if (now - lastDebugTime > 2000) {
-      Serial.printf("[KEON STROKE] %s → Pos:%u Speed:99 (level %u, debounce:%ums)\n", 
-                    isMovingUp ? "UP  " : "DOWN", targetPos, speedStep, debounce);
-      lastDebugTime = now;
-    }
+    Serial.printf("[KEON] Level:%u Range:%u Pos:%u Speed:%u\n", 
+                  speedStep, posRange, targetPos, keonSpeed);
   }
 }
- //void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, bool isMovingUp) {
-  //if (!keonConnected) return;
-  
-  // Extra safety: Don't sync if paused
-  //extern bool paused;
-  //if (paused) {
-    //Serial.println("[KEON SYNC] ERROR: Called while paused!");
-    //return;
-  //}
 
-  //static bool lastDirection = false;
-  //static uint32_t lastSyncTime = 0;
-  //static uint32_t lastDebugTime = 0;
-
-  //uint32_t now = millis();
-  
-  // Alleen updaten bij direction change (volle stroke)
-  //if (isMovingUp != lastDirection) {
-    
-    // Debounce: min 100ms tussen strokes (voorkomt jitter)
-    //if ((now - lastSyncTime) < 100) {
-      //return;
-    //}
-    
-    // Full stroke positie
-    //uint8_t targetPos = isMovingUp ? 99 : 0;
-    
-    // Altijd max speed voor snelste response
-    //uint8_t keonSpeed = 99;
-    
-    //keonMove(targetPos, keonSpeed);
-    
-    //lastDirection = isMovingUp;
-    //lastSyncTime = now;
-    
-    // Debug output (elke 2 seconden)
-    //if (now - lastDebugTime > 2000) {
-      //Serial.printf("[KEON STROKE] %s → Pos:%u Speed:99 (level %u)\n", 
-                    //isMovingUp ? "UP  " : "DOWN", targetPos, speedStep);
-      //lastDebugTime = now;
-    //}
-  //}
-//}
-//void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, float sleevePercentage) {
-  //if (!keonConnected) return;
-  
-  // Extra safety: Don't sync if paused (this should never happen, but just in case)
-  //extern bool paused;
-  //if (paused) {
-    //Serial.println("[KEON SYNC] ERROR: Called while paused!");
-    //return;
-  //}
-
-  //static uint8_t lastPosition = 50;
-  //static uint32_t lastSyncTime = 0;
-  //static uint32_t lastDebugTime = 0;
-  //const uint32_t SYNC_INTERVAL_MS = 100;  // 10Hz to avoid blocking animation
-
-  // Variable sync interval based on speedStep
-  // speedStep 0 = slow updates, speedStep 7 = fast updates
-  //uint32_t syncInterval = 300 - (speedStep * 35);  // 300ms @ speed 0, 55ms @ speed 7
-  //if (syncInterval < 50) syncInterval = 50;  // Minimum 50ms
-
-  //uint32_t now = millis();
-  
-  // Rate limit to prevent blocking main loop
-  //if ((now - lastSyncTime) < syncInterval) {
-    //return;
-  //}
-  //if ((now - lastSyncTime) < SYNC_INTERVAL_MS) {
-    //return;
-  //}
-  
-  // Map sleeve percentage (0-100) directly to Keon position (0-99)
-  // FULL RANGE at all speeds, just like the animation!
-  //uint8_t position = (uint8_t)(sleevePercentage * 0.99f);
-  //if (position > 99) position = 99;
-  
-  // Keon speed: always 99 for instant response
-  // The TEMPO is controlled by animation frequency (speedStep affects animation Hz)
-  //uint8_t keonSpeed = 99;
-
-  
-  // Only send if position changed (reduce BLE traffic)
-  //int posDiff = abs((int)position - (int)lastPosition);
-  
-  //if (posDiff >= 2) {  // Small threshold to reduce jitter
-    //keonMove(position, keonSpeed);
-    //lastPosition = position;
-    //lastSyncTime = now;
-    
-    // Debug output every 2 seconds
-    //if (now - lastDebugTime > 2000) {
-      //Serial.printf("[KEON SYNC] Pos:%u Speed:%u SleevePercent:%.1f speedStep:%u\n", 
-                   // position, keonSpeed, sleevePercentage, speedStep);
-      //lastDebugTime = now;
-    //}
- // }
-//}
 
 // ===============================================================================
 // MAC ADDRESS MANAGEMENT
