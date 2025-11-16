@@ -1618,12 +1618,16 @@ void uiTick() {
   } else if (cev==CE_SHORT && !paletteOpen){
     if (!paused) {
       parkToBottom = true;
+      Serial.println("[DEBUG] parkToBottom set to TRUE here! ui_cpp");
       keonSyncEnabled = false;
     }else { 
-      paused = false; parkToBottom = false; 
+      paused = false; parkToBottom = false;
+      phase = 0.0f;
+      //capY_draw = (float)CAP_Y_IN; 
       velEMA = 0.0f;
       keonSyncEnabled = true;
       Serial.println("[UNPAUSE] velEMA reset for crispy auto vacuum response");
+      Serial.printf("[UNPAUSE DEBUG] paused=%d parkToBottom=%d phase=%.2f\n", paused, parkToBottom, phase);
     }
   }
 
@@ -1821,6 +1825,11 @@ void uiTick() {
   if (!paused && !parkToBottom) {
     phase += TAU * instF * dt * CFG.ANIM_SPEED_FACTOR;
     if (phase > TAU) phase -= TAU;
+    static uint32_t lastPhaseDebug = 0;
+    if (millis() - lastPhaseDebug > 1000) {
+      Serial.printf("[DEBUG PHASE] phase=%.3f paused=%d parkToBottom=%d\n", phase, paused, parkToBottom);
+      lastPhaseDebug = millis();
+    }
   }
   
   float s = 0.5f * (sinf(phase) + 1.0f);
@@ -1921,7 +1930,8 @@ void uiTick() {
     }
   }
 
-  if (parkToBottom && capY_draw < (float)CAP_Y_IN) {
+  if (parkToBottom && capY_draw < (float)CAP_Y_IN && paused) {
+  //if (parkToBottom && capY_draw < (float)CAP_Y_IN) {  
     capY_draw += 0.5f;
     if (capY_draw > (float)CAP_Y_IN) {
       capY_draw = (float)CAP_Y_IN;

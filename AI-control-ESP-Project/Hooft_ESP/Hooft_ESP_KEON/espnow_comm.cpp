@@ -373,6 +373,7 @@ void handleBodyESPMessage(const bodyESP_message_t &msg) {
     // 1. Zet animatie op pauze
     extern bool paused;
     paused = true;
+    Serial.println("[DEBUG] paused set to TRUE here! espnow_comm_cpp");
     
     // 2. Snelheid naar minimum (0)
     extern uint8_t g_speedStep;
@@ -506,8 +507,8 @@ void sendBodyESPStatusUpdate(const machineStatus_message_t &msg) {
 void sendM5AtomStatusUpdate(const monitoring_message_t &msg) {
   esp_err_t result = esp_now_send(m5atom_MAC, (uint8_t*)&msg, sizeof(msg));
   if (result == ESP_OK) {
-    Serial.printf("[TX M5Atom Status OK] Trust:%.1f, Sleeve:%.1f, Status:%s\n", 
-                  msg.trustSpeed, msg.sleeveSpeed, msg.status);
+    //Serial.printf("[TX M5Atom Status OK] Trust:%.1f, Sleeve:%.1f, Status:%s\n", 
+ //                 msg.trustSpeed, msg.sleeveSpeed, msg.status);
   } else {
     Serial.printf("[TX M5Atom Status ERROR] Send failed: %d\n", result);
   }
@@ -516,9 +517,9 @@ void sendM5AtomStatusUpdate(const monitoring_message_t &msg) {
 void sendM5AtomPumpColors(const pumpColors_message_t &msg) {
   esp_err_t result = esp_now_send(m5atom_MAC, (uint8_t*)&msg, sizeof(msg));
   if (result == ESP_OK) {
-    Serial.printf("[TX M5Atom Colors OK] Sent pump colors: A(%d,%d,%d) B(%d,%d,%d), flags=0x%02X (VacLED:%d DebugLED:%d)\n", 
-                  msg.a_r, msg.a_g, msg.a_b, msg.b_r, msg.b_g, msg.b_b, msg.flags, 
-                  (msg.flags & 0x04) ? 1 : 0, (msg.flags & 0x08) ? 1 : 0);
+    //Serial.printf("[TX M5Atom Colors OK] Sent pump colors: A(%d,%d,%d) B(%d,%d,%d), flags=0x%02X (VacLED:%d DebugLED:%d)\n", 
+   //               msg.a_r, msg.a_g, msg.a_b, msg.b_r, msg.b_g, msg.b_b, msg.flags, 
+   //                (msg.flags & 0x04) ? 1 : 0, (msg.flags & 0x08) ? 1 : 0);
   } else {
     Serial.printf("[TX M5Atom Colors ERROR] Send failed: %d (ESP_ERR_ESPNOW_NOT_INIT=%d)\n", 
                   result, ESP_ERR_ESPNOW_NOT_INIT);

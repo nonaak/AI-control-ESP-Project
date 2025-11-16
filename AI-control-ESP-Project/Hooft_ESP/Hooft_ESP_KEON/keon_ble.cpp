@@ -290,14 +290,22 @@ void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, float sleevePerc
   static uint8_t lastPosition = 50;
   static uint32_t lastSyncTime = 0;
   static uint32_t lastDebugTime = 0;
-  const uint32_t SYNC_INTERVAL_MS = 100;  // 10Hz to avoid blocking animation
+  //const uint32_t SYNC_INTERVAL_MS = 100;  // 10Hz to avoid blocking animation
+
+  // Variable sync interval based on speedStep
+  // speedStep 0 = slow updates, speedStep 7 = fast updates
+  uint32_t syncInterval = 300 - (speedStep * 35);  // 300ms @ speed 0, 55ms @ speed 7
+  if (syncInterval < 50) syncInterval = 50;  // Minimum 50ms
 
   uint32_t now = millis();
   
   // Rate limit to prevent blocking main loop
-  if ((now - lastSyncTime) < SYNC_INTERVAL_MS) {
+  if ((now - lastSyncTime) < syncInterval) {
     return;
   }
+  //if ((now - lastSyncTime) < SYNC_INTERVAL_MS) {
+    //return;
+  //}
   
   // Map sleeve percentage (0-100) directly to Keon position (0-99)
   // FULL RANGE at all speeds, just like the animation!
@@ -307,6 +315,7 @@ void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, float sleevePerc
   // Keon speed: always 99 for instant response
   // The TEMPO is controlled by animation frequency (speedStep affects animation Hz)
   uint8_t keonSpeed = 99;
+
   
   // Only send if position changed (reduce BLE traffic)
   int posDiff = abs((int)position - (int)lastPosition);
