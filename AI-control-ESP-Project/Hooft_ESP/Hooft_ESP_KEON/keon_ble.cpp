@@ -1,4 +1,5 @@
 #include "keon_ble.h"
+#include "config.h"
 #include <BLEUtils.h>
 
 // ===============================================================================
@@ -15,9 +16,10 @@ uint8_t keonCurrentSpeed = 0;
 
 // Connection state tracking
 static uint32_t lastKeonCommand = 0;
-static uint32_t lastKeonReconnectAttempt = 0;
 static bool keonInitialized = false;
-static String keonMacAddress = KEON_MAC_ADDRESS;
+
+// MAC address storage
+static String lastConnectedMAC = "";
 
 // ===============================================================================
 // BLE CALLBACK HANDLER
@@ -26,46 +28,38 @@ static String keonMacAddress = KEON_MAC_ADDRESS;
 class KeonClientCallback : public BLEClientCallbacks {
   void onConnect(BLEClient* pclient) {
     keonConnected = true;
-    Serial.println("[KEON] ✅ Connected!");
+    Serial.println("[KEON] BLE Connected");
   }
-  
   void onDisconnect(BLEClient* pclient) {
     keonConnected = false;
-    Serial.println("[KEON] ❌ Disconnected!");
+    Serial.println("[KEON] BLE Disconnected");
   }
 };
 
 // ===============================================================================
-// COMMAND SENDING
+// COMMAND SENDING (NO DELAYS!)
 // ===============================================================================
 
-/**
- * Send raw command to Keon (internal helper)
- */
 static bool keonSendCommand(uint8_t* data, size_t length) {
   if (!keonConnected || keonTxCharacteristic == nullptr) {
     return false;
   }
 
-  // Rate limiting
   uint32_t now = millis();
   if ((now - lastKeonCommand) < KEON_COMMAND_DELAY_MS) {
     return false;
   }
 
-  // Send with response (more reliable)
   try {
     keonTxCharacteristic->writeValue(data, length, true);
     lastKeonCommand = now;
     return true;
   } catch (...) {
-    // Try without response as fallback
     try {
       keonTxCharacteristic->writeValue(data, length, false);
       lastKeonCommand = now;
       return true;
     } catch (...) {
-      Serial.println("[KEON] ❌ Write failed");
       return false;
     }
   }
@@ -75,9 +69,6 @@ static bool keonSendCommand(uint8_t* data, size_t length) {
 // MOVEMENT CONTROL
 // ===============================================================================
 
-/**
- * Move Keon to position with speed
- */
 bool keonMove(uint8_t position, uint8_t speed) {
   if (position > 99) position = 99;
   if (speed > 99) speed = 99;
@@ -89,112 +80,74 @@ bool keonMove(uint8_t position, uint8_t speed) {
   return keonSendCommand(cmd, 5);
 }
 
-/**
- * Stop at specific position
- */
-static bool keonStopAtPosition(uint8_t position) {
+bool keonStopAtPosition(uint8_t position) {
   if (position > 99) position = 99;
   uint8_t cmd[5] = {0x04, 0x00, position, 0x00, 0x00};
   return keonSendCommand(cmd, 5);
 }
 
-/**
- * Stop at current position
- */
 bool keonStop() {
   return keonStopAtPosition(keonCurrentPosition);
 }
 
-/**
- * Convenience functions
- */
 bool keonMoveSlow(uint8_t position) {
-  return keonMove(position, 33);  // 33% speed
+  return keonMove(position, 33);
 }
 
 bool keonMoveMedium(uint8_t position) {
-  return keonMove(position, 66);  // 66% speed
+  return keonMove(position, 66);
 }
 
 bool keonMoveFast(uint8_t position) {
-  return keonMove(position, 99);  // 99% speed
-}
-
-/**
- * Park Keon at bottom when paused
- */
-void keonParkToBottom() {
-  if (!keonConnected) return;
-  Serial.println("[KEON] Parking to bottom (paused)");
-  keonMove(0, 0);  // Bottom position, speed 0
+  return keonMove(position, 99);
 }
 
 // ===============================================================================
 // CONNECTION MANAGEMENT
 // ===============================================================================
 
-/**
- * Initialize Keon BLE system
- */
 void keonInit() {
-  if (keonInitialized) {
-    Serial.println("[KEON] Already initialized");
-    return;
-  }
-  
-  Serial.println("[KEON] Initializing BLE...");
+  if (keonInitialized) return;
   BLEDevice::init("HoofdESP_KeonController");
   keonInitialized = true;
   Serial.println("[KEON] BLE initialized");
 }
 
-/**
- * Connect to Keon via BLE
- * WARNING: This function BLOCKS for ~500ms-1s during connection!
- * This is INTENTIONAL and works fine with ESP-NOW.
- */
 bool keonConnect() {
   if (!keonInitialized) {
     keonInit();
   }
 
-  Serial.printf("[KEON] Connecting to %s...\n", keonMacAddress.c_str());
-
-  // Create client
+  Serial.println("[KEON] Attempting connection...");
+  
   keonClient = BLEDevice::createClient();
   keonClient->setClientCallbacks(new KeonClientCallback());
 
-  // Connect (BLOCKING ~500ms-1s)
   if (!keonClient->connect(keonAddress)) {
-    Serial.println("[KEON] ❌ Connect failed");
+    Serial.println("[KEON] Connection failed!");
     return false;
   }
 
-  // Stabilization delay (BLOCKING)
   delay(500);
 
-  // Get service
   BLERemoteService* pRemoteService = keonClient->getService(KEON_SERVICE_UUID);
   if (pRemoteService == nullptr) {
-    Serial.println("[KEON] ❌ Service not found");
+    Serial.println("[KEON] Service not found!");
     keonClient->disconnect();
     return false;
   }
 
-  // Get characteristic
   keonTxCharacteristic = pRemoteService->getCharacteristic(KEON_TX_CHAR_UUID);
 
-  // Fallback: search for writable characteristic
   if (keonTxCharacteristic == nullptr) {
-    Serial.println("[KEON] Searching for writable characteristic...");
+    Serial.println("[KEON] TX Characteristic not found, searching...");
     std::map<std::string, BLERemoteCharacteristic*>* characteristics = pRemoteService->getCharacteristics();
-    
     if (characteristics != nullptr) {
       for (auto &entry : *characteristics) {
         BLERemoteCharacteristic* pChar = entry.second;
         if (pChar->canWrite() || pChar->canWriteNoResponse()) {
           keonTxCharacteristic = pChar;
-          Serial.printf("[KEON] Found: %s\n", pChar->getUUID().toString().c_str());
+          Serial.println("[KEON] Found writable characteristic!");
           break;
         }
       }
@@ -202,20 +155,17 @@ bool keonConnect() {
   }
 
   if (keonTxCharacteristic == nullptr) {
-    Serial.println("[KEON] ❌ No writable characteristic found");
+    Serial.println("[KEON] No writable characteristic found!");
     keonClient->disconnect();
     return false;
   }
 
   keonConnected = true;
-  lastKeonReconnectAttempt = millis();
-  Serial.println("[KEON] ✅ Connected and ready!");
+  lastConnectedMAC = String(KEON_MAC_ADDRESS);
+  Serial.printf("[KEON] Connected successfully to %s\n", KEON_MAC_ADDRESS);
   return true;
 }
 
-/**
- * Disconnect from Keon
- */
 void keonDisconnect() {
   if (keonConnected && keonClient != nullptr) {
     Serial.println("[KEON] Disconnecting...");
@@ -227,36 +177,22 @@ void keonDisconnect() {
   }
 }
 
-/**
- * Check if Keon is connected
- */
 bool keonIsConnected() {
   return keonConnected && keonClient != nullptr && keonTxCharacteristic != nullptr;
 }
 
-/**
- * Check connection state - ULTRA LIGHTWEIGHT!
- * CALL THIS IN YOUR MAIN LOOP!
- * 
- * Only checks connection status, no reconnect logic.
- * This ensures animation keeps running smoothly.
- */
 void keonCheckConnection() {
-  // Ultra-fast connection check (no blocking!)
   if (keonConnected && keonClient != nullptr) {
     if (!keonClient->isConnected()) {
+      Serial.println("[KEON] Connection lost!");
       keonConnected = false;
       keonTxCharacteristic = nullptr;
-      Serial.println("[KEON] Connection lost - reconnect via menu");
     }
   }
 }
 
-/**
- * Manual reconnect attempt
- */
 void keonReconnect() {
-  Serial.println("[KEON] Manual reconnect requested");
+  Serial.println("[KEON] Manual reconnect...");
   if (keonConnected) {
     keonDisconnect();
   }
@@ -264,68 +200,182 @@ void keonReconnect() {
 }
 
 // ===============================================================================
-// ANIMATION SYNCHRONIZATION
-// ===============================================================================
-
-/**
- * Sync Keon movement with HoofdESP animation
- * 
- * Simple 1:1 mapping:
- * - Keon follows sleeve position exactly (0-99 full range)
- * - Tempo is determined by animation speed (slow → fast)
- * - Just like the on-screen animation!
- * 
- * IMPORTANT: This should ONLY be called when animation is running!
- */
-void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, bool isMovingUp) {
-  if (!keonConnected) return;
-  
-  extern bool paused;
-  if (paused) {
-    Serial.println("[KEON SYNC] ERROR: Called while paused!");
-    return;
-  }
-  
-  static bool keonDirection = false;  // ← KEON's eigen direction!
-  static uint32_t lastSyncTime = 0;
-  uint32_t now = millis();
-  
-  // Level 0 = langzaam (1000ms), Level 6 = snel (200ms)
-  uint32_t strokeInterval = 1000 - ((speedStep * 800) / (speedSteps - 1));
-  
-  // Alleen update op KEON's eigen timing, NIET op animatie direction!
-  if ((now - lastSyncTime) < strokeInterval) {
-    return;  // Nog niet tijd voor volgende stroke
-  }
-  
-  // Toggle KEON's eigen direction
-  keonDirection = !keonDirection;
-  
-  // Volle stroke altijd
-  uint8_t targetPos = keonDirection ? 99 : 0;
-  uint8_t keonSpeed = 99;
-  
-  keonMove(targetPos, keonSpeed);
-  
-  lastSyncTime = now;
-  
-  Serial.printf("[KEON INDEPENDENT] L:%u Pos:%u Interval:%ums\n", 
-                speedStep, targetPos, strokeInterval);
-}
-
-
-// ===============================================================================
 // MAC ADDRESS MANAGEMENT
 // ===============================================================================
 
 String keonGetLastMAC() {
-  return keonMacAddress;
+  return lastConnectedMAC;
 }
 
 void keonSetMAC(const char* mac) {
-  keonMacAddress = String(mac);
-  keonAddress = BLEAddress(mac);
-  Serial.printf("[KEON] MAC updated to: %s\n", mac);
+  lastConnectedMAC = String(mac);
+  Serial.printf("[KEON] MAC set to: %s (requires recompile)\n", mac);
+}
+
+// ===============================================================================
+// PARK TO BOTTOM
+// ===============================================================================
+
+void keonParkToBottom() {
+  if (!keonConnected) return;
+  Serial.println("[KEON] Parking to bottom (pause)");
+  keonMove(0, 50);
+}
+
+// ===============================================================================
+// 🚀 NIEUWE ONAFHANKELIJKE KEON CONTROL - GEFIXTE VERSIE!
+// ===============================================================================
+
+/**
+ * ✅ KEON INDEPENDENT TICK - 100% ONAFHANKELIJK MET SPEED MAPPING!
+ * 
+ * FIXED:
+ * - Speed niet meer altijd 99, maar gemapped naar speedStep (20-99)
+ * - Bij lage levels = langzame Keon beweging
+ * - Bij hoge levels = snelle Keon beweging
+ * - Volle strokes (0↔99) blijven behouden
+ * 
+ * TIMING:
+ * - Level 0: 1200ms interval, speed 20 = 25 strokes/min (LANGZAAM)
+ * - Level 7: 400ms interval, speed 99 = 75 strokes/min (SNEL)
+ */
+//void keonIndependentTick() {
+  //if (!keonConnected) return;
+  
+  //extern bool paused;
+  //if (paused) return;
+  
+  //static bool keonDirection = false;
+  //static uint32_t lastStroke = 0;
+  
+  //uint32_t now = millis();
+  
+  //extern uint8_t g_speedStep;
+  
+  // ✅ MAP speedStep (0-7) naar Keon speed (20-99)
+  // Level 0 = langzaam (speed 20)
+  // Level 7 = snel (speed 99)
+  //uint8_t keonSpeed = 20 + ((g_speedStep * 79) / 7);
+  //if (keonSpeed < 20) keonSpeed = 20;  // Minimum voor soepele beweging
+  //if (keonSpeed > 99) keonSpeed = 99;  // Maximum
+  
+  // ✅ Sync interval: hoe vaak we direction togglen
+  // Level 0: 1200ms (traag)
+  // Level 7: 400ms (snel)
+  //uint32_t syncInterval = 1200 - ((g_speedStep * 800) / 7);
+  
+  //if ((now - lastStroke) < syncInterval) {
+    //return;  // Nog niet tijd voor volgende toggle
+  //}
+  
+  // Toggle direction
+  //keonDirection = !keonDirection;
+  //uint8_t targetPos = keonDirection ? 99 : 0;
+  
+  // Stuur naar Keon met variabele speed
+  //bool success = keonMove(targetPos, keonSpeed);
+  
+  //if (success) {
+    //lastStroke = now;
+    
+    // Debug output (elke 2 seconden)
+    //static uint32_t lastDebug = 0;
+    //if (now - lastDebug > 2000) {
+      //Serial.printf("[KEON INDEPENDENT] Level:%u Speed:%u Pos:%u Interval:%ums (%.0f strokes/min)\n", 
+                    //g_speedStep,
+                    //keonSpeed,
+                    //targetPos,
+                    //syncInterval,
+                    //60000.0f / (syncInterval * 2));
+      //lastDebug = now;
+    //}
+  //}
+//}
+void keonIndependentTick() {
+  if (!keonConnected) return;
+  
+  extern bool paused;
+  if (paused) return;
+  
+  static bool keonDirection = false;
+  static uint32_t lastStroke = 0;
+  
+  uint32_t now = millis();
+  extern uint8_t g_speedStep;
+  
+  // ✅ Variabele STROKE RANGE
+  // Level 0: Korte strokes (40-60) = range 20
+  // Level 7: Lange strokes (0-99) = range 99
+  uint8_t strokeRange = 20 + ((g_speedStep * 79) / 7);  // 20 bij level 0, 99 bij level 7
+  
+  // ✅ Interval: Hoe vaak we togglen
+  // Level 0: 1200ms (langzaam)
+  // Level 7: 400ms (snel)
+  uint32_t syncInterval = 1200 - ((g_speedStep * 800) / 7);
+  
+  if ((now - lastStroke) < syncInterval) {
+    return;
+  }
+  
+  // Toggle direction
+  keonDirection = !keonDirection;
+  
+  // Bereken positie gebaseerd op range
+  uint8_t targetPos;
+  if (keonDirection) {
+    targetPos = 50 + (strokeRange / 2);  // Omhoog
+  } else {
+    targetPos = 50 - (strokeRange / 2);  // Omlaag
+  }
+  
+  // ✅ Speed ALTIJD 99 (volle kracht!)
+  uint8_t keonSpeed = 99;
+  
+  bool success = keonMove(targetPos, keonSpeed);
+  
+  if (success) {
+    lastStroke = now;
+    
+    static uint32_t lastDebug = 0;
+    if (now - lastDebug > 2000) {
+      Serial.printf("[KEON INDEPENDENT] Level:%u Range:%u Pos:%u Speed:99 Interval:%ums\n", 
+                    g_speedStep, strokeRange, targetPos, syncInterval);
+      lastDebug = now;
+    }
+  }
+}
+
+// ===============================================================================
+// OUDE FUNCTIE - Voor Body ESP AI (indien gebruikt)
+// ===============================================================================
+
+void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, bool isMovingUp) {
+  if (!keonConnected) return;
+
+  static uint8_t lastPosition = 50;
+  static uint8_t lastSpeed = 0;
+  static bool lastDirection = false;
+  static uint32_t lastSyncTime = 0;
+  const uint32_t SYNC_INTERVAL_MS = 100;
+
+  uint32_t now = millis();
+  
+  if ((now - lastSyncTime) < SYNC_INTERVAL_MS) {
+    return;
+  }
+  
+  uint8_t keonSpeed = (speedSteps <= 1) ? 0 : (speedStep * 99) / (speedSteps - 1);
+  if (keonSpeed > 99) keonSpeed = 99;
+  
+  uint8_t position = isMovingUp ? 99 : 0;
+  
+  if (position != lastPosition || keonSpeed != lastSpeed || isMovingUp != lastDirection) {
+    keonMove(position, keonSpeed);
+    lastPosition = position;
+    lastSpeed = keonSpeed;
+    lastDirection = isMovingUp;
+    lastSyncTime = now;
+  }
 }
 
 // ===============================================================================
@@ -333,9 +383,6 @@ void keonSetMAC(const char* mac) {
 // ===============================================================================
 
 void keonPrintStatus() {
-  Serial.println("[KEON] === STATUS ===");
-  Serial.printf("  Connected: %s\n", keonConnected ? "YES" : "NO");
-  Serial.printf("  Position: %u\n", keonCurrentPosition);
-  Serial.printf("  Speed: %u\n", keonCurrentSpeed);
-  Serial.printf("  MAC: %s\n", keonMacAddress.c_str());
+  Serial.printf("[KEON STATUS] Connected:%d Pos:%u Speed:%u MAC:%s\n", 
+                keonConnected, keonCurrentPosition, keonCurrentSpeed, lastConnectedMAC.c_str());
 }

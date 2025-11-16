@@ -51,58 +51,10 @@ bool keonMoveFast(uint8_t position);
 bool keonStop();
 void keonParkToBottom();
 
-// ===============================================================================
-// 🚀 NIEUWE ONAFHANKELIJKE KEON CONTROL
-// ===============================================================================
-
-/**
- * ✅ KEON INDEPENDENT TICK - 100% ONAFHANKELIJK VAN ANIMATIE!
- * 
- * Deze functie maakt de Keon COMPLEET los van de animatie.
- * 
- * FEATURES:
- * - Eigen timing gebaseerd op speedStep (0-7)
- * - Eigen direction toggle (NIET van animatie!)
- * - Level 0 = langzaam (1000ms = 60 strokes/min)
- * - Level 7 = snel (200ms = 300 strokes/min)
- * - Volle strokes altijd (0 ↔ 99)
- * - GEEN ruis meer van animatie!
- * 
- * GEBRUIK:
- * - Roep aan vanuit uiTick() elke frame
- * - Gebruikt g_speedStep (van Nunchuk OF Body ESP)
- * - Stopt automatisch bij paused = true
- * 
- * PRIORITEIT:
- * - Nunchuk joystick → g_speedStep → Keon (HOOGSTE)
- * - Body ESP AI → g_speedStep → Keon (als Nunchuk idle)
- * - Animatie → GEEN invloed op Keon!
- */
-void keonIndependentTick();
-
-// ===============================================================================
-// OUDE FUNCTIE - BEHOUDEN VOOR BODY ESP AI CONTROL
-// ===============================================================================
-
-/**
- * ⚠️ LEGACY: Sync Keon with animation OR Body ESP stress levels
- * 
- * GEBRUIKT DOOR:
- * - espnow_comm.cpp -> syncKeonToStressLevel() 
- * - Body ESP AI control via stress levels
- * 
- * NIET VERWIJDEREN - Body ESP heeft dit nodig!
- * 
- * Parameters:
- * - speedStep: Current speed level (0-7)
- * - speedSteps: Total speed levels (should be 8)
- * - isMovingUp: Direction (true = up, false = down)
- */
+// Animation synchronization
+// Sync Keon to real sleeve position from animation
+//void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, float sleevePercentage);
 void keonSyncToAnimation(uint8_t speedStep, uint8_t speedSteps, bool isMovingUp);
-
-// ===============================================================================
-// CONNECTION STATE & UTILITY
-// ===============================================================================
 
 // Connection state check (call this in loop!)
 void keonCheckConnection();

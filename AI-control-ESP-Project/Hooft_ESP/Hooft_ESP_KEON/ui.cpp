@@ -1814,8 +1814,12 @@ void uiTick() {
     }
   }
 
+  // ================= ANIMATIE EERST =================
+  // We need to calculate animation first to get updated phase for auto vacuum
   updateSpeedStepWithJoystick(jy);
   drawSpeedBarTop(g_speedStep, CFG.SPEED_STEPS);
+  //updateSpeedStepWithJoystick(jy);
+  //drawSpeedBarTop(g_speedStep, CFG.SPEED_STEPS);
 
   uint32_t nowUs = micros();
   float dt = (nowUs - lastUs) / 1e6f;
@@ -1921,18 +1925,19 @@ void uiTick() {
         keonParkToBottom();
         hasParked = true;
       }
-    } else {
-      // Animation running → Sync Keon to exact sleeve position
-      static bool hasParked = false;
-      hasParked = false;  // Reset flag when unpaused
-      
-      extern uint8_t g_speedStep;
-      //bool goingUp = (velEMA < 0.0f);  // Deze wordt al eerder berekend
-      keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, goingUp);
-      //float sleevePercent = getSleevePercentage();
-      //keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
-    }
+   } else {
+  // Animation running → Keon draait onafhankelijk op eigen tempo
+  static bool hasParked = false;
+  hasParked = false;  // Reset flag when unpaused
+  
+  // 🚀 NIEUWE ONAFHANKELIJKE KEON CONTROL
+  extern void keonIndependentTick();
+  keonIndependentTick();
+  
+  // NOTE: keonIndependentTick() gebruikt g_speedStep automatisch
+  // en checkt zelf of paused = true/false
   }
+}
 
   //if (parkToBottom && capY_draw < (float)CAP_Y_IN && paused) {
   if (parkToBottom && capY_draw < (float)CAP_Y_IN) {  
