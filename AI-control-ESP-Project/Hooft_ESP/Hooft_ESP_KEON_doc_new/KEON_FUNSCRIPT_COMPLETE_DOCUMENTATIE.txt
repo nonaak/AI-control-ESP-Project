@@ -1,0 +1,719 @@
+# 🎬 KEON FUNSCRIPT-BASED CONTROL - COMPLETE DOCUMENTATIE
+**Datum:** 17 November 2025  
+**Status:** Waypoint implementatie klaar, nog te testen  
+**Volgende stap:** Testen + eventuele handshake implementatie
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📋 INHOUDSOPGAVE
+
+1. [Achtergrond & Beslissing](#achtergrond)
+2. [Waarom Funscript Methode](#waarom-funscript)
+3. [Waypoint-Based Implementatie](#implementatie)
+4. [Code & Bestanden](#code)
+5. [Test Resultaten Tot Nu Toe](#test-resultaten)
+6. [Handshake Mogelijkheden](#handshake)
+7. [Toekomstige Integratie](#toekomst)
+8. [Volgende Stappen](#volgende-stappen)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🎯 ACHTERGROND & BESLISSING {#achtergrond}
+
+### **Doel:**
+Keon onafhankelijk van animatie laten werken met **smooth, consistente volle strokes**.
+
+### **Eisen:**
+- ✅ Alle levels: VOLLE strokes (0→99→0→99)
+- ✅ Alleen snelheid varieert (Level 0=langzaam, Level 7=snel)
+- ✅ Geen "ruis" of burst patterns
+- ✅ Future-proof voor Body ESP funscript integratie
+
+### **Probleem met oude methode:**
+```
+FIXED INTERVAL COMMANDS:
+ESP stuurt: Command elke 400-1200ms (vast interval)
+Probleem:   Commands komen sneller dan Keon kan verwerken
+Result:     Commands stapelen in BLE buffer → burst ruis
+            Level 0: 5 snelle strokes → 1 langzame → herhaal
+            Level 7: Onregelmatige snelheden, dubbele commands
+```
+
+**Serial output bewijs:**
+```
+[KEON #18] Dir:DOWN Pos:1   ← Stuur DOWN
+[KEON #19] Dir:DOWN Pos:1   ← DUBBEL! Command elke 400ms
+[KEON #20] Dir:DOWN Pos:1   ← DRIEDUBBEL! Keon kan niet bij
+```
+
+### **Beslissing:**
+Overstappen naar **waypoint-based control** (zoals Funscripts werken)!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🎬 WAAROM FUNSCRIPT METHODE {#waarom-funscript}
+
+### **Hoe Funscripts werken:**
+
+**JSON formaat:**
+```json
+{
+  "actions": [
+    {"at": 0,    "pos": 0},     ← Waypoint 1: Bij t=0, ga naar pos 0
+    {"at": 800,  "pos": 100},   ← Waypoint 2: Bij t=800ms, ga naar pos 100
+    {"at": 1500, "pos": 0}      ← Waypoint 3: Bij t=1500ms, ga naar pos 0
+  ]
+}
+```
+
+**Principe:**
+1. **Waypoint-based:** Commands alleen bij START beweging
+2. **Afstand-gebaseerd:** Tijd berekend uit distance
+3. **Wait for completion:** Nieuwe command pas als vorige klaar
+4. **Fire-and-forget:** Keon firmware handelt interpolatie af
+
+**Voordelen:**
+- ✅ Geen command stapeling (max 1 command in uitvoering)
+- ✅ Fysiek realistische timing (grote beweging = meer tijd)
+- ✅ Smooth beweging (Keon krijgt de tijd)
+- ✅ Future-proof (Body ESP kan later funscripts sturen)
+
+### **Vergelijking:**
+
+**Fixed Interval (OUD):**
+```
+Time:    0ms  400ms 800ms 1200ms 1600ms
+ESP:     │    │     │     │      │     (commands elke 400ms)
+Keon:    └────┴─────┴─────┴──────┴──   (buffer vol → burst)
+```
+
+**Waypoint-based (NIEUW):**
+```
+Time:    0ms       700ms      1400ms
+ESP:     │         │          │        (alleen bij start)
+Keon:    └─────────┴──────────┴─       (smooth, geen stapeling)
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🔧 WAYPOINT-BASED IMPLEMENTATIE {#implementatie}
+
+### **State Machine:**
+```
+┌─────────────────────────────────────────┐
+│  IDLE (klaar voor nieuwe beweging)      │
+└──────────────┬──────────────────────────┘
+               │
+               ↓
+┌─────────────────────────────────────────┐
+│  START BEWEGING                          │
+│  - Bereken afstand                       │
+│  - Bereken tijd (distance × msPerUnit)   │
+│  - Stuur 1 command: keonMove(target, 99)│
+│  - Markeer isMoving = true              │
+└──────────────┬──────────────────────────┘
+               │
+               ↓
+┌─────────────────────────────────────────┐
+│  WAIT FOR COMPLETION                     │
+│  - Timer loopt (moveDuration)            │
+│  - GEEN nieuwe commands!                 │
+│  - Check elapsed >= duration?            │
+└──────────────┬──────────────────────────┘
+               │
+               ↓ (completion detected)
+┌─────────────────────────────────────────┐
+│  MOVEMENT COMPLETE                       │
+│  - Markeer isMoving = false             │
+│  - Terug naar IDLE                       │
+└──────────────┬──────────────────────────┘
+               │
+               └──────────────────────────→ (repeat)
+```
+
+### **Kern Code:**
+```cpp
+void keonIndependentTick() {
+  static bool isMoving = false;
+  static uint8_t currentPos = 50;
+  static uint8_t targetPos = 50;
+  static uint32_t moveStartTime = 0;
+  static uint32_t moveDuration = 0;
+  
+  uint32_t now = millis();
+  
+  if (!isMoving) {
+    // ✅ START NIEUWE BEWEGING
+    currentPos = targetPos;
+    targetPos = nextDirection ? 99 : 0;
+    
+    // Bereken tijd op basis van afstand
+    uint8_t distance = abs(targetPos - currentPos);
+    float msPerUnit = 8.0f - (speedStep * 5.0f / 7.0f);
+    moveDuration = distance * msPerUnit;
+    
+    // Stuur 1 command
+    keonMove(targetPos, 99);
+    isMoving = true;
+    
+  } else {
+    // ✅ WACHT TOT COMPLEET
+    if ((now - moveStartTime) >= moveDuration) {
+      isMoving = false;  // Klaar!
+    }
+  }
+}
+```
+
+### **Timing Formule:**
+```cpp
+msPerUnit = 8.0f - (speedStep * 5.0f / 7.0f)
+
+Level 0: 8.0 ms/unit × 99 units = 792ms → 76 strokes/min
+Level 1: 7.3 ms/unit × 99 units = 723ms → 83 strokes/min
+Level 2: 6.6 ms/unit × 99 units = 653ms → 92 strokes/min
+Level 3: 5.9 ms/unit × 99 units = 584ms → 103 strokes/min
+Level 4: 5.1 ms/unit × 99 units = 505ms → 119 strokes/min
+Level 5: 4.4 ms/unit × 99 units = 436ms → 138 strokes/min
+Level 6: 3.7 ms/unit × 99 units = 366ms → 164 strokes/min
+Level 7: 3.0 ms/unit × 99 units = 297ms → 202 strokes/min
+```
+
+**Safety:** Minimum 300ms duration (Keon fysieke limiet)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📁 CODE & BESTANDEN {#code}
+
+### **Hoofdbestand:**
+**keon_ble.cpp** - functie: `keonIndependentTick()`
+
+**Locatie:** `/AI-control-ESP-Project/Hooft_ESP/Hooft_ESP_KEON/keon_ble.cpp`
+
+**Volledig te vervangen functie:**
+Zie bestand: `keonIndependentTick_WAYPOINT.txt`
+
+### **Belangrijke variabelen:**
+```cpp
+static bool isMoving = false;           // In beweging?
+static uint8_t currentPos = 50;         // Huidige positie (0-99)
+static uint8_t targetPos = 50;          // Doel positie (0-99)
+static uint32_t moveStartTime = 0;      // Start tijd beweging
+static uint32_t moveDuration = 0;       // Benodigde tijd (ms)
+static bool nextDirection = false;      // Volgende richting (0=DOWN, 1=UP)
+```
+
+### **Tuning parameters:**
+```cpp
+// SNELHEID AANPASSEN:
+float msPerUnit = 8.0f - (speedStep * 5.0f / 7.0f);
+//                ↑ Verhogen = langzamer overall
+//                           ↑ Verhogen = groter verschil tussen levels
+
+// MINIMUM TIJD AANPASSEN:
+if (moveDuration < 300) moveDuration = 300;
+//                  ↑ Verhogen voor meer stability
+```
+
+### **Ondersteunende bestanden:**
+1. **WAYPOINT_UITLEG_COMPLEET.txt** - Volledige technische uitleg
+2. **KEON_STATUS_RAPPORT.txt** - Complete project status
+3. **KEON_PARAMETER_VERWARRING.txt** - Uitleg speed vs position parameter
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📊 TEST RESULTATEN TOT NU TOE {#test-resultaten}
+
+### **Fixed Interval Tests (OUD):**
+
+**Test 1: Originele implementatie**
+```
+Range: Variabel (20 @ L0, 99 @ L7)
+Interval: Variabel (1200ms @ L0, 400ms @ L7)
+Result: ❌ Level 0: burst ruis (5 snel, 1 langzaam)
+        ❌ Level 7: dubbele commands, chaos
+```
+
+**Test 2: Slimme fysieke limiet**
+```
+minPhysicalTime = 300 + (strokeRange * 4)
+Result: ❌ Geen verbetering
+        Software perfect, hardware probleem
+```
+
+**Test 3: Grotere minimum range**
+```
+Range: 50-99 (was 20-99)
+Result: ❌ Nog steeds onregelmatig
+        Probleem niet de range size
+```
+
+**Test 4: Volle strokes, langere intervals**
+```
+Range: Altijd 99 (volle strokes)
+Interval: 1500ms @ L0, 700ms @ L7
+Result: ❌ Nog steeds onregelmatig
+        Commands nog steeds te snel
+```
+
+### **Conclusie oude methode:**
+**SOFTWARE WAS PERFECT** (consistente commands in serial log)
+**KEON KON NIET BIJHOUDEN** (BLE buffer overflow → burst uitvoering)
+
+### **Verwachte result waypoint methode:**
+✅ Geen command stapeling (max 1 actief)
+✅ Smooth beweging (Keon krijgt tijd)
+✅ Consistent patroon
+❓ NOG TE TESTEN (accu leeg)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🔗 HANDSHAKE MOGELIJKHEDEN {#handshake}
+
+### **Uit eerdere Keon reverse engineering:**
+
+**Bekende characteristics:**
+```
+Service UUID: 00001900-0000-1000-8000-00805f9b34fb
+
+TX (Commands):
+UUID: 00001901 OF 00001902 (een van beide werkt)
+Properties: WRITE, WRITE_NO_RESPONSE
+Description: Send movement commands
+
+RX (Notifications) - ONBEVESTIGD:
+UUID: 00001902 (estimated)
+Properties: NOTIFY (possibly)
+Description: Battery, position, status? (not tested)
+```
+
+**Protocol timing (uit Wireshark):**
+- Recommended interval: 100-150ms between commands
+- Can handle: up to 10 commands/second
+- Response time: ~50-100ms movement start after command
+
+### **Vraag: Heeft Keon completion handshake?**
+
+**3 Levels van handshake:**
+
+#### **1. BLE Protocol ACK ✅ (Werkt)**
+```cpp
+writeValue(data, length, true);  // ← true = vraag ACK
+```
+- BLE stack level
+- Bevestigt: "Data ontvangen"
+- Code probeert dit eerst, fallback naar no-ACK
+
+#### **2. Command Accepted ❓ (Waarschijnlijk niet)**
+- Application level
+- Zou zijn: "Command begrepen en geaccepteerd"
+- Geen bewijs gevonden in protocol reverse engineering
+
+#### **3. Movement Complete ❌ (Zeer waarschijnlijk niet)**
+- Application level
+- Zou zijn: "Beweging compleet, positie bereikt"
+- **RX characteristic NIET GETEST in eerdere research**
+- Funscripts gebruiken dit ook niet (timing estimation)
+
+### **TODO: Test RX Characteristic!**
+
+**Jouw eerdere tester testte alleen TX (welke char werkt voor commands)**
+**NIET getest: Of RX characteristic bestaat en wat die doet!**
+
+**Test code (uitgebreider dan jouw tester):**
+```cpp
+void scanKeonCharacteristics() {
+  BLERemoteService* service = keonClient->getService(KEON_SERVICE_UUID);
+  
+  std::map<std::string, BLERemoteCharacteristic*>* chars = 
+      service->getCharacteristics();
+      
+  for (auto &entry : *chars) {
+    BLERemoteCharacteristic* pChar = entry.second;
+    Serial.printf("[KEON SCAN] UUID: %s\n", entry.first.c_str());
+    Serial.printf("            canRead: %d\n", pChar->canRead());
+    Serial.printf("            canWrite: %d\n", pChar->canWrite());
+    Serial.printf("            canNotify: %d\n", pChar->canNotify());
+    
+    // Probeer lezen als mogelijk
+    if (pChar->canRead()) {
+      std::string value = pChar->readValue();
+      Serial.printf("            Value: ");
+      for (char c : value) {
+        Serial.printf("%02X ", (uint8_t)c);
+      }
+      Serial.println();
+      
+      // Check if position (0-99 range)
+      if (value.length() == 1) {
+        uint8_t val = (uint8_t)value[0];
+        if (val <= 99) {
+          Serial.printf("            ⚠️  POSSIBLE POSITION: %d\n", val);
+        }
+      }
+    }
+  }
+}
+```
+
+**Als RX characteristic gevonden wordt:**
+- Kunnen we huidige positie uitlezen!
+- Kunnen we WACHTEN tot target bereikt!
+- Echte completion detection! 🎯
+- VEEL beter dan timing estimation!
+
+**Als NIET gevonden:**
+- Waypoint timing is enige optie (zoals Funscripts doen)
+- Tune parameters voor beste result (zoals we nu doen)
+
+### **Hoe Funscripts het oplossen:**
+
+**Ze schatten timing empirisch:**
+```javascript
+// Buttplug.io / Funscript libraries
+function estimateDuration(distance, speed) {
+  // Via testen bepaald:
+  // Keon max ~150mm/s bij speed 99 (uit jouw Wireshark data)
+  return distance * empiricalConstant;
+}
+```
+
+**Onze waypoint methode doet hetzelfde!**
+
+**Uit jouw protocol doc:**
+- Physical Speed: ~100-200 strokes per minute
+- Smooth interpolation between positions
+- No discrete steps
+
+**Dus onze `msPerUnit` schatting is vergelijkbaar met wat Funscripts doen!**
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🚀 TOEKOMSTIGE INTEGRATIE {#toekomst}
+
+### **Fase 1: Waypoint Basis (NU) ✅**
+```cpp
+keonIndependentTick() {
+  // Genereer waypoints op basis van speedStep
+  // Voer uit met completion timing
+}
+```
+
+### **Fase 2: Funscript Parser**
+```cpp
+struct FunscriptAction {
+  uint32_t timestamp_ms;  // "at" in JSON
+  uint8_t position;        // "pos" in JSON (0-100)
+};
+
+std::vector<FunscriptAction> parseFunscript(const char* json) {
+  // Parse JSON
+  // Return acties in volgorde
+}
+```
+
+### **Fase 3: Funscript Executor**
+```cpp
+void executeFunscript(std::vector<FunscriptAction>& script) {
+  static size_t currentIndex = 0;
+  static uint32_t scriptStartTime = 0;
+  
+  uint32_t elapsed = millis() - scriptStartTime;
+  
+  if (elapsed >= script[currentIndex].timestamp_ms) {
+    // Start beweging naar volgende waypoint
+    startWaypointMovement(script[currentIndex].position);
+    currentIndex++;
+  }
+}
+```
+
+### **Fase 4: Body ESP AI Integration**
+```cpp
+void onBodyESPData(BodyESPData data) {
+  if (data.hasStressLevel) {
+    // Pas funscript aan op basis van stress
+    if (data.stressLevel > THRESHOLD_HIGH) {
+      adjustFunscriptSpeed(0.7f);  // 30% langzamer
+    } else if (data.stressLevel < THRESHOLD_LOW) {
+      adjustFunscriptSpeed(1.3f);  // 30% sneller
+    }
+  }
+  
+  if (data.hasFunscriptCommand) {
+    // Body ESP stuurt direct funscript waypoint
+    executeFunscriptAction(data.action);
+  }
+}
+```
+
+### **Fase 5: Hybrid Mode**
+```
+┌─────────────────────────────────────┐
+│  HOOFD ESP (Master)                 │
+│  ┌───────────────────────────────┐  │
+│  │ Keon Waypoint Engine          │  │
+│  │ - Basis waypoint generatie    │  │
+│  │ - Funscript parsing           │  │
+│  │ - AI correctie toepassing     │  │
+│  └───────────────────────────────┘  │
+└──────────────┬──────────────────────┘
+               │
+               ↓ ESP-NOW
+┌──────────────────────────────────────┐
+│  BODY ESP (AI Biometrics)            │
+│  - Stress level meten                │
+│  - Funscript modificatie suggereren  │
+│  - Real-time correctie sturen        │
+└──────────────────────────────────────┘
+```
+
+**Voordelen unified systeem:**
+- ✅ Centrale waypoint engine
+- ✅ Body ESP kan corrigeren
+- ✅ Beide gebruiken zelfde methode
+- ✅ Smooth integratie
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📋 VOLGENDE STAPPEN {#volgende-stappen}
+
+### **STAP 1: Test Waypoint Basis ⏳**
+**Status:** Code klaar, accu leeg
+**Action:** 
+1. Keon opladen
+2. Upload waypoint code
+3. Test alle levels (0-7)
+4. Check serial output voor:
+   - Geen dubbele commands binnen moveDuration
+   - Consistente WAYPOINT messages
+   - Smooth gevoel
+
+**Verwacht:**
+```
+[KEON #1] WAYPOINT: 50→99 (dist:49 dur:392ms 8.0ms/unit) Level:0
+...wacht 392ms, GEEN nieuwe commands...
+[KEON #2] WAYPOINT: 99→0 (dist:99 dur:792ms 8.0ms/unit) Level:0
+...wacht 792ms, GEEN nieuwe commands...
+```
+
+**Als succesvol:**
+→ Ga naar STAP 2
+
+**Als nog steeds ruis:**
+→ Tune parameters (verhoog msPerUnit base)
+→ Of: implementeer completion detection (STAP 3)
+
+---
+
+### **STAP 2: Scan Keon Characteristics 🔍**
+**Status:** Test code klaar
+**Action:**
+1. Voeg `scanKeonCharacteristics()` toe aan keon_ble.cpp
+2. Roep aan in `keonConnect()` (eenmalig bij verbinden)
+3. Check serial output voor readable characteristics
+
+**Code toevoegen:**
+```cpp
+// In keon_ble.cpp, NA successful connect:
+if (keonConnected) {
+  Serial.println("[KEON] Scanning characteristics...");
+  scanKeonCharacteristics();
+}
+```
+
+**Mogelijke uitkomsten:**
+
+**A) Geen readable chars:**
+→ Waypoint timing is enige optie (zoals Funscripts)
+→ Tune parameters voor beste result
+
+**B) Readable position char:**
+→ Implementeer polling: `uint8_t getCurrentPosition()`
+→ Gebruik voor completion detection!
+
+**C) Notify characteristic:**
+→ BESTE! Subscribe voor real-time updates
+→ Perfecte completion detection
+
+---
+
+### **STAP 3: Completion Detection (Optioneel) 🎯**
+**Status:** Alleen als characteristic gevonden
+**Action:** Implementeer op basis van STAP 2 result
+
+**Optie A: Position Polling**
+```cpp
+bool isMovementComplete() {
+  if (!canReadPosition) return false;
+  
+  uint8_t currentPos = readKeonPosition();
+  uint8_t tolerance = 2;  // ±2 units
+  
+  return (abs(currentPos - targetPos) <= tolerance);
+}
+
+// In waypoint tick:
+if (isMoving) {
+  if (isMovementComplete()) {
+    isMoving = false;  // ECHTE completion!
+  }
+}
+```
+
+**Optie B: Notify Subscription**
+```cpp
+void onKeonPositionNotify(BLERemoteCharacteristic* pChar, 
+                           uint8_t* data, size_t length) {
+  uint8_t currentPos = data[0];  // Decode based on format
+  
+  if (isMoving && abs(currentPos - targetPos) <= 2) {
+    isMoving = false;  // Real-time completion!
+  }
+}
+
+// In connect:
+positionChar->registerForNotify(onKeonPositionNotify);
+```
+
+---
+
+### **STAP 4: Funscript Parser 📄**
+**Status:** Toekomstig
+**Action:** Implementeer JSON parsing
+
+**Bibliotheken:**
+- ArduinoJson (voorkeur - lightweight)
+- cJSON (alternatief)
+
+**Basis parser:**
+```cpp
+#include <ArduinoJson.h>
+
+struct FunscriptAction {
+  uint32_t at;    // Timestamp in ms
+  uint8_t pos;    // Position 0-100
+};
+
+std::vector<FunscriptAction> parseFunscript(const char* json) {
+  StaticJsonDocument<4096> doc;
+  deserializeJson(doc, json);
+  
+  std::vector<FunscriptAction> actions;
+  JsonArray array = doc["actions"];
+  
+  for (JsonObject obj : array) {
+    FunscriptAction action;
+    action.at = obj["at"];
+    action.pos = obj["pos"];
+    actions.push_back(action);
+  }
+  
+  return actions;
+}
+```
+
+---
+
+### **STAP 5: Body ESP Integration 🤖**
+**Status:** Toekomstig
+**Action:** ESP-NOW funscript commands
+
+**ESP-NOW packet structure:**
+```cpp
+struct BodyESPCommand {
+  uint8_t type;  // 0=stress_level, 1=funscript_action
+  union {
+    struct {
+      uint8_t stressLevel;  // 0-100
+    } stress;
+    struct {
+      uint32_t timestamp;
+      uint8_t position;
+    } action;
+  } data;
+};
+```
+
+**Hoofd ESP handler:**
+```cpp
+void onBodyESPCommand(const uint8_t* mac, const uint8_t* data, int len) {
+  BodyESPCommand* cmd = (BodyESPCommand*)data;
+  
+  if (cmd->type == 0) {
+    // Stress level → adjust waypoint timing
+    adjustSpeedFactor(cmd->data.stress.stressLevel);
+  } else if (cmd->type == 1) {
+    // Direct funscript action → execute
+    queueFunscriptAction(cmd->data.action);
+  }
+}
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🔧 TUNING GUIDE
+
+### **Als te langzaam:**
+```cpp
+// Verlaag base speed (pas op! Niet onder Keon limiet)
+float msPerUnit = 6.0f - ((float)g_speedStep * 3.0f / 7.0f);
+```
+
+### **Als te snel / nog steeds ruis:**
+```cpp
+// Verhoog base speed
+float msPerUnit = 10.0f - ((float)g_speedStep * 7.0f / 7.0f);
+
+// Of verhoog minimum
+if (moveDuration < 500) moveDuration = 500;
+```
+
+### **Als te weinig verschil tussen levels:**
+```cpp
+// Verhoog factor (meer spread)
+float msPerUnit = 8.0f - ((float)g_speedStep * 7.0f / 7.0f);
+//                                            ↑ Was 5.0f
+```
+
+### **Als te veel verschil:**
+```cpp
+// Verlaag factor (minder spread)
+float msPerUnit = 8.0f - ((float)g_speedStep * 3.0f / 7.0f);
+//                                            ↑ Was 5.0f
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📚 REFERENTIE LINKS
+
+### **Keon Protocol:**
+- GitHub: AI-control-ESP-Project/PROTOCOL_REFERENCE.md
+- Lovense documentation: https://www.lovense.com/
+
+### **Funscript Format:**
+- Spec: https://github.com/FunscriptToolbox/FunscriptUtils
+- Buttplug.io: https://buttplug.io/
+
+### **BLE Protocol:**
+- ESP32 BLE: https://github.com/nkolban/ESP32_BLE_Arduino
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ✅ CHECKLIST VOOR VOLGEND GESPREK
+
+- [ ] Keon accu opgeladen
+- [ ] Waypoint code getest (alle levels 0-7)
+- [ ] Serial output opgeslagen
+- [ ] Smooth gevoel bevestigd?
+- [ ] Characteristics scan gedaan?
+- [ ] Readable position gevonden?
+- [ ] Dit document gelezen!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+**EINDE DOCUMENTATIE**
+
+Gemaakt: 17 November 2025
+Voor: Volgend gesprek over Keon Funscript implementatie
+Status: Waypoint code klaar, wacht op test

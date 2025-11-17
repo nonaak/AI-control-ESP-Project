@@ -1,0 +1,182 @@
+// ===== KEON CHARACTERISTIC SCANNER =====
+// Voeg dit toe aan keon_ble.cpp
+
+// ===============================================================================
+// CHARACTERISTIC SCANNER (Voor handshake detectie)
+// ===============================================================================
+
+void scanKeonCharacteristics() {
+  if (!keonConnected || keonClient == nullptr) {
+    Serial.println("[KEON SCAN] ERROR: Not connected!");
+    return;
+  }
+  
+  Serial.println("[KEON SCAN] ═══════════════════════════════════════");
+  Serial.println("[KEON SCAN] Scanning all characteristics...");
+  Serial.println("[KEON SCAN] ═══════════════════════════════════════");
+  
+  BLERemoteService* pRemoteService = keonClient->getService(KEON_SERVICE_UUID);
+  if (pRemoteService == nullptr) {
+    Serial.println("[KEON SCAN] ERROR: Service not found!");
+    return;
+  }
+  
+  // Get all characteristics in the service
+  std::map<std::string, BLERemoteCharacteristic*>* characteristics = 
+      pRemoteService->getCharacteristics();
+      
+  if (characteristics == nullptr) {
+    Serial.println("[KEON SCAN] ERROR: No characteristics found!");
+    return;
+  }
+  
+  Serial.printf("[KEON SCAN] Found %d characteristics:\n", characteristics->size());
+  Serial.println();
+  
+  int charIndex = 0;
+  for (auto &entry : *characteristics) {
+    charIndex++;
+    BLERemoteCharacteristic* pChar = entry.second;
+    
+    Serial.printf("[KEON SCAN] ─── Characteristic #%d ───\n", charIndex);
+    Serial.printf("[KEON SCAN] UUID:       %s\n", entry.first.c_str());
+    Serial.printf("[KEON SCAN] canRead:    %s\n", pChar->canRead() ? "YES ✓" : "no");
+    Serial.printf("[KEON SCAN] canWrite:   %s\n", pChar->canWrite() ? "YES ✓" : "no");
+    Serial.printf("[KEON SCAN] canWriteNR: %s\n", pChar->canWriteNoResponse() ? "YES ✓" : "no");
+    Serial.printf("[KEON SCAN] canNotify:  %s\n", pChar->canNotify() ? "YES ✓" : "no");
+    Serial.printf("[KEON SCAN] canIndicate:%s\n", pChar->canIndicate() ? "YES ✓" : "no");
+    
+    // Als readable, probeer te lezen
+    if (pChar->canRead()) {
+      Serial.println("[KEON SCAN] Attempting to read value...");
+      try {
+        std::string value = pChar->readValue();
+        Serial.printf("[KEON SCAN] Read success! Length: %d bytes\n", value.length());
+        Serial.print("[KEON SCAN] Value (hex): ");
+        for (size_t i = 0; i < value.length(); i++) {
+          Serial.printf("%02X ", (uint8_t)value[i]);
+        }
+        Serial.println();
+        
+        Serial.print("[KEON SCAN] Value (dec): ");
+        for (size_t i = 0; i < value.length(); i++) {
+          Serial.printf("%d ", (uint8_t)value[i]);
+        }
+        Serial.println();
+        
+        // Check if it looks like position (0-99 range)
+        if (value.length() == 1) {
+          uint8_t val = (uint8_t)value[0];
+          if (val <= 99) {
+            Serial.printf("[KEON SCAN] ⚠️  POSSIBLE POSITION: %d\n", val);
+          }
+        }
+        
+      } catch (...) {
+        Serial.println("[KEON SCAN] Read failed (exception)");
+      }
+    }
+    
+    // Check if this is the known TX characteristic
+    if (entry.first == KEON_TX_CHAR_UUID) {
+      Serial.println("[KEON SCAN] *** THIS IS THE TX (WRITE) CHARACTERISTIC ***");
+    }
+    
+    Serial.println();
+  }
+  
+  Serial.println("[KEON SCAN] ═══════════════════════════════════════");
+  Serial.println("[KEON SCAN] Scan complete!");
+  Serial.println("[KEON SCAN] ═══════════════════════════════════════");
+  Serial.println();
+  
+  // Summary
+  Serial.println("[KEON SCAN] SUMMARY:");
+  bool foundReadable = false;
+  bool foundNotify = false;
+  
+  for (auto &entry : *characteristics) {
+    BLERemoteCharacteristic* pChar = entry.second;
+    if (pChar->canRead() && entry.first != KEON_TX_CHAR_UUID) {
+      Serial.printf("[KEON SCAN] ✓ Found readable char: %s\n", entry.first.c_str());
+      foundReadable = true;
+    }
+    if (pChar->canNotify()) {
+      Serial.printf("[KEON SCAN] ✓ Found notify char: %s\n", entry.first.c_str());
+      foundNotify = true;
+    }
+  }
+  
+  if (!foundReadable && !foundNotify) {
+    Serial.println("[KEON SCAN] ✗ No readable or notify characteristics found");
+    Serial.println("[KEON SCAN]   → Waypoint timing is only option (like Funscripts)");
+  } else {
+    if (foundReadable) {
+      Serial.println("[KEON SCAN] → Can implement position polling!");
+    }
+    if (foundNotify) {
+      Serial.println("[KEON SCAN] → Can subscribe for real-time updates!");
+    }
+  }
+  
+  Serial.println();
+}
+
+// ===============================================================================
+// DECLARATIE IN HEADER (keon_ble.h toevoegen)
+// ===============================================================================
+// void scanKeonCharacteristics();
+
+// ===============================================================================
+// GEBRUIK
+// ===============================================================================
+// Voeg toe in keonConnect(), NA successful connection:
+//
+// if (keonConnected) {
+//   Serial.println("[KEON] Connection successful, scanning characteristics...");
+//   scanKeonCharacteristics();
+// }
+//
+// Of roep handmatig aan via serial command in main loop
+
+// ===============================================================================
+// VOORBEELD OUTPUT (wat je zou moeten zien)
+// ===============================================================================
+/*
+[KEON SCAN] ═══════════════════════════════════════
+[KEON SCAN] Scanning all characteristics...
+[KEON SCAN] ═══════════════════════════════════════
+[KEON SCAN] Found 3 characteristics:
+
+[KEON SCAN] ─── Characteristic #1 ───
+[KEON SCAN] UUID:       00001901-0000-1000-8000-00805f9b34fb
+[KEON SCAN] canRead:    YES ✓
+[KEON SCAN] canWrite:   no
+[KEON SCAN] canWriteNR: no
+[KEON SCAN] canNotify:  YES ✓
+[KEON SCAN] canIndicate:no
+[KEON SCAN] Attempting to read value...
+[KEON SCAN] Read success! Length: 1 bytes
+[KEON SCAN] Value (hex): 32
+[KEON SCAN] Value (dec): 50
+[KEON SCAN] ⚠️  POSSIBLE POSITION: 50
+
+[KEON SCAN] ─── Characteristic #2 ───
+[KEON SCAN] UUID:       00001902-0000-1000-8000-00805f9b34fb
+[KEON SCAN] canRead:    no
+[KEON SCAN] canWrite:   YES ✓
+[KEON SCAN] canWriteNR: YES ✓
+[KEON SCAN] canNotify:  no
+[KEON SCAN] canIndicate:no
+[KEON SCAN] *** THIS IS THE TX (WRITE) CHARACTERISTIC ***
+
+[KEON SCAN] ═══════════════════════════════════════
+[KEON SCAN] Scan complete!
+[KEON SCAN] ═══════════════════════════════════════
+
+[KEON SCAN] SUMMARY:
+[KEON SCAN] ✓ Found readable char: 00001901-0000-1000-8000-00805f9b34fb
+[KEON SCAN] ✓ Found notify char: 00001901-0000-1000-8000-00805f9b34fb
+[KEON SCAN] → Can implement position polling!
+[KEON SCAN] → Can subscribe for real-time updates!
+*/

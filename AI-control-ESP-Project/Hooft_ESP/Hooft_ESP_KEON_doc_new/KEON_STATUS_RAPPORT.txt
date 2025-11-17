@@ -1,0 +1,594 @@
+# 📋 KEON INDEPENDENT SYSTEEM - STATUS RAPPORT
+**Datum:** 16 November 2025  
+**Gesprek:** Keon onafhankelijk maken van animatie  
+**Status:** WERK IN UITVOERING - Ruis probleem nog niet opgelost
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🎯 DOEL VAN DEZE SESSIE
+
+**Probleem:**
+Keon was gekoppeld aan animatie direction → ruis in beweging
+
+**Oplossing:**
+Keon 100% onafhankelijk maken met eigen timing en range
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ✅ WAT IS OPGELOST
+
+### **1. KEON PARAMETER VERWARRING**
+
+**HET PROBLEEM:**
+Elke keer werd er verwarring over de Keon "speed" parameter:
+- FOUT gedacht: Speed = strokes per minuut
+- ECHT: Speed = motor power naar doelpositie
+
+**DE OPLOSSING:**
+Document gemaakt: `KEON_PARAMETER_VERWARRING.txt` met volledige uitleg:
+
+```
+Keon command: {0x04, 0x00, POSITION, 0x00, SPEED}
+
+POSITION (0-99):
+  - Doelpositie van sleeve
+  - 0 = beneden, 99 = boven
+
+SPEED (0-99):
+  - HOE SNEL motor naar positie beweegt
+  - NIET "strokes per minuut"!
+  - Speed 99 = volle motor power
+  - Speed 20 = langzame motor power
+
+CORRECTE IMPLEMENTATIE:
+  1. Speed = ALTIJD 99 (volle kracht)
+  2. Stroke range = variabel (klein bij L0, groot bij L7)
+  3. Stroke timing = variabel (langzaam bij L0, snel bij L7)
+```
+
+---
+
+### **2. NIEUWE ONAFHANKELIJKE KEON FUNCTIE**
+
+**Bestand:** `keon_ble.cpp`  
+**Functie:** `keonIndependentTick()`
+
+**Implementatie:**
+```cpp
+void keonIndependentTick() {
+  // 1. STROKE RANGE (variabel)
+  // Level 0: range 20 (pos 40-60) = KORTE strokes
+  // Level 7: range 99 (pos 0-99) = LANGE strokes
+  uint8_t strokeRange = 20 + ((g_speedStep * 79) / 7);
+  
+  // 2. TIMING (variabel)
+  // Level 0: 1200ms tussen toggles = LANGZAAM
+  // Level 7: 400ms tussen toggles = SNEL
+  uint32_t syncInterval = 1200 - ((g_speedStep * 800) / 7);
+  
+  // 3. POSITIE (center ± range/2)
+  keonDirection = !keonDirection;
+  uint8_t targetPos = keonDirection ? 
+      (50 + strokeRange/2) : 
+      (50 - strokeRange/2);
+  
+  // 4. SPEED = ALTIJD 99!
+  uint8_t keonSpeed = 99;
+  
+  keonMove(targetPos, keonSpeed);
+}
+```
+
+**WAT HET DOET:**
+- Level 0: Korte (20 range), langzame (1200ms) strokes
+- Level 7: Lange (99 range), snelle (400ms) strokes
+- Speed altijd 99 voor volle motor power
+- 100% onafhankelijk van animatie
+
+**GEBRUIKT IN:** `ui.cpp` → `uiTick()` functie
+```cpp
+extern void keonIndependentTick();
+keonIndependentTick();
+```
+
+---
+
+### **3. WAT WEL GOED WERKT**
+
+✅ **Pause functionaliteit:**
+- C knop pauzeert systeem
+- `keonParkToBottom()` werkt correct
+- Keon gaat netjes naar positie 0
+- Bij unpause hervat Keon op juiste level
+- **GEEN wijzigingen nodig!**
+
+✅ **Connection management:**
+- Keon verbinden via menu werkt
+- BLE initialisatie OK
+- MAC address correct (ac:67:b2:25:42:5a)
+- Disconnect werkt
+
+✅ **Level switching:**
+- Nunchuk joystick wijzigt g_speedStep
+- Keon reageert op level changes
+- Range en interval passen aan
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ❌ WAT NOG NIET OPGELOST IS
+
+### **🔴 HET RUIS PROBLEEM**
+
+**SYMPTOMEN:**
+- Keon beweging voelt niet 100% smooth
+- "Ruis" aanwezig bij alle levels
+- **BELANGRIJK:** Level 0 (langzaam) heeft MEER ruis dan Level 7 (snel)
+- Niet echt "sprongen", meer iets dat knaagt
+- Mogelijk gekoppeld aan hogere animatie snelheid?
+- Keon maakt soms snelle catch-up bewegingen
+
+**DIT IS VREEMD omdat:**
+- Normaal: hogere snelheid = meer ruis (verwacht)
+- Werkelijk: lagere snelheid = meer ruis (niet verwacht!)
+
+---
+
+### **🔍 DEBUG VRAGEN (VOOR VOLGENDE SESSIE)**
+
+**OM HET RUIS PROBLEEM TE IDENTIFICEREN:**
+
+**Vraag 1: WAT IS DE RUIS PRECIES?**
+
+A) **Timing ruis** - Strokes komen onregelmatig?
+```
+Verwacht: 1200ms, 1200ms, 1200ms, 1200ms
+Werkelijk: 1200ms, 980ms, 1350ms, 1150ms
+```
+
+B) **Beweging ruis** - Keon maakt extra/vreemde bewegingen?
+```
+Tijdens stroke van 40→60:
+- Gaat naar 60, dan kort terug naar 55, dan weer 60 (tikt)
+- Of: Overshoot naar 65 ipv 60
+```
+
+C) **Burst ruis** - Keon staat stil, dan ineens burst van bewegingen?
+```
+Still... still... still... BAM-BAM-BAM... still...
+```
+
+D) **Amplitude ruis** - Stroke lengte varieert?
+```
+Verwacht: Altijd 40-60 (range 20)
+Werkelijk: 35-65, 42-58, 38-62 (range varieert)
+```
+
+**GEDETAILLEERDE TEST INSTRUCTIES:**
+
+**SETUP:**
+1. Serial Monitor open (115200 baud)
+2. Keon verbonden
+3. Unpause (C knop)
+4. Start op Level 0
+
+**TEST LEVEL 0 (30 seconden):**
+
+Beantwoord deze vragen tijdens de test:
+
+1. **Timing consistentie:**
+   - Zie je in Serial: `[KEON INDEPENDENT] Level:0 Range:20 Pos:XX Speed:99 Interval:1200ms`?
+   - Komen deze messages ELKE 2 seconden? (consistent?)
+   - Of variëren de timestamps?
+   
+2. **Fysieke beweging:**
+   - Voelt de stroke ELKE KEER hetzelfde?
+   - Of zijn er strokes die sneller/langzamer voelen?
+   - Maakt de Keon "tik" geluiden (start-stop)?
+   
+3. **Stroke lengte:**
+   - Blijft de stroke lengte consistent?
+   - Of variëren sommige strokes korter/langer?
+   
+4. **Pauzes tussen strokes:**
+   - Is er consistent ~1.2 seconden tussen elke stroke?
+   - Of zijn er momenten waar het langer/korter duurt?
+   
+5. **Vreemde bewegingen:**
+   - Maakt de Keon ineens snelle bewegingen tussendoor?
+   - Blijft hij soms even "hangen"?
+   - Gaat hij soms iets terug en dan weer verder?
+
+6. **Serial output:**
+   - Zie je andere Keon messages tussendoor?
+   - Zie je veel ESP-NOW messages tijdens Keon commands?
+   - Zie je error messages?
+
+**PAUZE - NOTEER BEVINDINGEN**
+
+**TEST LEVEL 7 (30 seconden):**
+
+Verander naar Level 7 (joystick omhoog) en beantwoord:
+
+1. **Timing consistentie:**
+   - Interval zou ~400ms moeten zijn
+   - Voelt het consistent snel?
+   - Of zijn er haperingen?
+   
+2. **Vergelijking met Level 0:**
+   - Voelt Level 7 SMOOTHER of RUISIGER dan Level 0?
+   - Heeft Level 7 meer/minder/gelijke ruis?
+   
+3. **Stroke lengte:**
+   - Volle strokes (0-99)?
+   - Consistent lang?
+   
+4. **Serial output bij Level 7:**
+   - Messages nog steeds elke 2 seconden?
+   - Interval correct (400ms)?
+   
+5. **Animatie invloed:**
+   - Draait animatie nu sneller op scherm?
+   - Zie je correlatie tussen animatie snelheid en Keon gedrag?
+
+**NA DE TEST:**
+
+1. **Copy ALLE Serial Monitor output** (beide levels)
+2. **Beschrijf de ruis in je eigen woorden:**
+   - Wat voel je precies?
+   - Wanneer is het het ergst?
+   - Hoe zou je het beschrijven aan iemand anders?
+   
+3. **Is het één van deze types:**
+   - A) Timing ruis (onregelmatige intervals)
+   - B) Beweging ruis (extra beweginkjes, tikken)
+   - C) Burst ruis (stilstand dan burst)
+   - D) Amplitude ruis (variërende stroke lengte)
+   - E) Iets anders? Beschrijf!
+
+**EXTRA TEST (Optioneel):**
+
+Test met animatie op verschillende snelheden:
+1. Zet Keon op Level 3 (medium)
+2. Laat animatie snelheid variëren via ... (hoe doe je dit?)
+3. Check: Verandert Keon gedrag als animatie sneller/langzamer gaat?
+
+---
+
+### **🤔 VERDENKINGEN OVER OORZAAK**
+
+**VERDENKING 1: BLE vs ESP-NOW Radio Conflict**
+```
+ESP32 heeft 1 radio voor:
+- BLE (Keon verbinding)
+- WiFi/ESP-NOW (Body ESP, Pomp, M5Atom)
+
+Mogelijk vechten ze om radio tijd?
+
+Bij animatie hogere snelheid:
+- uiTick() draait vaker
+- Meer ESP-NOW traffic?
+- BLE commands worden vertraagd?
+- Burst uitvoering van gebufferde commands?
+```
+
+**BEWIJS VOOR:**
+- Ruis correleert met animatie snelheid
+- Multiple radio systemen actief
+
+**BEWIJS TEGEN:**
+- Rate limiting (200ms) zou moeten beschermen
+- BLE en ESP-NOW zouden kunnen co-existen
+
+---
+
+**VERDENKING 2: Oude keonSyncToAnimation() nog ergens actief**
+```
+Misschien wordt ERGENS nog de oude functie aangeroepen?
+Dat zou dubbele commands geven!
+```
+
+**CHECK NODIG:**
+- Zoek in code naar `keonSyncToAnimation(` calls
+- Vooral in: ui.cpp, espnow_comm.cpp
+- Ook: `syncKeonToAnimation()` (zonder keon_ prefix)
+
+**BEWIJS VOOR:**
+- Ruis zou verklaard worden door dubbele commands
+
+**BEWIJS TEGEN:**
+- In ui.cpp is het vervangen door keonIndependentTick()
+
+---
+
+**VERDENKING 3: Command Rate Limiting (200ms) te streng**
+```cpp
+#define KEON_COMMAND_DELAY_MS 200
+
+// Bij hoge levels:
+// Interval = 400ms (Level 7)
+// Rate limit = 200ms
+// Ratio = OK (400 > 200)
+
+// Bij lage levels:
+// Interval = 1200ms (Level 0)  
+// Rate limit = 200ms
+// Ratio = ruim OK (1200 >> 200)
+```
+
+**Dit lijkt NIET het probleem** - rate limiting is ruim genoeg
+
+---
+
+**VERDENKING 4: Kleine Stroke Range probleem (Level 0)**
+```
+Level 0: Range 20 = positie 40-60
+Level 7: Range 99 = positie 0-99
+
+Mechanisch:
+- Kleine bewegingen (20 range) = moeilijker voor motor?
+- Grote bewegingen (99 range) = makkelijker voor motor?
+
+Keon motor kan beter met grote strokes werken!
+```
+
+**TEST VOOR DEZE THEORIE:**
+```cpp
+// In keon_ble.cpp wijzig:
+uint8_t strokeRange = 50 + ((g_speedStep * 49) / 7);  // 50 @ L0, 99 @ L7
+
+// Nu heeft Level 0 ook grotere strokes (range 50)
+// Als ruis vermindert → dit was het probleem!
+```
+
+**BEWIJS VOOR:**
+- Level 0 (klein range) heeft MEER ruis
+- Keon is mechanisch device met sleeves
+- Kleine bewegingen zijn moeilijker
+
+**BEWIJS TEGEN:**
+- Range 20 is nog steeds 20% van totaal (niet extreem klein)
+
+---
+
+**VERDENKING 5: BLE Command Buffering**
+```cpp
+keonTxCharacteristic->writeValue(data, length, true);
+```
+
+BLE library kan commands bufferen in stack.
+
+**Scenario:**
+1. keonIndependentTick() stuurt command
+2. BLE stack buffert het (radio busy met ESP-NOW)
+3. Later: burst van gebufferde commands
+4. Keon krijgt ze allemaal tegelijk → ruis
+
+**BEWIJS VOOR:**
+- Ruis correleert met radio activity
+- Burst-achtig gedrag
+
+**BEWIJS TEGEN:**
+- Rate limiting zou dit moeten voorkomen
+- Try/catch fallback naar write zonder response
+
+---
+
+**VERDENKING 6: keonIndependentTick() frequentie**
+```
+uiTick() draait elke frame (60-120 Hz bij animatie)
+keonIndependentTick() wordt ELKE frame aangeroepen
+
+Bij hogere animatie snelheid:
+- uiTick() draait vaker
+- keonIndependentTick() wordt vaker gecheckt
+- Meer overhead?
+```
+
+**MAAR:** Binnenin heeft het timing check:
+```cpp
+if ((now - lastStroke) < syncInterval) {
+  return;  // Exit meteen
+}
+```
+
+**Dus dit zou NIET het probleem moeten zijn**
+
+---
+
+**VERDENKING 7: Animatie nog steeds invloed heeft**
+```
+Misschien heeft animatie indirect invloed:
+- Via timing van uiTick()?
+- Via shared variables?
+- Via radio bandwidth?
+```
+
+**CHECK NODIG:**
+- Is animatie ECHT gescheiden?
+- Gebruikt keonIndependentTick() alleen g_speedStep?
+- Geen andere animatie variabelen?
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📡 BODY ESP & ESP-NOW SITUATIE
+
+**HUIDIGE STATUS:**
+- Body ESP stuurt stress levels via ESP-NOW
+- Stress level → g_speedStep update
+- keonIndependentTick() leest g_speedStep
+- **DUS: Body ESP AI werkt automatisch!**
+
+**OUDE FUNCTIE:**
+```cpp
+void keonSyncToAnimation(...)  // Nog in code maar NIET meer gebruikt
+```
+
+**BESLISSING NODIG:**
+- Oude functie weghalen? (is dead code)
+- Of bewaren voor backwards compatibility?
+
+**BELANGRIJKE VRAGEN:**
+- Gebruikt espnow_comm.cpp nog `syncKeonToStressLevel()`?
+- Roept die functie intern `keonSyncToAnimation()` aan?
+- Zo ja: dan moet die herschreven worden naar alleen `g_speedStep` updaten
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📊 TECHNISCHE DETAILS
+
+### **BESTANDEN AANGEPAST:**
+
+**1. keon_ble.h**
+- Nieuwe functie declaratie: `void keonIndependentTick();`
+- Oude functie behouden: `void keonSyncToAnimation(...);`
+- Alle andere functies ongewijzigd
+
+**2. keon_ble.cpp**
+- Nieuwe functie: `keonIndependentTick()` toegevoegd
+- Oude functie: `keonSyncToAnimation()` behouden (mogelijk dead code)
+- Connection management ongewijzigd
+- MAC address functies werkend
+
+**3. ui.cpp**
+- In `uiTick()` functie:
+  - OUDE: `keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, goingUp);`
+  - NIEUW: `keonIndependentTick();`
+- Pause/unpause logica: ONGEWIJZIGD (werkt goed!)
+
+### **CONFIGURATIE:**
+
+```cpp
+// MAC Address
+#define KEON_MAC_ADDRESS "ac:67:b2:25:42:5a"
+
+// UUIDs
+#define KEON_SERVICE_UUID "00001900-0000-1000-8000-00805f9b34fb"
+#define KEON_TX_CHAR_UUID "00001902-0000-1000-8000-00805f9b34fb"
+
+// Timing
+#define KEON_COMMAND_DELAY_MS 200  // Rate limiting
+
+// Speed Levels
+g_speedStep: 0-7 (8 levels)
+```
+
+### **FORMULES:**
+
+```cpp
+// Stroke range (klein→groot)
+strokeRange = 20 + ((g_speedStep * 79) / 7)
+// Level 0: 20
+// Level 7: 99
+
+// Sync interval (langzaam→snel)
+syncInterval = 1200 - ((g_speedStep * 800) / 7)
+// Level 0: 1200ms
+// Level 7: 400ms
+
+// Positie berekening
+centerPos = 50
+targetPos = keonDirection ? 
+    (centerPos + strokeRange/2) :
+    (centerPos - strokeRange/2)
+
+// Speed (vast!)
+keonSpeed = 99
+```
+
+### **VERWACHTE GEDRAG:**
+
+```
+Level 0: Range 20 (40-60), Interval 1200ms, Speed 99
+         = Korte, langzame strokes
+
+Level 7: Range 99 (0-99), Interval 400ms, Speed 99
+         = Lange, snelle strokes
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ✅ OPLOSSING GEVONDEN: WAYPOINT-BASED CONTROL
+
+### **Probleem oorzaak:**
+- Fixed interval commands (elke 400-1200ms)
+- Commands kwamen sneller dan Keon kon verwerken
+- Commands stapelden op in BLE buffer → burst ruis
+
+### **Oplossing: Waypoint-based (zoals Funscripts!)**
+
+**Principe:**
+1. Stuur ALLEEN command bij START beweging
+2. Bereken tijd op basis van AFSTAND
+3. Wacht tot beweging COMPLEET
+4. Pas dan nieuwe beweging starten
+
+**Code:**
+```cpp
+if (!isMoving) {
+  // Bereken afstand-gebaseerde tijd
+  float msPerUnit = 8.0f - (speedStep * 5.0f / 7.0f);
+  moveDuration = distance * msPerUnit;
+  
+  // Stuur 1 command
+  keonMove(targetPos, 99);
+  isMoving = true;
+  
+} else {
+  // Wacht tot compleet
+  if (elapsed >= moveDuration) {
+    isMoving = false;  // Klaar voor volgende
+  }
+}
+```
+
+**Voordelen:**
+- ✅ Geen command stapeling meer
+- ✅ Fysiek realistische timing
+- ✅ Future-proof voor funscript integratie
+- ✅ Body ESP kan later funscripts real-time aanpassen
+
+**Bestanden:**
+- keonIndependentTick_WAYPOINT.txt
+- WAYPOINT_UITLEG_COMPLEET.txt
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📝 SAMENVATTING VOOR VOLGEND GESPREK
+
+**WAT WERKT:**
+✅ Keon onafhankelijk van animatie
+✅ Pause/unpause
+✅ Level switching (0-7)
+✅ Connection management
+✅ Range variatie (klein→groot)
+✅ Interval variatie (langzaam→snel)
+
+**WAT NIET WERKT:**
+❌ Ruis in Keon beweging (vooral bij Level 0)
+
+**VERDENKINGEN:**
+1. Radio conflict (BLE vs ESP-NOW)
+2. Kleine range probleem bij Level 0
+3. Dubbele command calls
+4. BLE buffering
+
+**WAT NODIG IS:**
+1. Identificeer type ruis (A/B/C/D)
+2. Test minimum range fix
+3. Serial output analyse
+4. Radio conflict test
+
+**BELANGRIJK:**
+- Document KEON_PARAMETER_VERWARRING.txt lezen!
+- Speed parameter = motor power, NIET stroke snelheid
+- Altijd speed 99 gebruiken
+- Varieer range en interval, niet speed
+
+═══════════════════════════════════════════════════════════════════════════════
+
+**EINDE RAPPORT**
+
+Dit document bevat alle informatie voor het volgende gesprek.
+Neem dit mee zodat je niet alles opnieuw hoeft uit te leggen!
+
+═══════════════════════════════════════════════════════════════════════════════

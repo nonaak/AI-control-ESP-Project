@@ -1,0 +1,175 @@
+# 🎬 WAYPOINT-BASED KEON CONTROL - COMPLETE UITLEG
+
+## 🔄 HOE HET WERKT (FUNSCRIPT METHODE):
+
+### **State Machine:**
+```
+IDLE → START BEWEGING → WACHT TOT COMPLEET → IDLE → ...
+  ↑                                              │
+  └──────────────────────────────────────────────┘
+```
+
+### **Flow:**
+1. **IDLE:** Klaar voor nieuwe beweging
+2. **START:** 
+   - Bereken afstand (bijv. 0→99 = 99 units)
+   - Bereken tijd (bijv. 99 × 6ms = 594ms)
+   - Stuur 1 command: `keonMove(99, 99)`
+   - Markeer als "moving"
+3. **WACHT:** 
+   - Timer loopt (594ms)
+   - **GEEN nieuwe commands!**
+4. **COMPLEET:** 
+   - Timer bereikt → markeer "niet moving"
+   - Terug naar IDLE
+
+---
+
+## ✅ WAAROM DIT BETER IS:
+
+### **Oude methode (Fixed Interval):**
+```
+ESP:   ─┬─┬─┬─┬─┬─┬─  (elke 400ms: nieuw command)
+       
+Keon:  🚀🚀🚀───🚀🚀─  (commands stapelen, burst ruis)
+```
+
+### **Nieuwe methode (Waypoint):**
+```
+ESP:   ─┬──────┬──────┬  (alleen bij start beweging)
+       
+Keon:  🚀──────🚀──────🚀  (smooth, geen stapeling!)
+```
+
+**Voordelen:**
+- ✅ **Geen command stapeling** (maar 1 per beweging!)
+- ✅ **Tijd gebaseerd op afstand** (fysiek realistisch)
+- ✅ **Future-proof** voor funscript integratie
+- ✅ **Smooth beweging** (Keon krijgt de tijd)
+
+---
+
+## 📊 TIMING PER LEVEL:
+
+### **Formule:**
+```cpp
+msPerUnit = 8.0 - (speedStep * 5.0 / 7.0)
+
+Level 0: 8.0 ms/unit → 99 units = 792ms → 76 strokes/min
+Level 1: 7.3 ms/unit → 99 units = 723ms → 83 strokes/min
+Level 2: 6.6 ms/unit → 99 units = 653ms → 92 strokes/min
+Level 3: 5.9 ms/unit → 99 units = 584ms → 103 strokes/min
+Level 4: 5.1 ms/unit → 99 units = 505ms → 119 strokes/min
+Level 5: 4.4 ms/unit → 99 units = 436ms → 138 strokes/min
+Level 6: 3.7 ms/unit → 99 units = 366ms → 164 strokes/min
+Level 7: 3.0 ms/unit → 99 units = 297ms → 202 strokes/min
+```
+
+**Let op:** Level 7 kan fysiek te snel zijn!
+→ Code heeft `minDuration = 300ms` safety
+
+---
+
+## 🎯 VERWACHTE SERIAL OUTPUT:
+
+### **Level 0 (langzaam):**
+```
+[KEON #1] WAYPOINT: 50→99 (dist:49 dur:392ms 8.0ms/unit) Level:0
+...wacht 392ms...
+[KEON #2] WAYPOINT: 99→0 (dist:99 dur:792ms 8.0ms/unit) Level:0
+...wacht 792ms...
+[KEON #3] WAYPOINT: 0→99 (dist:99 dur:792ms 8.0ms/unit) Level:0
+...wacht 792ms...
+[KEON WAYPOINT] 10 strokes completed at Level:0
+```
+
+**Geen dubbele commands meer binnen 792ms!**
+
+### **Level 7 (snel):**
+```
+[KEON #1] WAYPOINT: 50→99 (dist:49 dur:300ms 3.0ms/unit) Level:7
+...wacht 300ms...
+[KEON #2] WAYPOINT: 99→0 (dist:99 dur:300ms 3.0ms/unit) Level:7
+...wacht 300ms...
+[KEON #3] WAYPOINT: 0→99 (dist:99 dur:300ms 3.0ms/unit) Level:7
+```
+
+**Consistent 300ms minimum (safety)!**
+
+---
+
+## 🔧 TUNING PARAMETERS:
+
+Als het nog steeds ruis heeft, pas aan:
+
+### **Langzamer maken:**
+```cpp
+// Verhoog base speed
+float msPerUnit = 10.0f - ((float)g_speedStep * 7.0f / 7.0f);
+// Level 0: 10ms/unit = 990ms
+// Level 7: 3ms/unit = 297ms
+```
+
+### **Sneller maken:**
+```cpp
+// Verlaag base speed (pas op voor Keon limiet!)
+float msPerUnit = 6.0f - ((float)g_speedStep * 3.0f / 7.0f);
+// Level 0: 6ms/unit = 594ms
+// Level 7: 3ms/unit = 297ms
+```
+
+### **Minimum tijd aanpassen:**
+```cpp
+// Verhoog voor meer stability
+if (moveDuration < 500) moveDuration = 500;  // Was 300ms
+```
+
+---
+
+## 🚀 TOEKOMST: FUNSCRIPT INTEGRATIE
+
+Met deze waypoint-based methode kan je later:
+
+### **1. Funscript JSON parsen:**
+```json
+{
+  "actions": [
+    {"at": 0,    "pos": 0},
+    {"at": 1000, "pos": 100},
+    {"at": 1800, "pos": 20}
+  ]
+}
+```
+
+### **2. Direct uitvoeren:**
+```cpp
+void executeWaypoint(uint8_t targetPos, uint32_t duration) {
+  keonMove(targetPos, 99);
+  moveStartTime = millis();
+  moveDuration = duration;
+  isMoving = true;
+}
+```
+
+### **3. Body ESP AI correctie:**
+```cpp
+// Body ESP kan funscript real-time aanpassen
+if (stressLevel > threshold) {
+  adjustFunscriptSpeed(0.8f);  // 20% langzamer
+}
+```
+
+**Dit systeem is klaar voor de toekomst!** 🎯
+
+---
+
+## 📋 TEST CHECKLIST:
+
+- [ ] Upload nieuwe code
+- [ ] Test Level 0: Smooth? Geen bursts?
+- [ ] Test Level 3: Smooth? Juiste snelheid?
+- [ ] Test Level 7: Smooth? Niet te snel?
+- [ ] Check Serial: Geen dubbele commands binnen moveDuration?
+- [ ] Voelt het consistent aan?
+
+**Als dit werkt → We hebben de perfecte basis voor funscript integratie!** ✅

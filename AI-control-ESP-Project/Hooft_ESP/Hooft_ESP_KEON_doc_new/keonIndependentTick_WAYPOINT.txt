@@ -1,0 +1,80 @@
+// ===== WAYPOINT-BASED KEON CONTROL (FUNSCRIPT METHODE) =====
+// Vervang de hele keonIndependentTick() functie in keon_ble.cpp
+
+void keonIndependentTick() {
+  if (!keonConnected) return;
+  
+  extern bool paused;
+  if (paused) return;
+  
+  // State machine voor waypoint-based control
+  static bool isMoving = false;
+  static uint8_t currentPos = 50;
+  static uint8_t targetPos = 50;
+  static uint32_t moveStartTime = 0;
+  static uint32_t moveDuration = 0;
+  static bool nextDirection = false;  // false=DOWN(0), true=UP(99)
+  static uint32_t strokeCount = 0;
+  
+  uint32_t now = millis();
+  extern uint8_t g_speedStep;
+  
+  if (!isMoving) {
+    // ✅ START NIEUWE BEWEGING
+    
+    // Update current position
+    currentPos = targetPos;
+    
+    // Bepaal nieuwe target (altijd volle strokes: 0 of 99)
+    targetPos = nextDirection ? 99 : 0;
+    nextDirection = !nextDirection;
+    
+    // ✅ BEREKEN TIJD OP BASIS VAN AFSTAND (zoals Funscripts!)
+    uint8_t distance = abs(targetPos - currentPos);
+    
+    // Base tijd per unit afstand (ms per positie-eenheid)
+    // Level 0: langzaam (8ms per unit) → 99 units = 792ms
+    // Level 7: snel (3ms per unit) → 99 units = 297ms
+    float msPerUnit = 8.0f - ((float)g_speedStep * 5.0f / 7.0f);
+    if (msPerUnit < 3.0f) msPerUnit = 3.0f;  // Minimum 3ms per unit
+    
+    moveDuration = (uint32_t)(distance * msPerUnit);
+    
+    // Minimum tijd voor stability
+    if (moveDuration < 300) moveDuration = 300;
+    
+    // ✅ STUUR COMMAND (alleen 1x per beweging!)
+    bool success = keonMove(targetPos, 99);
+    
+    if (success) {
+      moveStartTime = now;
+      isMoving = true;
+      strokeCount++;
+      
+      Serial.printf("[KEON #%u] WAYPOINT: %u→%u (dist:%u dur:%ums %.0fms/unit) Level:%u\n", 
+                    strokeCount,
+                    currentPos,
+                    targetPos,
+                    distance,
+                    moveDuration,
+                    msPerUnit,
+                    g_speedStep);
+    }
+    
+  } else {
+    // ✅ WACHT TOT BEWEGING COMPLEET
+    
+    uint32_t elapsed = now - moveStartTime;
+    
+    if (elapsed >= moveDuration) {
+      // Beweging compleet!
+      isMoving = false;
+      
+      // Debug elke 10 strokes
+      if (strokeCount % 10 == 0) {
+        Serial.printf("[KEON WAYPOINT] 10 strokes completed at Level:%u\n", g_speedStep);
+      }
+    }
+    // Anders: nog bezig, doe niks (GEEN nieuwe commands!)
+  }
+}
