@@ -1,0 +1,103 @@
+// ===== KEON BEST-EFFORT SOLUTION (GEEN POSITION FEEDBACK) =====
+// Voor keon_ble.cpp
+// Combineert: STOP commands + 150ms minimum + conservatieve timing
+
+void keonIndependentTick() {
+  if (!keonConnected) return;
+  
+  extern bool paused;
+  if (paused) return;
+  
+  static bool keonDirection = false;
+  static uint32_t lastCommand = 0;
+  static uint32_t strokeCount = 0;
+  static bool isSettling = false;
+  static uint32_t settleStartTime = 0;
+  
+  uint32_t now = millis();
+  extern uint8_t g_speedStep;
+  
+  // ✅ SETTLING STATE (na STOP command)
+  if (isSettling) {
+    if ((now - settleStartTime) < 100) {
+      return;  // Wacht 100ms na stop
+    }
+    isSettling = false;  // Settling klaar
+  }
+  
+  // ✅ CONSERVATIEVE INTERVALS
+  // Level 0: 2500ms (24 strokes/min) - ZEER LANGZAAM maar smooth
+  // Level 7: 1500ms (40 strokes/min) - MEDIUM
+  uint32_t baseInterval = 2500 - ((g_speedStep * 1000) / 7);
+  
+  // ✅ ABSOLUTE MINIMUM 150ms (zoals FeelConnect)
+  if (baseInterval < 150) baseInterval = 150;
+  
+  // Check of het tijd is
+  if ((now - lastCommand) < baseInterval) {
+    return;
+  }
+  
+  // Toggle direction
+  keonDirection = !keonDirection;
+  uint8_t targetPos = keonDirection ? 99 : 0;
+  
+  if (keonTxCharacteristic == nullptr) return;
+  
+  try {
+    // ✅ STUUR MOVE COMMAND
+    uint8_t moveCmd[5] = {0x04, 0x00, targetPos, 0x00, 99};
+    keonTxCharacteristic->writeValue(moveCmd, 5, true);
+    
+    lastCommand = now;
+    strokeCount++;
+    
+    Serial.printf("[KEON FINAL #%u] MOVE %s Int:%ums L:%u\n",
+                  strokeCount,
+                  keonDirection ? "UP" : "DOWN",
+                  baseInterval,
+                  g_speedStep);
+    
+    // ✅ WACHT 50ms, DAN STOP (CLEAR BUFFER)
+    delay(50);
+    
+    uint8_t stopCmd[5] = {0x04, 0x00, targetPos, 0x00, 0};  // Speed 0
+    keonTxCharacteristic->writeValue(stopCmd, 5, true);
+    
+    // Start settling period
+    isSettling = true;
+    settleStartTime = millis();
+    
+    if (strokeCount % 10 == 0) {
+      Serial.printf("[KEON FINAL] 10 strokes at Level %u\n", g_speedStep);
+    }
+    
+  } catch (...) {
+    Serial.println("[KEON] Command failed!");
+  }
+}
+
+// ===============================================================================
+// REALISTISCHE VERWACHTINGEN:
+// ===============================================================================
+// 
+// Met deze oplossing:
+// ✅ Beter dan zonder fixes
+// ✅ Smooth-er operation
+// ✅ Buffer wordt gecleard met STOP commands
+// ✅ Respecteert Keon's interne timing (150ms)
+// 
+// Maar nog steeds:
+// ⚠️ Niet perfect smooth
+// ⚠️ Langzamer dan ideaal
+// ⚠️ Keon firmware beperkingen blijven
+// 
+// Dit is de BESTE mogelijk zonder position feedback.
+// Keon hardware heeft inherente beperkingen.
+// 
+// TIMING RESULTAAT:
+// Level 0: 2500ms + 100ms settle = ~23 strokes/min
+// Level 7: 1500ms + 100ms settle = ~37 strokes/min
+// 
+// ACCEPTABEL voor gebruik, niet perfect.
+// ===============================================================================
