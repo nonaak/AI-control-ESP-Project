@@ -1577,10 +1577,31 @@ void uiTick() {
     }
   }
 
-  //CEvent cev = pollCEvent(cNow);
+//CEvent cev = pollCEvent(cNow);
+
+  //CEvent cev = skipCEventThisFrame ? CE_NONE : pollCEvent(cNow);
+  //skipCEventThisFrame = false;  // Reset after use
 
   CEvent cev = skipCEventThisFrame ? CE_NONE : pollCEvent(cNow);
   skipCEventThisFrame = false;  // Reset after use
+
+  // ═══════════════════════════════════════════════════════════
+  // Z BUTTON VACUUM TOGGLE - DIRECT EN SIMPEL
+  // ═══════════════════════════════════════════════════════════
+  static bool prevZNow = false;
+  if (!zNow && prevZNow && uiMode == MODE_ANIM) {
+    // Z released in animatie mode → toggle vacuum
+    extern bool pompUnitZuigActive;
+    pompUnitZuigActive = !pompUnitZuigActive;
+    Serial.printf("[VACUUM] Toggle: %s\n", pompUnitZuigActive ? "ON" : "OFF");
+    
+    // Send update to Pump Unit
+    //extern void sendImmediateArrowUpdate();
+    extern void sendToggleZuigenCommand();
+    //sendImmediateArrowUpdate();
+    sendToggleZuigenCommand();
+  }
+  prevZNow = zNow;
 
   ZEvent zev = pollZEvent(zNow);
   ZClickType zClick = pollZClick(zNow);
@@ -1590,13 +1611,29 @@ void uiTick() {
                   (zClick == Z_SINGLE) ? "SINGLE" : (zClick == Z_VIBE) ? "VIBE" : "NONE");
   }
   
+bool zEdge = (zev == ZE_SHORT);
+  
+  // ═══════════════════════════════════════════════════════════
+  // Z BUTTON HANDLING - Gebruik alleen zClick systeem
+  // ═══════════════════════════════════════════════════════════
+  
+  // VIBE toggle (dubbele klik)
   if (zClick == Z_VIBE) {
     vibeState = !vibeState;
-    Serial.printf("[Z-VIBE] Vibe toggle: %s -> sending bit 3 to M5StickC Plus\n", 
-                  vibeState ? "ON" : "OFF");
+    Serial.printf("[Z-VIBE] Vibe toggle: %s\n", vibeState ? "ON" : "OFF");
   }
   
-  bool zEdge = (zev == ZE_SHORT);
+  // VACUUM toggle (enkele klik) - werkt NA timeout (500ms)
+  //if (zClick == Z_SINGLE && uiMode == MODE_ANIM) {
+    //extern bool pompUnitZuigActive;
+    //pompUnitZuigActive = !pompUnitZuigActive;
+    //Serial.printf("[Z-VACUUM] Vacuum toggle: %s (single click confirmed)\n", 
+                  //pompUnitZuigActive ? "ON" : "OFF");
+    
+    // Send ESP-NOW command
+    //extern void sendImmediateArrowUpdate();
+    //sendImmediateArrowUpdate();
+  //}
 
   if (nunchukHelpPopupOpen) {
     if (cev == CE_SHORT) {
@@ -1619,6 +1656,12 @@ void uiTick() {
     if (!paused) {
       parkToBottom = true;
       paused = true;
+      // STOP AUTO VACUUM BIJ PAUSE!
+      extern bool arrowFull;
+      arrowFull = false;
+      extern void sendImmediateArrowUpdate();
+      sendImmediateArrowUpdate();
+      Serial.println("[PAUSE] arrowFull=false sent to stop auto vacuum");
       Serial.println("[DEBUG] parkToBottom set to TRUE here! ui_cpp");
       keonSyncEnabled = false;
     }else { 
@@ -1825,14 +1868,171 @@ void uiTick() {
   float dt = (nowUs - lastUs) / 1e6f;
   lastUs = nowUs;
 
+//------------------------------------------------------
 
-  // Calculate step01 for rod color
+// Calculate step01 for rod color
+float step01 = (CFG.SPEED_STEPS<=1)?0.0f : (float)g_speedStep/(float)(CFG.SPEED_STEPS-1);
+
+// Base frequency from Keon levels
+extern float keonGetStrokeFrequency(uint8_t level);
+float baseInstF = keonGetStrokeFrequency(g_speedStep);
+
+if (!paused && !parkToBottom) {
+  // ═══════════════════════════════════════════════════════════
+  // ADAPTIVE MOTION BLEND
+  // ═══════════════════════════════════════════════════════════
+  
+  float instF = baseInstF;
+  
+  extern bool m5atom_connected;
+  extern int8_t currentMotionDir;
+  extern uint8_t currentMotionSpeed;
+  
+  if (CFG.motionBlendEnabled && m5atom_connected) {
+    // ───────────────────────────────────────────────────────
+    // SPEED BLENDING (altijd actief)
+    // ───────────────────────────────────────────────────────
+    float nunchukWeight = CFG.userSpeedWeight / 100.0f;
+    float motionWeight = CFG.motionSpeedWeight / 100.0f;
+    
+    static float smoothedMotionSpeed = 0.0f;
+    smoothedMotionSpeed = 0.9f * smoothedMotionSpeed + 0.1f * currentMotionSpeed;
+    
+    float motionSpeedMultiplier = (smoothedMotionSpeed / 100.0f) * 1.5f;
+    float blendedFreq = baseInstF * (nunchukWeight + (motionWeight * motionSpeedMultiplier));
+    instF = blendedFreq;
+    
+    // ───────────────────────────────────────────────────────
+    // DIRECTION SYNC (alleen bij lage snelheden!)
+    // ───────────────────────────────────────────────────────
+    // Bij L6-L7: sensor te langzaam → direction sync UIT
+    bool allowDirectionSync = (g_speedStep <= 5);
+    
+    if (CFG.motionDirectionSync && allowDirectionSync) {
+      static int8_t stableDir = 0;
+      static int8_t lastDir = 0;
+      static uint8_t dirCounter = 0;
+      
+      if (currentMotionDir == lastDir) {
+        dirCounter++;
+        if (dirCounter >= 3) {  // 3 frames (sneller dan 5)
+          stableDir = currentMotionDir;
+          dirCounter = 3;
+        }
+      } else {
+        dirCounter = 0;
+        lastDir = currentMotionDir;
+      }
+      
+      if (stableDir != 0) {
+        float targetPhase = (stableDir > 0) ? 3.14159f : 0.0f;
+        float phaseDiff = targetPhase - phase;
+        
+        while (phaseDiff > 3.14159f) phaseDiff -= 6.28318f;
+        while (phaseDiff < -3.14159f) phaseDiff += 6.28318f;
+        
+        // Adaptive correctie snelheid op basis van level
+        float correctionRate = 0.02f;  // L0-L2: 2%
+        if (g_speedStep >= 3) correctionRate = 0.01f;  // L3-L5: 1%
+        
+        if (abs(phaseDiff) > 0.785f) {  // >45° uit sync
+          phase += phaseDiff * correctionRate;
+        }
+      }
+    }
+  }
+  
+  // Update phase
+  phase += TAU * instF * dt * CFG.ANIM_SPEED_FACTOR;
+  if (phase > TAU) phase -= TAU;
+  
+  // Debug
+  static uint32_t lastPhaseDebug = 0;
+  if (millis() - lastPhaseDebug > 1000) {
+    Serial.printf("[DEBUG PHASE] phase=%.3f paused=%d parkToBottom=%d\n", phase, paused, parkToBottom);
+    lastPhaseDebug = millis();
+  }
+}
+
+//--------------------------------------------------------------
+/*
+// Calculate step01 for rod color
+float step01 = (CFG.SPEED_STEPS<=1)?0.0f : (float)g_speedStep/(float)(CFG.SPEED_STEPS-1);
+
+// Base frequency from Keon levels
+extern float keonGetStrokeFrequency(uint8_t level);
+float baseInstF = keonGetStrokeFrequency(g_speedStep);
+
+if (!paused && !parkToBottom) {
+  // ═══════════════════════════════════════════════════════════
+  // SMOOTH MOTION BLEND - Animatie volgt M5Atom GELEIDELIJK
+  // ═══════════════════════════════════════════════════════════
+  
+  float instF = baseInstF;  // Start met basis frequentie
+  
+  // Als Motion Blend enabled EN M5Atom online
+  extern bool m5atom_connected;
+  extern int8_t currentMotionDir;    // 1=UP, -1=DOWN, 0=STILL
+  extern uint8_t currentMotionSpeed; // 0-100%
+  
+  if (CFG.motionBlendEnabled && m5atom_connected) {
+    // Speed adjustment: blend nunchuk + M5Atom speed
+    float nunchukWeight = CFG.userSpeedWeight / 100.0f;      // 40%
+    float motionWeight = CFG.motionSpeedWeight / 100.0f;     // 60%
+    
+    // M5Atom speed percentage → frequency multiplier
+    float motionSpeedMultiplier = (currentMotionSpeed / 100.0f) * 1.5f; // 0-150%
+    
+    // Blend: basis freq * (nunchuk% + motion%)
+    float blendedFreq = baseInstF * (nunchukWeight + (motionWeight * motionSpeedMultiplier));
+    instF = blendedFreq;
+    
+    // Direction Sync: Target phase op basis van M5Atom richting
+    if (CFG.motionDirectionSync) {
+      float targetPhase = phase;
+      
+      if (currentMotionDir > 0) {
+        // UP: target = top half van cycle (π/2 tot 3π/2)
+        targetPhase = 3.14159f; // π (top)
+      } else if (currentMotionDir < 0) {
+        // DOWN: target = bottom half (0 of 2π)
+        targetPhase = 0.0f; // bottom
+      }
+      // STILL: geen target change
+      
+      // SMOOTH correctie naar target (10% lerp - geen schokken!)
+      if (currentMotionDir != 0) {
+        float phaseDiff = targetPhase - phase;
+        
+        // Normalize difference to -π to π
+        while (phaseDiff > 3.14159f) phaseDiff -= 6.28318f;
+        while (phaseDiff < -3.14159f) phaseDiff += 6.28318f;
+        
+        // Smooth correction (0.05 = 5% per frame, zeer smooth!)
+        phase += phaseDiff * 0.05f;
+      }
+    }
+  }
+  
+  // Update phase met (mogelijk gecorrigeerde) frequency
+  phase += TAU * instF * dt * CFG.ANIM_SPEED_FACTOR;
+  if (phase > TAU) phase -= TAU;
+  
+  // Debug output
+  static uint32_t lastPhaseDebug = 0;
+  if (millis() - lastPhaseDebug > 1000) {
+    Serial.printf("[DEBUG PHASE] phase=%.3f paused=%d parkToBottom=%d\n", phase, paused, parkToBottom);
+    lastPhaseDebug = millis();
+  }
+}*/
+//----------------------------------------------------
+  /*// Calculate step01 for rod color
   float step01 = (CFG.SPEED_STEPS<=1)?0.0f : (float)g_speedStep/(float)(CFG.SPEED_STEPS-1);
 
 // Use Keon frequencies for animation sync!
   extern float keonGetStrokeFrequency(uint8_t level);
   float instF = keonGetStrokeFrequency(g_speedStep);
-  
+
   //float step01 = (CFG.SPEED_STEPS<=1)?0.0f : (float)g_speedStep/(float)(CFG.SPEED_STEPS-1);
   //float instF = CFG.MIN_SPEED_HZ + step01 * (CFG.MAX_SPEED_HZ - CFG.MIN_SPEED_HZ);
 
@@ -1844,7 +2044,8 @@ void uiTick() {
       Serial.printf("[DEBUG PHASE] phase=%.3f paused=%d parkToBottom=%d\n", phase, paused, parkToBottom);
       lastPhaseDebug = millis();
     }
-  }
+  }*/
+  //----------------------------------------------------------------------------
   
   float s = 0.5f * (sinf(phase) + 1.0f);
   float ease = schlick_gain(CFG.easeGain, s);
@@ -1931,7 +2132,8 @@ void uiTick() {
 
   //if (parkToBottom && capY_draw < (float)CAP_Y_IN && paused) {
   if (parkToBottom && capY_draw < (float)CAP_Y_IN) {  
-    capY_draw += 0.5f;
+    //capY_draw += 0.5f;
+    capY_draw += 1.0f;
     if (capY_draw > (float)CAP_Y_IN) {
       capY_draw = (float)CAP_Y_IN;
       parkToBottom=false;

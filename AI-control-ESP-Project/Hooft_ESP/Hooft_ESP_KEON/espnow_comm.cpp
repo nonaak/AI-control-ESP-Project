@@ -1053,3 +1053,58 @@ void sendImmediateArrowUpdate() {
     Serial.printf("[IMMEDIATE] FAILED: %d\n", result);
   }
 }
+// ===============================================================================
+// NUNCHUK COMMAND FUNCTIONS - Send to Body ESP
+// ===============================================================================
+
+void sendOrgasmTrigger() {
+  if (!bodyESP_connected) {
+    Serial.println("[ORGASM] Cannot send - Body ESP offline!");
+    return;
+  }
+  
+  machineStatus_message_t msg;
+  memset(&msg, 0, sizeof(msg));
+  
+  strcpy(msg.command, "ORGASM_TRIGGER");
+  msg.trust = getUserTrustSpeed();
+  msg.sleeve = getUserSleeveSpeed();
+  msg.suction = abs(currentVacuumReading);
+  msg.vibeOn = vibeState;
+  msg.zuigActive = pompUnitZuigActive;
+  msg.vacuumMbar = abs(currentVacuumReading / 0.75f);
+  
+  extern bool paused;
+  extern uint8_t g_speedStep;
+  msg.pauseActive = paused;
+  msg.currentSpeedStep = g_speedStep;
+  
+  sendBodyESPStatusUpdate(msg);
+  Serial.println("[ESP-NOW] ORGASM_TRIGGER sent to Body ESP!");
+}
+
+void sendFunscriptCommand(bool enabled) {
+  if (!bodyESP_connected) {
+    Serial.printf("[FUNSCRIPT] Cannot send - Body ESP offline!\n");
+    return;
+  }
+  
+  machineStatus_message_t msg;
+  memset(&msg, 0, sizeof(msg));
+  
+  strcpy(msg.command, enabled ? "FUNSCRIPT_ON" : "FUNSCRIPT_OFF");
+  msg.trust = getUserTrustSpeed();
+  msg.sleeve = getUserSleeveSpeed();
+  msg.suction = abs(currentVacuumReading);
+  msg.vibeOn = vibeState;
+  msg.zuigActive = pompUnitZuigActive;
+  msg.vacuumMbar = abs(currentVacuumReading / 0.75f);
+  
+  extern bool paused;
+  extern uint8_t g_speedStep;
+  msg.pauseActive = paused;
+  msg.currentSpeedStep = g_speedStep;
+  
+  sendBodyESPStatusUpdate(msg);
+  Serial.printf("[ESP-NOW] Funscript %s sent to Body ESP!\n", enabled ? "ON" : "OFF");
+}

@@ -3,7 +3,7 @@
 AI-Controlled ESP32 Edging System - Complete Overzicht
 ═══════════════════════════════════════════════════════════════════════════════
 
-**Datum:** 14 November 2025
+**Datum:** 20 November 2025 - FINAL UPDATE!
 **Project:** AI-Control-ESP-Project
 **Owner:** Aak
 
@@ -14,140 +14,218 @@ AI-Controlled ESP32 Edging System - Complete Overzicht
 ```
 Pomp Unit (ESP8266):       ████████████████████ 100% ✅ KLAAR!
 Body ESP (SC01 Plus):      ████████████████░░░░  80% 🔄 Rotary encoder TODO
-Hooft ESP (CYD 2.8"):      ████████████████░░░░  80% 🔄 Testing & nunchuk
+Hooft ESP (CYD 2.8"):      ███████████████████░  95% ✅ BIJNA COMPLEET!
 M5StickC Plus:             ████████████████████ 100% ✅ KLAAR (hardware twijfel)
 ```
 
-**Totaal Project:** ~85% compleet (Alle modules veel verder dan gedacht!)
+**Totaal Project:** ~94% compleet (Hooft ESP major progress vandaag!)
 
 ═══════════════════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════════════
+
+# 🎉 VANDAAG GEFIXT (20 Nov 2025) - FINAL SESSION
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ✅ HOOFT ESP - KEON + VACUUM + NUNCHUK COMPLEET!
+
+**Status:** MASSIVE BREAKTHROUGH! 🚀🎊
+
+### ✅ KEON 8-LEVEL SYSTEEM WERKEND:
+  ✅ KEON_LEVEL_POSITIONS array geoptimaliseerd (0,30,45,55,65,75,85,99)
+  ✅ Duidelijk verschil tussen alle 8 levels
+  ✅ Level 0 start correct
+  ✅ Smooth progressie van langzaam naar snel
+  ✅ Animatie sync perfect (/1.09 frequencies)
+  
+### ✅ VACUUM SYSTEEM COMPLEET:
+  ✅ Z-knop single click toggle werkend (sendToggleZuigenCommand)
+  ✅ Werkt in animatie mode + tijdens pause
+  ✅ Auto vacuum stopt correct bij pause (arrowFull=false fix)
+  ✅ Smooth ParkToBottom (1.0f pixels/frame)
+  ✅ Geen conflicten met vibe toggle
+
+### ✅ VIBE SYSTEEM WERKEND:
+  ✅ Z-knop double click toggle (via pollZClick)
+  ✅ Geen conflict met vacuum toggle
+  ✅ Smooth debouncing
+
+### ✅ NUNCHUK HOLD DETECTION COMPLEET! 🎉
+  ✅ Y-axis hold 3 sec → ORGASM_TRIGGER naar Body ESP ✅ GETEST!
+  ✅ X-axis hold 2 sec LEFT → FUNSCRIPT_OFF naar Body ESP ✅ GETEST!
+  ✅ X-axis hold 2 sec RIGHT → FUNSCRIPT_ON naar Body ESP ✅ GETEST!
+  ✅ ESP-NOW commands: sendOrgasmTrigger() ✅
+  ✅ ESP-NOW commands: sendFunscriptCommand(bool) ✅
+  ✅ Debug logging voor hold timing ✅
+  ✅ Juiste Y-axis detectie (jy > JY_HI) ✅
+
+### ✅ UI CONTROLS WERKEND (100%):
+  ✅ C-knop: Pause/Resume
+  ✅ Z-knop 1x: Vacuum toggle
+  ✅ Z-knop 2x: Vibe toggle
+  ✅ Y-as: Speed control (8 levels)
+  ✅ Y-as hold 3 sec: Orgasm trigger 🆕
+  ✅ X-as hold 2 sec L: Funscript OFF 🆕
+  ✅ X-as hold 2 sec R: Funscript ON 🆕
+  ✅ ParkToBottom smooth (1.0f)
+
+### ✅ MOTION BLEND:
+  ✅ Getest met M5Atom online/offline handling
+  ✅ Graceful fallback naar nunchuk control
+  ✅ Configureerbaar via menu
+
 ═══════════════════════════════════════════════════════════════════════════════
 
 # 🔴 PRIORITEIT 1: KRITISCHE TAKEN (Week 1)
 
 ═══════════════════════════════════════════════════════════════════════════════
 
-## 🎮 HOOFT ESP - Testing & Integration (Klein beetje werk!)
+## 🎮 HOOFT ESP - Testing & Integration
 
 **Hardware:** CYD 2.8" (ESP32-WROOM-32)
-**Status:** Keon BLE ✅ + ESP-NOW ✅ = BIJNA KLAAR!
+**Status:** 95% COMPLEET! ✅ MASSIVE progress vandaag!
 
-### HUIDIGE SITUATIE - VEEL BETER DAN GEDACHT!
+✅ **KEON BLE COMPLEET (100%):**
+  ✅ keon_ble.cpp volledig werkend
+  ✅ 8 levels met perfecte sync
+  ✅ Auto-reconnect logic
+  ✅ Animatie sync (/1.09 frequencies)
+  ✅ Direct response (geen rate limiter blocking)
+  ✅ Core 0 task voor stable operation
 
-✅ **Keon BLE COMPLEET:**
-  - keon_ble.cpp volledig werkend
-  - Auto-reconnect logic
-  - Sync met animatie
-  - README_WORKING_KEON.md
+✅ **ESP-NOW COMPLEET (100%):**
+  ✅ espnow_comm.cpp 800+ regels code!
+  ✅ initESPNow() met channel 4
+  ✅ Bidirectionele communicatie
+  ✅ Alle message handlers (Body ESP, Pump Unit, M5Atom)
+  ✅ Send functies (status, pump control, colors)
+  ✅ Safety systeem (timeouts, emergency stop)
+  ✅ Nunchuk commands naar Body ESP 🆕
+    * sendOrgasmTrigger() ✅
+    * sendFunscriptCommand(bool) ✅
 
-✅ **ESP-NOW COMPLEET GEÏMPLEMENTEERD:**
-  - espnow_comm.cpp 800+ regels code!
-  - initESPNow() met channel 4
-  - Bidirectionele communicatie
-  - Alle message handlers:
-    * handleBodyESPMessage() - AI overrides ✅
-    * handlePumpUnitMessage() - Vacuum telemetry ✅
-    * handleM5AtomMotionMessage() - Motion sync ✅
-  - Send functies:
-    * sendPumpControlMessages() ✅
-    * sendBodyESPStatusUpdate() ✅
-    * sendM5AtomStatusUpdate() ✅
-  - Safety systeem:
-    * checkCommunicationTimeouts() ✅
-    * handleEmergencyStop() ✅
-    * performSafetyChecks() ✅
+✅ **AI INTEGRATION KLAAR (100%):**
+  ✅ AI override factors (trust/sleeve)
+  ✅ Emergency stop handling
+  ✅ Playback stress levels
+  ✅ AI vibe/vacuum commands
 
-✅ **AI INTEGRATION KLAAR:**
-  - AI override factors (trust/sleeve)
-  - Emergency stop handling
-  - Playback stress levels
-  - AI vibe/vacuum commands
+✅ **VACUUM SYSTEEM KLAAR (100%):**
+  ✅ PumpStatusMsg ontvangst
+  ✅ Real-time HX711 vacuum display
+  ✅ Zuigen toggle commands (Z-knop 1x)
+  ✅ Auto vacuum pause handling
+  ✅ Start-lube en lube shot functies
 
-✅ **VACUUM SYSTEEM KLAAR:**
-  - PumpStatusMsg ontvangst
-  - Real-time HX711 vacuum display
-  - Zuigen toggle commands
-  - Start-lube en lube shot functies
+✅ **MOTION SYNC KLAAR (100%):**
+  ✅ M5Atom motion data ontvangen
+  ✅ syncMotionToAnimation() met blending
+  ✅ Configureerbaar via CFG.motionBlendEnabled
+  ✅ Graceful offline handling
 
-✅ **MOTION SYNC KLAAR:**
-  - M5Atom motion data ontvangen
-  - syncMotionToAnimation() met blending
-  - Configureerbaar via CFG.motionBlendEnabled
+✅ **NUNCHUK CONTROLS COMPLEET (100%):** 🆕
+  ✅ Y-as speed control (8 levels)
+  ✅ Y-as hold 3 sec → Orgasm trigger
+  ✅ X-as hold 2 sec L → Funscript OFF
+  ✅ X-as hold 2 sec R → Funscript ON
+  ✅ Z-knop 1x → Vacuum toggle
+  ✅ Z-knop 2x → Vibe toggle
+  ✅ C-knop → Pause/Resume
 
-🔶 **WAT NOG MOET (Klein!):**
-  - Testen met alle 4 modules samen
-  - Edge cases verifiëren
-  - UI polish (connection indicators)
-  - Nunchuk hardware testen
+🔶 **WAT NOG MOET (Zeer klein!):**
+  ☐ Testen met alle 4 modules samen (dag 1-2)
+  ☐ Edge cases verifiëren (dag 3-4)
+  ☐ UI polish: connection indicators (dag 5)
+  ☐ 2+ uur stability test
 
 ---
 
 ### TODO - WEEK 1: TESTING & VERIFICATION (Dag 1-3)
 
+✅ **Test Keon BLE** (VANDAAG GETEST!)
+  ✅ 8 levels werkend met goede spread
+  ✅ Animatie sync perfect (/1.09)
+  ✅ Auto-reconnect getest
+  ✅ Core 0 task stable
+
+✅ **Test Vacuum Control** (VANDAAG GETEST!)
+  ✅ Z-knop toggle werkend
+  ✅ Werkt in animatie + pause
+  ✅ Auto vacuum stopt bij pause
+  ✅ Geen conflict met vibe
+
+✅ **Test Nunchuk Hold Detection** (VANDAAG GETEST!) 🆕
+  ✅ Y-hold 3 sec → Orgasm trigger
+  ✅ X-hold 2 sec L → Funscript OFF
+  ✅ X-hold 2 sec R → Funscript ON
+  ✅ ESP-NOW commands verzonden naar Body ESP
+  ✅ Debug logging werkt
+
 ☐ **Test ESP-NOW Communicatie**
-  - Upload huidige code
-  - Verify ESP-NOW init succesvol
-  - Serial Monitor: Check peer adding
-  - Verify channel 4 correct
+  ☐ Upload huidige code
+  ☐ Verify ESP-NOW init succesvol
+  ☐ Serial Monitor: Check peer adding
+  ☐ Verify channel 4 correct
 
 ☐ **Test Body ESP ontvangst**
-  - Body ESP stuurt AI override
-  - Check handleBodyESPMessage() wordt aangeroepen
-  - Verify trust/sleeve factors worden updated
-  - Test emergency stop command
-  - Test AI vibe/vacuum commands
+  ☐ Body ESP stuurt AI override
+  ☐ Check handleBodyESPMessage() wordt aangeroepen
+  ☐ Verify trust/sleeve factors worden updated
+  ☐ Test emergency stop command
+  ☐ Test AI vibe/vacuum commands
+  ✅ Test orgasm trigger ontvangst 🆕
+  ✅ Test funscript toggle ontvangst 🆕
 
 ☐ **Test Pomp Unit ontvangst**
-  - Check PumpStatusMsg ontvangst
-  - Verify vacuum telemetry display
-  - Check pump status indicators
-  - Test zuigen toggle
+  ☐ Check PumpStatusMsg ontvangst
+  ☐ Verify vacuum telemetry display
+  ☐ Check pump status indicators
+  ✅ Test zuigen toggle (GETEST VANDAAG!)
 
 ☐ **Test verzenden naar modules**
-  - Verify sendPumpControlMessages() works
-  - Check sendBodyESPStatusUpdate() works
-  - Test sendM5AtomStatusUpdate() works
-  - Monitor Serial output voor send errors
+  ☐ Verify sendPumpControlMessages() works
+  ☐ Check sendBodyESPStatusUpdate() works
+  ☐ Test sendM5AtomStatusUpdate() works
+  ☐ Monitor Serial output voor send errors
 
 ☐ **Test timeouts**
-  - Disconnect Body ESP → timeout werkt?
-  - Disconnect Pomp Unit → timeout werkt?
-  - Verify graceful degradation (geen crashes)
-  - Test reconnection detection
+  ☐ Disconnect Body ESP → timeout werkt?
+  ☐ Disconnect Pomp Unit → timeout werkt?
+  ☐ Verify graceful degradation (geen crashes)
+  ☐ Test reconnection detection
 
 ---
 
-### TODO - WEEK 1-2: NUNCHUK TESTING (Dag 4-7)
+### TODO - WEEK 1-2: NUNCHUK TESTING
 
-**Status:** Code bestaat (motion.cpp/h), hardware nog niet getest
+**Status:** BIJNA COMPLEET! ✅ Basis + hold detection getest!
 
-☐ **Hardware Setup**
-  - Wireless nunchuk adapter aanwezig?
-  - Connect op I2C pins 21/22 (Wire)
-  - Test nunchuk I2C address (0x52)
-  - Verify nunchuk data reading
+✅ **Hardware Setup**
+  ✅ Nunchuk verbonden (I2C pins 21/22)
+  ✅ I2C address 0x52 correct
+  ✅ Data reading werkend
 
-☐ **Test Nunchuk Input**
+✅ **Test Nunchuk Input** (MEESTE GETEST!)
   ```
-  Y-as omhoog     → Speed verhogen (0-7)
-  Y-as omlaag     → Speed verlagen  
-  Y-as 4 sec top  → Orgasm trigger
-  X-as links 2sec → Funscript OFF
-  X-as rechts 2sec→ Funscript ON
-  Z button 1x     → Zuigen toggle
-  Z button 2x     → Vibe toggle
-  C button        → Context-aware (PAUSE/START/SKIP)
+  ✅ Y-as omhoog     → Speed verhogen (0-7) GETEST!
+  ✅ Y-as omlaag     → Speed verlagen GETEST!
+  ✅ Y-as 3 sec top  → Orgasm trigger GETEST! 🆕
+  ✅ X-as links 2sec → Funscript OFF GETEST! 🆕
+  ✅ X-as rechts 2sec→ Funscript ON GETEST! 🆕
+  ✅ Z button 1x     → Zuigen toggle GETEST!
+  ✅ Z button 2x     → Vibe toggle GETEST!
+  ✅ C button        → Pause/Resume GETEST!
   ```
 
 ☐ **Test Priority System**
-  - Nunchuk override werkt?
-  - AI commands alleen als geen nunchuk input?
-  - Manual control heeft voorrang?
+  ☐ Nunchuk override werkt?
+  ☐ AI commands alleen als geen nunchuk input?
+  ☐ Manual control heeft voorrang?
 
-☐ **Test Button Debouncing**
-  - Geen double-triggers?
-  - Smooth responsiveness?
-  - Long press detection werkt?
+✅ **Test Button Debouncing**
+  ✅ Geen double-triggers Z-knop (GETEST!)
+  ✅ Smooth responsiveness (GETEST!)
+  ✅ Hold detection werkt (Y + X getest!)
 
 ---
 
@@ -156,28 +234,28 @@ M5StickC Plus:             █████████████████�
 **Status:** Basic UI werkt, maar kan polish gebruiken
 
 ☐ **Add ESP-NOW Status Indicators**
-  - Body ESP connection indicator (groen/rood)
-  - Pomp Unit connection indicator
-  - M5Atom connection indicator (optioneel)
-  - Display connection timeouts
+  ☐ Body ESP connection indicator (groen/rood)
+  ☐ Pomp Unit connection indicator
+  ☐ M5Atom connection indicator (optioneel)
+  ☐ Display connection timeouts
 
 ☐ **Add Vacuum Display**
-  - Real-time vacuum reading (mbar)
-  - Pump status (vacuum ON/OFF)
-  - Lube pump status
-  - Zuigen mode indicator
+  ☐ Real-time vacuum reading (mbar)
+  ☐ Pump status (vacuum ON/OFF)
+  ☐ Lube pump status
+  ✅ Zuigen mode indicator (BASIS WERKEND)
 
 ☐ **Add AI Status Display**
-  - AI override active indicator
-  - Trust/Sleeve factors (visual)
-  - Stress level van Body ESP
-  - Emergency stop alert
+  ☐ AI override active indicator
+  ☐ Trust/Sleeve factors (visual)
+  ☐ Stress level van Body ESP
+  ☐ Emergency stop alert
 
 ☐ **Polish Existing UI**
-  - Keon connected indicator (al aanwezig?)
-  - Speed step display prominent
-  - Orgasm countdown (Y 4 sec)
-  - Warning icons (high stress, edge, PONR)
+  ✅ Keon connected indicator (WERKEND)
+  ✅ Speed step display prominent (8 LEVELS)
+  ✅ Orgasm trigger visual feedback 🆕
+  ☐ Warning icons (high stress, edge, PONR)
 
 ---
 
@@ -186,44 +264,46 @@ M5StickC Plus:             █████████████████�
 ☐ **4-Module Integration Test**
   ```
   1. Start alle 4 modules:
-     - Hooft ESP (CYD)
-     - Body ESP (SC01 Plus)  
-     - Pomp Unit (ESP8266)
-     - M5StickC Plus
+     ✅ Hooft ESP (CYD) - READY! 95% compleet!
+     ✅ Body ESP (SC01 Plus) - READY!
+     ✅ Pomp Unit (ESP8266) - READY!
+     ✅ M5StickC Plus - READY!
   
   2. Verify bidirectionele communicatie:
-     - Body ESP → Hooft ESP (AI overrides) ✓
-     - Hooft ESP → Pomp Unit (vacuum control) ✓
-     - Pomp Unit → Hooft ESP (telemetry) ✓
-     - Hooft ESP → M5Atom (status) ✓
-     - M5Atom → Hooft ESP (motion) ✓
+     ☐ Body ESP → Hooft ESP (AI overrides)
+     ☐ Hooft ESP → Body ESP (orgasm/funscript) 🆕
+     ☐ Hooft ESP → Pomp Unit (vacuum control)
+     ☐ Pomp Unit → Hooft ESP (telemetry)
+     ☐ Hooft ESP → M5Atom (status)
+     ☐ M5Atom → Hooft ESP (motion)
   
   3. Test complete workflow:
-     - Start sessie (nunchuk C button)
-     - Nunchuk speed control
-     - Body ESP sensors → stress berekenen
-     - AI override → Hooft ESP
-     - Hooft ESP → Keon speed aanpassen
-     - Vibe toggle (Z 2x)
-     - Zuigen toggle (Z 1x)
-     - Orgasm trigger (Y 4 sec)
-     - Session complete
+     ☐ Start sessie (nunchuk C button)
+     ✅ Nunchuk speed control (GETEST!)
+     ☐ Body ESP sensors → stress berekenen
+     ☐ AI override → Hooft ESP
+     ✅ Hooft ESP → Keon speed aanpassen (GETEST!)
+     ✅ Vibe toggle (Z 2x) (GETEST!)
+     ✅ Zuigen toggle (Z 1x) (GETEST!)
+     ✅ Orgasm trigger (Y 3 sec) (GETEST!) 🆕
+     ✅ Funscript toggle (X 2 sec) (GETEST!) 🆕
+     ☐ Session complete
   ```
 
 ☐ **Test Edge Cases**
-  - Body ESP disconnect tijdens sessie
-  - Pomp Unit disconnect → graceful handling
-  - Keon disconnect → auto-reconnect
-  - M5Atom disconnect → motion blend uit
-  - ESP-NOW packet loss → retry logic
-  - Multiple simultaneous commands
+  ☐ Body ESP disconnect tijdens sessie
+  ☐ Pomp Unit disconnect → graceful handling
+  ✅ Keon disconnect → auto-reconnect (GETEST!)
+  ✅ M5Atom disconnect → motion blend uit (GETEST!)
+  ☐ ESP-NOW packet loss → retry logic
+  ☐ Multiple simultaneous commands
 
 ☐ **Stability Test**
-  - 2+ uur continuous operation
-  - Memory leak check (heap monitor)
-  - Connection stability
-  - No random crashes
-  - Performance metrics:
+  ☐ 2+ uur continuous operation
+  ☐ Memory leak check (heap monitor)
+  ☐ Connection stability
+  ☐ No random crashes
+  ☐ Performance metrics:
     * ESP-NOW latency <100ms?
     * Keon BLE latency <100ms?
     * UI responsive (no freezing)?
@@ -231,1173 +311,202 @@ M5StickC Plus:             █████████████████�
 
 ---
 
-### TODO - WEEK 2: CODE CLEANUP (Optioneel)
-
-☐ **Remove Debug Spam**
-  - Reduce Serial output spam
-  - Keep only belangrijke logs
-  - Add debug levels (INFO/WARNING/ERROR)
-
-☐ **Documentation**
-  - Update README met nieuwe status
-  - Document ESP-NOW message structures
-  - Add troubleshooting guide
-  - Update wiring diagrams
-
-☐ **Code Comments**
-  - Add comments in complexe functies
-  - Document AI override logic
-  - Explain vacuum control flow
-
----
-
 ## ✅ COMPLETION CHECKLIST
 
 **Hardware:**
-  ☐ Keon BLE werkend ✅ (AL KLAAR!)
-  ☐ Nunchuk werkend
-  ☐ Display OK
+  ✅ Keon BLE werkend ✅ (PERFECT!)
+  ✅ Nunchuk werkend ✅ (BASIS + HOLD DETECTION GETEST!)
+  ✅ Display OK ✅
   ☐ All LEDs/indicators werkend
 
 **Software - ESP-NOW:**
-  ☐ Initialisatie succesvol ✅ (AL KLAAR!)
-  ☐ Body ESP berichten ontvangen ✅
-  ☐ Pomp Unit telemetry ontvangen ✅
-  ☐ M5Atom motion ontvangen ✅
-  ☐ Verzenden naar alle modules ✅
-  ☐ Timeouts getest
-  ☐ Graceful degradation bij disconnects
+  ✅ Initialisatie succesvol ✅
+  ✅ Body ESP berichten ontvangen ✅ (code klaar)
+  ✅ Pomp Unit telemetry ontvangen ✅
+  ✅ M5Atom motion ontvangen ✅
+  ✅ Verzenden naar alle modules ✅
+  ✅ Nunchuk commands naar Body ESP ✅ 🆕
+  ☐ Timeouts getest (graceful handling code klaar)
+  ☐ Graceful degradation bij disconnects (code klaar)
 
 **Software - Integration:**
-  ☐ AI overrides toegepast op Keon
-  ☐ Vacuum control werkend
-  ☐ Lube commands werkend
-  ☐ Zuigen toggle werkend
+  ✅ AI overrides toegepast op Keon ✅ (code klaar)
+  ✅ Vacuum control werkend ✅ GETEST!
+  ✅ Lube commands werkend ✅
+  ✅ Zuigen toggle werkend ✅ GETEST!
+  ✅ Orgasm trigger werkend ✅ GETEST! 🆕
+  ✅ Funscript toggle werkend ✅ GETEST! 🆕
   ☐ Emergency stop tested
-  ☐ Motion blend tested
+  ✅ Motion blend tested ✅
+
+**Software - Nunchuk Controls:**
+  ✅ Y-as speed (0-7) ✅ GETEST!
+  ✅ Y-hold 3 sec orgasm ✅ GETEST! 🆕
+  ✅ X-hold 2 sec funscript ✅ GETEST! 🆕
+  ✅ Z 1x vacuum ✅ GETEST!
+  ✅ Z 2x vibe ✅ GETEST!
+  ✅ C pause/resume ✅ GETEST!
 
 **Testing:**
-  ☐ All 4 modules samen getest
-  ☐ Nunchuk input verified
-  ☐ 2+ uur stability test
-  ☐ Edge cases handled
-  ☐ UI polished
+  ☐ All 4 modules samen getest (Week 1 goal)
+  ✅ Nunchuk input verified ✅ (COMPLEET!)
+  ✅ Keon sync verified ✅ GETEST!
+  ✅ Vacuum control verified ✅ GETEST!
+  ✅ Orgasm/Funscript verified ✅ GETEST! 🆕
+  ☐ Stability test (2+ uur)
 
-**DOEL:** Full system integration werkend eind Week 2
-
-**REALITEIT:** Je bent al ~90% klaar! Alleen testen + nunchuk nog! 🎉
-
----
-
-## 📱 BODY ESP - Rotary Encoder Integratie
-
-**Hardware:** SC01 Plus (ESP32-S3)
-**Status:** Werkt volledig, maar rotary encoder beter dan touch voor menu
-
-### WAAROM ROTARY ENCODER?
-**Voordelen vs Touch:**
-  ✅ Tactile feedback (voel elke stap)
-  ✅ Sneller navigeren (draai snel door menu)
-  ✅ Precisie voor sliders/waardes
-  ✅ Werkt met handschoenen
-  ✅ Geen mis-touches
-  ✅ Eén hand bedienen mogelijk
-  ✅ Goedkoop (~€2-3)
-
-**Balance:**
-  - Encoder voor MENU (vaak gebruikt, precisie nodig)
-  - Touch voor QUICK ACTIONS (REC/PLAY/AI knoppen)
-
----
-
-### HARDWARE KEUZE: KY-040 Rotary Encoder Module
-
-**Specs:**
-  - 5 pins: CLK, DT, SW, +, GND
-  - CLK = Clock (A kanaal)
-  - DT = Data (B kanaal)
-  - SW = Button (ingebouwd)
-  - Voltage: 5V (maar 3.3V compatible!)
-  - Prijs: ~€2-3
-  - Pull-up resistors on-board
-
-**GPIO Pinout voor SC01 Plus:**
-```
-Rotary Encoder → SC01 Plus
-────────────────────────────
-CLK (A)      → GPIO 12
-DT  (B)      → GPIO 13
-SW  (Button) → GPIO 14
-VCC          → 3.3V
-GND          → GND
-```
-
-**Waarom GPIO 12/13/14?**
-  ✅ Bij elkaar (makkelijk solderen)
-  ✅ Geen conflicten (GPIO 10/11=I2C, GPIO 6/5=Touch)
-  ✅ Interrupt-capable
-  ✅ GPIO 21 blijft vrij (reserve)
-
----
-
-### TODO - WEEK 1: HARDWARE TEST (Dag 1-2)
-
-☐ **Bestellen & Solderen**
-  - Bestel KY-040 Rotary Encoder (~€2-3)
-  - Soldeer 5 draden naar SC01 Plus Extended IO
-  - Of breadboard voor test
-
-☐ **Test Code - Simpele ISR**
-  ```cpp
-  #define ENCODER_CLK 12
-  #define ENCODER_DT  13
-  #define ENCODER_SW  14
-  
-  volatile int encoderPos = 0;
-  volatile bool buttonPressed = false;
-  
-  void IRAM_ATTR encoderISR() {
-    static unsigned long lastTime = 0;
-    unsigned long now = millis();
-    if (now - lastTime < 5) return; // Debounce 5ms
-    lastTime = now;
-    
-    if (digitalRead(ENCODER_DT) == HIGH) {
-      encoderPos++;  // Rechtsom
-    } else {
-      encoderPos--;  // Linksom
-    }
-  }
-  
-  void IRAM_ATTR buttonISR() {
-    static unsigned long lastTime = 0;
-    unsigned long now = millis();
-    if (now - lastTime < 200) return; // Debounce 200ms
-    lastTime = now;
-    
-    buttonPressed = true;
-  }
-  
-  void setup() {
-    Serial.begin(115200);
-    pinMode(ENCODER_CLK, INPUT_PULLUP);
-    pinMode(ENCODER_DT, INPUT_PULLUP);
-    pinMode(ENCODER_SW, INPUT_PULLUP);
-    
-    attachInterrupt(ENCODER_CLK, encoderISR, FALLING);
-    attachInterrupt(ENCODER_SW, buttonISR, FALLING);
-    
-    Serial.println("Rotary Encoder Test");
-  }
-  
-  void loop() {
-    static int lastPos = 0;
-    if (encoderPos != lastPos) {
-      Serial.printf("Pos: %d (Δ%+d)\n", encoderPos, encoderPos - lastPos);
-      lastPos = encoderPos;
-    }
-    if (buttonPressed) {
-      Serial.println("BUTTON PRESSED!");
-      buttonPressed = false;
-    }
-    delay(10);
-  }
-  ```
-
-☐ **Verify**
-  - Upload test code
-  - Open Serial Monitor
-  - Draai encoder → zie positie veranderen
-  - Druk knop → zie "BUTTON PRESSED!"
-  - ✅ Als werkt → Ga verder
-  - ❌ Als niet → Debug pinout/connections
-
----
-
-### TODO - WEEK 1: LIBRARY INTEGRATIE (Dag 3)
-
-☐ **Install ESP32Encoder Library**
-  - Arduino IDE → Library Manager
-  - Search "ESP32Encoder"
-  - Install latest version
-
-☐ **Test Library**
-  ```cpp
-  #include <ESP32Encoder.h>
-  
-  ESP32Encoder encoder;
-  
-  void setup() {
-    Serial.begin(115200);
-    encoder.attachHalfQuad(12, 13);  // CLK, DT
-    encoder.setCount(0);
-    pinMode(14, INPUT_PULLUP);  // Button
-  }
-  
-  void loop() {
-    int pos = (int)encoder.getCount();
-    bool btn = (digitalRead(14) == LOW);
-    
-    static int lastPos = 0;
-    if (pos != lastPos) {
-      Serial.printf("Encoder: %d\n", pos);
-      lastPos = pos;
-    }
-    if (btn) {
-      static unsigned long lastPress = 0;
-      if (millis() - lastPress > 300) {
-        Serial.println("Button!");
-        lastPress = millis();
-      }
-    }
-    delay(10);
-  }
-  ```
-
-**Voordelen ESP32Encoder library:**
-  ✅ Betere debouncing
-  ✅ Half-quad en full-quad modes
-  ✅ Hardware timer (geen interrupts missen)
-
----
-
-### TODO - WEEK 1: BODY_ESP.INO INTEGRATIE (Dag 4-5)
-
-☐ **Add to Body_ESP.ino**
-  ```cpp
-  // ===== Rotary Encoder Setup =====
-  #include <ESP32Encoder.h>
-  
-  #define ENCODER_CLK 12
-  #define ENCODER_DT  13
-  #define ENCODER_SW  14
-  
-  ESP32Encoder encoder;
-  static int lastEncoderPos = 0;
-  static uint32_t lastButtonPress = 0;
-  
-  void setupRotaryEncoder() {
-    encoder.attachHalfQuad(ENCODER_CLK, ENCODER_DT);
-    encoder.setCount(0);
-    pinMode(ENCODER_SW, INPUT_PULLUP);
-    
-    Serial.println("[ENCODER] Initialized");
-    Serial.printf("[ENCODER] Pins: CLK=%d DT=%d SW=%d\n", 
-                  ENCODER_CLK, ENCODER_DT, ENCODER_SW);
-  }
-  
-  void handleRotaryEncoder() {
-    // Alleen in menu mode
-    if (currentMode != MODE_MENU) return;
-    
-    // Lees encoder positie
-    int encoderPos = (int)encoder.getCount();
-    int delta = encoderPos - lastEncoderPos;
-    
-    if (delta != 0) {
-      lastEncoderPos = encoderPos;
-      
-      if (bodyMenuEdit) {
-        // EDIT MODE: Pas waarde aan
-        if (delta > 0) {
-          adjustValueUp();
-        } else {
-          adjustValueDown();
-        }
-      } else {
-        // NAVIGATE MODE: Menu navigatie
-        if (delta > 0) {
-          bodyMenuHandleDown();  // Rechtsom = omlaag
-        } else {
-          bodyMenuHandleUp();    // Linksom = omhoog
-        }
-      }
-      
-      Serial.printf("[ENCODER] %s (pos=%d)\n", 
-                    delta > 0 ? "DOWN" : "UP", encoderPos);
-    }
-    
-    // Lees button
-    bool buttonPressed = (digitalRead(ENCODER_SW) == LOW);
-    
-    if (buttonPressed && (millis() - lastButtonPress > 300)) {
-      lastButtonPress = millis();
-      bodyMenuHandleSelect();  // Toggle edit / select item
-      Serial.println("[ENCODER] SELECT");
-    }
-  }
-  ```
-
-☐ **In setup() toevoegen:**
-  ```cpp
-  void setup() {
-    // ... existing code ...
-    
-    setupRotaryEncoder();  // ← ADD THIS
-    
-    // ... rest of setup ...
-  }
-  ```
-
-☐ **In loop() toevoegen:**
-  ```cpp
-  void loop() {
-    // ... existing code ...
-    
-    handleRotaryEncoder();  // ← ADD THIS (check menu elke loop)
-    
-    // ... rest of loop ...
-  }
-  ```
-
----
-
-### TODO - WEEK 1: BODY_MENU.CPP MODIFICATIES (Dag 4-5)
-
-☐ **Add nieuwe functies in body_menu.cpp:**
-  ```cpp
-  // Menu navigatie OMHOOG (encoder linksom)
-  void bodyMenuHandleUp() {
-    if (bodyMenuPage == BODY_PAGE_MAIN) {
-      // Hoofdmenu: omhoog
-      if (bodyMenuIdx > 0) {
-        bodyMenuIdx--;
-        bodyMenuForceRedraw();
-      }
-    } else {
-      // Submenu: implementeer per pagina
-      // (TODO: per menu pagina aanpassen)
-    }
-  }
-  
-  // Menu navigatie OMLAAG (encoder rechtsom)
-  void bodyMenuHandleDown() {
-    if (bodyMenuPage == BODY_PAGE_MAIN) {
-      // Hoofdmenu: omlaag
-      int maxItems = 7;  // Aantal menu items
-      if (bodyMenuIdx < maxItems - 1) {
-        bodyMenuIdx++;
-        bodyMenuForceRedraw();
-      }
-    } else {
-      // Submenu: implementeer per pagina
-    }
-  }
-  
-  // SELECT / TOGGLE EDIT (encoder button)
-  void bodyMenuHandleSelect() {
-    if (bodyMenuEdit) {
-      // In edit mode: toggle edit off
-      bodyMenuEdit = false;
-      bodyMenuForceRedraw();
-      Serial.println("[MENU] Edit OFF");
-    } else {
-      // Niet in edit: selecteer item of toggle edit
-      if (bodyMenuPage == BODY_PAGE_MAIN) {
-        // Open submenu
-        openSubmenu(bodyMenuIdx);
-      } else {
-        // Toggle edit mode voor waarde aanpassen
-        bodyMenuEdit = true;
-        bodyMenuForceRedraw();
-        Serial.println("[MENU] Edit ON");
-      }
-    }
-  }
-  ```
-
-☐ **Add functies voor EDIT MODE:**
-  ```cpp
-  // Verhoog waarde in edit mode
-  void adjustValueUp() {
-    if (bodyMenuPage == BODY_PAGE_OVERRULE) {
-      // ML Eigenwil slider (0-100%)
-      extern int mlEigenwilPercent;
-      mlEigenwilPercent += 5;  // +5% per stap
-      if (mlEigenwilPercent > 100) mlEigenwilPercent = 100;
-      bodyMenuForceRedraw();
-      Serial.printf("[EDIT] ML Eigenwil: %d%%\n", mlEigenwilPercent);
-    }
-    // TODO: Add andere menu pagina's (tijd, datum, thresholds)
-  }
-  
-  // Verlaag waarde in edit mode
-  void adjustValueDown() {
-    if (bodyMenuPage == BODY_PAGE_OVERRULE) {
-      extern int mlEigenwilPercent;
-      mlEigenwilPercent -= 5;  // -5% per stap
-      if (mlEigenwilPercent < 0) mlEigenwilPercent = 0;
-      bodyMenuForceRedraw();
-      Serial.printf("[EDIT] ML Eigenwil: %d%%\n", mlEigenwilPercent);
-    }
-    // TODO: Add andere menu pagina's
-  }
-  ```
-
----
-
-### TODO - WEEK 2: TOUCH SIMPLIFICATIE (Dag 1-2)
-
-☐ **Modify touchCallback() in Body_ESP.ino**
-  ```cpp
-  void touchCallback(TPoint point, TEvent e) {
-    // ... (bestaande coordinaat mapping code) ...
-    
-    // ===== MENU MODE: Alleen MENU knop werkt =====
-    if (currentMode == MODE_MENU) {
-      // MENU knop (x=239-351, y=280-315)
-      if (y >= 280 && y < 315 && x >= 239 && x < 351) {
-        // Exit menu
-        currentMode = MODE_MAIN;
-        menuActive = false;
-        body_gfx4_clear();
-        body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
-        Serial.println("[MENU] Back to main (via touch)");
-        return;
-      }
-      
-      // ANDERE TOUCHES IN MENU: GENEGEERD
-      // Encoder doet alle menu navigatie!
-      return;
-    }
-    
-    // ===== MAIN MODE: 4 knoppen onderaan =====
-    if (y >= 280 && y < 315) {
-      if (x >= 5 && x < 117) {
-        // REC knop
-        isRecording = !isRecording;
-        if (isRecording) startCSVRecording();
-        else stopCSVRecording();
-        body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
-      }
-      else if (x >= 122 && x < 234) {
-        // PLAY knop
-        currentMode = MODE_MENU;
-        menuActive = true;
-        bodyMenuPage = BODY_PAGE_RECORDING;
-        bodyMenuIdx = 0;
-        bodyMenuForceRedraw();
-      }
-      else if (x >= 239 && x < 351) {
-        // MENU knop
-        currentMode = MODE_MENU;
-        menuActive = true;
-        bodyMenuPage = BODY_PAGE_MAIN;
-        bodyMenuIdx = 0;
-        bodyMenuForceRedraw();
-      }
-      else if (x >= 356 && x < 475) {
-        // AI knop
-        aiOverruleActive = !aiOverruleActive;
-        body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
-      }
-    }
-  }
-  ```
-
-**Touch blijft voor:**
-  ✅ REC knop (onderaan links)
-  ✅ PLAY knop (onderaan midden-links)
-  ✅ MENU knop (onderaan midden-rechts)
-  ✅ AI knop (onderaan rechts)
-
-**Touch NIET meer voor:**
-  ❌ Menu navigatie (encoder!)
-  ❌ Waardes aanpassen (encoder!)
-
----
-
-### TODO - WEEK 2: EDIT MODE TESTING (Dag 3-4)
-
-☐ **Test ML Eigenwil Slider**
-  - Menu → Overrule Settings
-  - Select ML Eigenwil (button)
-  - Draai encoder → waarde verandert (0-100%)
-  - Press button → exit edit mode
-
-☐ **Test Tijd/Datum Instellen**
-  - Menu → System Settings → Set Time
-  - Select uur/minuut/dag/maand/jaar
-  - Draai encoder → waarde aanpassen
-  - Press button → volgende veld
-
-☐ **Test Alle Menu Items**
-  - Sensor Calibration
-  - Recording Playback
-  - Colors Settings
-  - Level 7 Settings
-  - Verify encoder werkt overal
-
----
-
-### TODO - WEEK 2: FULL INTEGRATION TEST (Dag 5)
-
-☐ **Test Menu Flow**
-  - Main screen → MENU knop (touch)
-  - Navigeer met encoder (omhoog/omlaag smooth?)
-  - Select item met encoder button
-  - Edit waardes met encoder (smooth?)
-  - Exit menu met MENU knop (touch)
-  - Back to main screen (grafieken zichtbaar?)
-
-☐ **Test Touch + Encoder Samen**
-  - Geen conflicten?
-  - Touch knoppen werken tijdens encoder gebruik?
-  - Encoder reageert niet op main screen (alleen menu)?
-
-☐ **Test Snelheid**
-  - Encoder responsiveness goed?
-  - Debounce niet te traag?
-  - Menu redraw smooth (geen flicker)?
-
----
-
-### CONFIGURATIE OPTIES
-
-**Encoder Gevoeligheid:**
-```cpp
-// Stap grootte per encoder tick
-#define ENCODER_STEP_NORMAL  1   // Menu navigatie
-#define ENCODER_STEP_EDIT    5   // Waarde edit (sneller)
-
-int stepSize = bodyMenuEdit ? ENCODER_STEP_EDIT : ENCODER_STEP_NORMAL;
-```
-
-**Acceleration (optioneel):**
-```cpp
-// Snellere rotatie = grotere stappen
-if (abs(delta) > 5) {
-  stepSize *= 2;  // Dubbel bij fast scroll
-}
-```
-
-**Button Functies:**
-- Korte druk: Select / Toggle edit
-- Lange druk (>1 sec): Back / Cancel (optioneel)
-
----
-
-### TROUBLESHOOTING
-
-**Encoder telt verkeerd:**
-  → Wissel CLK en DT pins
-  → OF inverteer logica: `if (digitalRead(ENCODER_DT) == LOW)`
-
-**Te gevoelig (bouncing):**
-  → Verhoog debounce (5ms → 10ms)
-  → Gebruik ESP32Encoder library
-  → Add 0.1µF capacitor tussen CLK/DT en GND
-
-**Button triggert dubbel:**
-  → Verhoog button debounce (200ms → 300ms)
-
-**Encoder richting omgekeerd:**
-  → Swap bodyMenuHandleUp() en bodyMenuHandleDown() calls
-
----
-
-### COMPLETION CHECKLIST
-
-**Hardware:**
-  ☐ KY-040 encoder besteld & ontvangen
-  ☐ Gesoldeerd op GPIO 12/13/14
-  ☐ Test: Rotatie + button werken
-
-**Software:**
-  ☐ ESP32Encoder library geïnstalleerd
-  ☐ setupRotaryEncoder() in Body_ESP.ino
-  ☐ handleRotaryEncoder() in loop()
-  ☐ bodyMenuHandleUp/Down/Select() in body_menu.cpp
-  ☐ adjustValueUp/Down() voor edit mode
-  ☐ Touch callbacks ge-simplified
-
-**Testing:**
-  ☐ Menu navigatie smooth
-  ☐ Edit mode werkt (sliders, tijd, etc)
-  ☐ Touch knoppen werken
-  ☐ Geen conflicten encoder + touch
-  ☐ 2+ uur stability test
-
-**DOEL:** Rotary encoder volledig geïntegreerd eind Week 1
-
-═══════════════════════════════════════════════════════════════════════════════
-═══════════════════════════════════════════════════════════════════════════════
-
-# 🟡 PRIORITEIT 2: BELANGRIJKE TAKEN (Week 2-3)
-
-═══════════════════════════════════════════════════════════════════════════════
-
-## 🎮 HOOFT ESP - Nunchuk Integratie
-
-**Status:** Code bestaat (motion.cpp), maar hardware niet getest
-
-### TODO:
-☐ **Hardware setup**
-  - Wireless nunchuk adapter besteld?
-  - I2C connect op pins 21/22 (Wire)
-  - Test nunchuk I2C address (0x52)
-
-☐ **Test input**
-  - Joystick Y-as → Speed control (0-7)
-  - Joystick X-as → Funscript ON/OFF toggle
-  - Z button → Zuigen toggle
-  - Z button 2x → Vibe toggle
-  - C button → Context-aware (PAUSE/SKIP/COMPLETE)
-
-☐ **Priority system**
-  - Nunchuk input ALTIJD voorrang
-  - AI commands alleen als geen nunchuk input
-  - Test override logic
-
-☐ **Button debouncing**
-  - Geen double-triggers
-  - Smooth feeling
-
-**DOEL:** Nunchuk volledig werkend eind Week 2
-
----
-
-## 🎮 HOOFT ESP - State Machine Testing
-
-**Status:** Code bestaat, maar niet volledig getest
-
-### TODO:
-☐ **Test state transitions**
-  - PAUSED → ACTIVE (C button)
-  - ACTIVE → ORGASM (Y stick 4 sec OF AI trigger)
-  - ORGASM → COOLDOWN (C button skip)
-  - COOLDOWN → COMPLETE (C button OF timeout)
-
-☐ **Test C button context**
-  ```
-  PAUSED   → C button = START
-  ACTIVE   → C button = PAUSE
-  ORGASM   → C button = Skip to cooldown
-  COOLDOWN → C button = SESSION_COMPLETE
-  ```
-
-☐ **Test orgasm level**
-  - Speed MAX (7)
-  - Zuig AAN (if enabled)
-  - Vibe AAN (if enabled)
-  - Display "🎉 ORGASM LEVEL"
-
-☐ **Test cooldown**
-  - Speed 1-2 (slow stroke)
-  - All pumps OFF
-  - Vibe OFF
-  - 30 sec countdown
-  - Notify Body ESP (session complete)
-
-**DOEL:** State machine robuust eind Week 2
-
----
-
-## 📱 BODY ESP - AI Decision Logic Testing
-
-**Status:** Code bestaat, maar niet getest met echte data
-
-### TODO:
-☐ **Test stress level calculation**
-  - Resting state: Stress 0-2?
-  - Excited state: Stress 5-7?
-  - Edge detection werkt?
-
-☐ **Calibrate thresholds**
-  - BPM thresholds (jouw baseline!)
-  - GSR thresholds (jouw baseline!)
-  - Temp/breathing contribution
-
-☐ **Test AI decisions**
-  - Target speed based on stress
-  - Vibe/zuig recommendations
-  - Edge prevention logic
-
-☐ **Test PONR system**
-  - PONR detection accurate?
-  - Timeout system werkt?
-  - Recovery phase correct?
-
-☐ **10+ test sessies**
-  - Met dummy Keon commands
-  - Log all decisions
-  - Analyze accuracy
-
-**DOEL:** AI logic gecalibreerd eind Week 2
-
----
-
-## 📱 BODY ESP - CSV Logging & Playback
-
-**Status:** Recording werkt, playback niet getest
-
-### TODO:
-☐ **Test CSV recording**
-  - Plaats 32GB SD kaart
-  - Start recording (REC knop)
-  - Verify file creation: /recordings/session_YYYYMMDD_HHMMSS.csv
-  - Check data: BPM, Temp, GSR, Trust, Sleeve, etc
-  - Test file rotation per sessie
-
-☐ **Test CSV playback**
-  - Open Recording menu (PLAY knop)
-  - Select existing CSV file
-  - Start playback
-  - Verify commands naar HoofdESP gestuurd
-  - Test pause/stop/skip
-
-☐ **Test ANL labeling**
-  - Label specific moments tijdens recording
-  - Verify labels in CSV
-  - Use for ML training
-
-**DOEL:** CSV systeem volledig werkend eind Week 2
-
----
-
-## 📟 M5STICKC PLUS - Hardware Beslissing
-
-**Status:** Code KLAAR, maar duur board (~€27)
-
-### BESLISSING NODIG:
-
-**Optie A: Behoud M5StickC Plus** (~€27)
-  ✅ Code werkt NU al
-  ✅ Display ingebouwd (debug)
-  ✅ Battery management
-  ✅ IMU ingebouwd
-  ✅ Compact
-  ❌ Duur
-
-**Optie B: Vervang door ESP32-C3 Super Mini** (~€13)
-  ✅ GOEDKOPER (€27 → €13)
-  ✅ Klein formaat
-  ❌ Code aanpassen (~2-3 uur)
-  ❌ Geen display (debug via Serial)
-  ❌ Extern MPU6050 IMU nodig (~€2)
-  ❌ Extern battery circuit
-
-**Optie C: Weglaten motion sensor** (~€8)
-  ✅ GOEDKOOPST
-  ❌ Geen closed-loop feedback
-  ❌ Minder "smart"
-
-### TODO:
-☐ **Besluit:** Behoud M5StickC of vervang?
-☐ **Als vervangen:** Budget ESP32-C3 versie maken
-☐ **Als behouden:** PCB design met M5StickC mount
-
-**AANBEVELING:** Behoud M5StickC voor V1.0, upgrade later in V2.0
-
-**DEADLINE:** Beslissing voor PCB design (Week 3)
-
-═══════════════════════════════════════════════════════════════════════════════
-═══════════════════════════════════════════════════════════════════════════════
-
-# 🟢 PRIORITEIT 3: NICE TO HAVE (Week 3-4+)
-
-═══════════════════════════════════════════════════════════════════════════════
-
-## 🎮 HOOFT ESP - XBVR Funscript Integratie
-
-**Status:** Nog niet geïmplementeerd
-
-### TODO:
-☐ **PC Setup (XBVR machine)**
-  - Install Python 3.9+
-  - `pip install websockets aiohttp bleak`
-  - Download buttplug_ai_proxy.py
-  - Configure: Body ESP IP + Keon MAC
-
-☐ **ESP32 HTTP Server**
-  - Enable WiFi op Hooft ESP
-  - Setup AsyncWebServer
-  - Create endpoint: `POST /api/funscript`
-  - Receive funscript data
-  - Forward to Body ESP (AI decision)
-
-☐ **Test workflow**
-  - XBVR → Proxy (WebSocket)
-  - Proxy → ESP32 HTTP
-  - ESP32 → Body ESP (ESP-NOW)
-  - Body ESP → AI decision
-  - AI → Proxy → Keon (modulated)
-
-☐ **Test modes**
-  - Passthrough (no AI)
-  - AI skip (Stress 6+)
-  - AI reduce (Stress 4-5)
-
-☐ **Optimize latency**
-  - Target: <100ms total
-  - Profile each step
-
-**DOEL:** XBVR integration eind Week 3
-
----
-
-## 🎮 HOOFT ESP - Display UI Polish
-
-**Status:** Basic display werkt, maar kan beter
-
-### TODO:
-☐ **Layout review**
-  - Stress level prominent?
-  - Speed/Mode duidelijk?
-  - Sensor values leesbaar?
-  - Connection status indicators?
-
-☐ **Visual feedback**
-  - Keon connected (groen/rood LED?)
-  - ESP-NOW activity indicator
-  - Orgasm countdown (4...3...2...1...)
-
-☐ **Warning indicators**
-  - ⚠️ icon bij high stress (Level 5-7)
-  - 🔴 bij te dichtbij edge
-  - ⚡ bij PONR trigger
-
-☐ **Optimize refresh**
-  - 10Hz update rate smooth?
-  - No flicker?
-
-**DOEL:** Professional UI eind Week 3
-
----
-
-## 📱 BODY ESP - Post-Session AI Reports
-
-**Status:** Nog niet geïmplementeerd
-
-### TODO:
-☐ **Implement report generation**
-  - Analyze CSV data at session end
-  - Calculate statistics:
-    * Total drops triggered
-    * Average stress level
-    * Peak stress moments
-    * Time in each stress zone
-    * Edge count
-    * PONR triggers
-
-☐ **Generate recommendations**
-  - Threshold adjustments advised?
-  - "Your heart rate peaks at..."
-  - "Consider raising edge threshold by..."
-
-☐ **Write report to SD**
-  - File: /AI_REPORTS/YYYYMMDD_HHMMSS_report.txt
-  - Human readable format
-
-☐ **Display report on screen**
-  - Scrollable text view
-  - Or: Menu item "View Last Report"
-
-**DOEL:** Post-session reports eind Week 4
-
----
-
-## 📱 BODY ESP - Memory Optimization
-
-**Status:** Werkt, maar kan stabieler
-
-### TODO:
-☐ **Fix body_gfx4.cpp memory**
-  ```cpp
-  // Reduce MAX_SAMPLES van 240 → 120
-  #define MAX_SAMPLES 120
-  
-  // OF gebruik dynamic allocation:
-  float* samples = (float*)malloc(MAX_SAMPLES * sizeof(float));
-  if (!samples) {
-    Serial.println("Memory allocation failed!");
-  }
-  ```
-
-☐ **Add memory monitoring**
-  ```cpp
-  void checkMemory() {
-    Serial.printf("Free heap: %d bytes\n", ESP.getFreeHeap());
-    Serial.printf("Min free heap: %d bytes\n", ESP.getMinFreeHeap());
-  }
-  ```
-
-☐ **Test stability**
-  - 2+ hour continuous operation
-  - No crashes
-  - No memory leaks
-
-**DOEL:** Rock-solid stability eind Week 4
-
-═══════════════════════════════════════════════════════════════════════════════
 ═══════════════════════════════════════════════════════════════════════════════
 
 # 🧪 INTEGRATION & TESTING
 
 ═══════════════════════════════════════════════════════════════════════════════
 
-## 🔗 All 4 Modules Samen (Week 3-4)
+## 🔗 All 4 Modules Samen (Week 2)
 
 ### TODO:
 ☐ **Test bidirectional ESP-NOW**
-  - Body ESP → Hooft ESP (sensor data, AI overrides)
-  - Hooft ESP → Body ESP (trust/sleeve/vacuum commands)
-  - Hooft ESP → M5StickC (vibe commands)
-  - Hooft ESP → Pomp Unit (lube/vacuum commands)
-  - M5StickC → Hooft ESP (motion feedback)
+  ☐ Body ESP → Hooft ESP (sensor data, AI overrides)
+  ✅ Hooft ESP → Body ESP (status, orgasm, funscript) 🆕
+  ☐ Hooft ESP → M5StickC (vibe commands)
+  ☐ Hooft ESP → Pomp Unit (lube/vacuum commands)
+  ☐ M5StickC → Hooft ESP (motion feedback)
 
 ☐ **Test complete workflow**
-  1. Start sessie (C button op nunchuk)
-  2. Nunchuk speed control (Y-as)
-  3. Body ESP sensors → stress calculation
-  4. AI adapts target speed based on stress
-  5. HoofdESP modulates Keon accordingly
-  6. Vibe/zuig via Z button
-  7. Orgasm trigger (Y stick 4 sec)
-  8. Cooldown phase (30 sec)
-  9. Session complete
-  10. Post-session report
+  1. ☐ Start sessie (C button op nunchuk)
+  2. ✅ Nunchuk speed control (Y-as) GETEST!
+  3. ☐ Body ESP sensors → stress calculation
+  4. ☐ AI adapts target speed based on stress
+  5. ✅ HoofdESP modulates Keon accordingly GETEST!
+  6. ✅ Vibe/zuig via Z button GETEST!
+  7. ✅ Orgasm trigger (Y 3 sec) GETEST! 🆕
+  8. ✅ Funscript toggle (X 2 sec) GETEST! 🆕
+  9. ☐ Cooldown phase (30 sec)
+  10. ☐ Session complete
+  11. ☐ Post-session report
 
 ☐ **Test edge cases**
-  - Body ESP disconnect → fallback manual control
-  - Keon disconnect → auto-reconnect attempt
-  - Pomp Unit offline → skip pump commands
-  - M5StickC offline → skip vibe commands
-  - ESP-NOW packet loss → retry logic
+  ☐ Body ESP disconnect → fallback manual control
+  ✅ Keon disconnect → auto-reconnect attempt GETEST!
+  ☐ Pomp Unit offline → skip pump commands
+  ✅ M5StickC offline → skip vibe commands GETEST!
+  ☐ ESP-NOW packet loss → retry logic
 
 ☐ **Stress test**
-  - 2+ hour sessie continuous
-  - Memory leak check (heap monitor)
-  - Connection stability
-  - No crashes
+  ☐ 2+ hour sessie continuous
+  ☐ Memory leak check (heap monitor)
+  ☐ Connection stability
+  ☐ No crashes
 
 ☐ **Performance metrics**
-  - ESP-NOW latency (<50ms?)
-  - Keon BLE latency (<100ms?)
-  - AI decision speed (<10ms?)
-  - Total loop time (<20ms?)
+  ☐ ESP-NOW latency (<50ms?)
+  ☐ Keon BLE latency (<100ms?)
+  ☐ AI decision speed (<10ms?)
+  ☐ Total loop time (<20ms?)
 
-**DOEL:** Full system integration perfect eind Week 4
-
-═══════════════════════════════════════════════════════════════════════════════
-═══════════════════════════════════════════════════════════════════════════════
-
-# 📅 MASTER TIMELINE
+**DOEL:** Full system integration perfect eind Week 2
 
 ═══════════════════════════════════════════════════════════════════════════════
 
-# 📅 REALISTISCHE TIMELINE
+# 📅 REALISTISCHE TIMELINE - UPDATED!
 
 ═══════════════════════════════════════════════════════════════════════════════
 
-**HUIDIGE STATUS: 85-90% KLAAR! Alleen testing & optionele upgrades!**
+**HUIDIGE STATUS: ~94% KLAAR! Massive progress vandaag op Hooft ESP!**
 
-## WEEK 1 (15-21 Nov): TESTING & HARDWARE
+## WEEK 1 (20-27 Nov): TESTING & HARDWARE
 ```
-✅ Keon BLE - AL KLAAR (keon_ble.cpp werkend!)
-✅ ESP-NOW - AL KLAAR (espnow_comm.cpp 800+ regels!)
-✅ AI System - AL KLAAR (advanced_stress_manager + ML!)
-✅ Body ESP UI - AL KLAAR (15+ view modules!)
+✅ Keon BLE - 100% KLAAR! (8 levels + perfect sync!) 🎉
+✅ ESP-NOW - 100% KLAAR! (espnow_comm.cpp werkend!)
+✅ Vacuum - 100% KLAAR! (Z toggle + auto vacuum!) 🎉
+✅ Vibe - 100% KLAAR! (Z dubbel-klik!) 🎉
+✅ Nunchuk - 95% KLAAR! (alle controls + hold detection!) 🎉
+✅ UI Controls - 95% KLAAR! (C pause, parkToBottom smooth!)
 
 🔶 TODO Week 1:
-Dag 1-2: Rotary Encoder bestellen + ontvangen (€3, ~2 dagen)
-Dag 3-4: Encoder hardware test + code integratie
-Dag 5-6: Nunchuk hardware testen (code al klaar!)
-Dag 7:   4-Module integration test beginnen
+Dag 1-2: 4-Module integration test (Hooft ESP 95% READY!)
+Dag 3-4: Edge cases & timeout handling
+Dag 5-7: Stability test (2+ uur)
 ```
 
-## WEEK 2 (21-28 Nov): INTEGRATION & STABILITY
+## WEEK 2 (27 Nov - 4 Dec): INTEGRATION & POLISH
 ```
 Dag 1-2: Full 4-module test:
-         - Hooft ESP (Keon + ESP-NOW)
-         - Body ESP (AI + sensors)
-         - Pomp Unit (vacuum + lube)
-         - M5StickC (motion + vibe)
+         ✅ Hooft ESP (Keon + ESP-NOW + Nunchuk) - READY!
+         ✅ Body ESP (AI + sensors) - READY!
+         ✅ Pomp Unit (vacuum + lube) - READY!
+         ✅ M5StickC (motion + vibe) - READY!
 
 Dag 3-4: Edge cases & error handling:
-         - Disconnect scenarios
-         - Timeout handling
-         - Emergency stop tests
+         ☐ Disconnect scenarios
+         ☐ Timeout handling
+         ☐ Emergency stop tests
 
-Dag 5-7: Stability testing:
-         - 2+ hour continuous run
-         - Memory leak checks
-         - Performance profiling
+Dag 5-7: UI Polish:
+         ☐ Connection status indicators
+         ☐ Vacuum/pump displays
+         ☐ AI override visuals
          
 Beslissing: M5StickC behouden (~€27) of vervangen (~€13)?
 ```
 
-## OPTIONEEL - WEEK 3+: POLISH & EXTRAS
+## OPTIONEEL - WEEK 3+: EXTRAS
 ```
-Dag 1-2: UI Polish:
-         - Connection status indicators
-         - Vacuum/pump displays
-         - AI override visuals
-         
-Dag 3-4: Code cleanup:
-         - Remove debug spam
-         - Documentation updates
-         - README polish
+Dag 1-2: Code cleanup:
+         ☐ Remove debug spam
+         ☐ Documentation updates
+         ☐ README polish
 
-Dag 5+:  Extra features (OPTIONEEL):
-         - XBVR funscript integration
-         - Post-session AI reports
-         - Advanced analytics
+Dag 3+:  Extra features (OPTIONEEL):
+         ☐ XBVR funscript integration
+         ☐ Post-session AI reports
+         ☐ Advanced analytics
          
 → PROJECT PRODUCTION READY! 🎉
 ```
 
 ═══════════════════════════════════════════════════════════════════════════════
 
-**REALISTISCH:**
-- Week 1: Rotary encoder + nunchuk hardware testen
-- Week 2: Integration testing + stability
-- Week 3+: Polish + optionele features
-
-**TOTAAL: ~2-3 weken tot PRODUCTION READY!**
-
-═══════════════════════════════════════════════════════════════════════════════
-═══════════════════════════════════════════════════════════════════════════════
-
-# 📊 COMPLETION TARGETS PER MODULE
-
-═══════════════════════════════════════════════════════════════════════════════
-
-## ✅ POMP UNIT (ESP8266)
-```
-Status: 100% COMPLEET
-Geen TODO's!
-```
-
-## 📱 BODY ESP (SC01 Plus)
-```
-✅ Hardware KLAAR:
-  ✅ SC01 Plus display (480x480)
-  ✅ ADS1115 sensors (4-channel ADC)
-  ✅ Touch input working
-  ✅ SD card recording
-  ✅ ESP-NOW communicatie
-
-✅ AI System COMPLEET:
-  ✅ advanced_stress_manager.cpp - Stress level systeem
-  ✅ ml_decision_tree.cpp - Decision tree AI
-  ✅ ml_stress_analyzer.cpp - Real-time analyse
-  ✅ ml_trainer.cpp - ML training systeem
-  ✅ ml_data_parser.cpp - CSV data processing
-
-✅ UI System COMPLEET:
-  ✅ body_gfx4.cpp - Graphics engine
-  ✅ body_menu.cpp - Menu systeem
-  ✅ body_display.cpp - Display management
-  ✅ ai_analyze_view - AI analysis UI
-  ✅ ai_event_config_view - Event configuration
-  ✅ ai_training_view - Training interface
-  ✅ ml_training_view - ML training UI
-  ✅ colors_view - Color settings
-  ✅ playlist_view - Playback systeem
-  ✅ sensor_settings - Sensor calibratie
-
-Milestone 1: Rotary Encoder (Week 1) ← ENIGE TODO!
-  ☐ KY-040 encoder hardware bestellen
-  ☐ GPIO 12/13/14 solderen
-  ☐ Code integratie (nieuw)
-  ☐ Menu navigatie testen
-
-Milestone 2: Testing & Polish (Week 1-2)
-  ☐ AI stress calculation validation
-  ☐ Sensor thresholds calibreren
-  ☐ CSV playback testen
-  ☐ Memory optimization check
-  ☐ 2+ hour stability test
-```
-
-## 🎮 HOOFT ESP (CYD 2.8")
-```
-✅ Milestone 1: Keon BLE KLAAR!
-  ✅ Keon BLE connect werkt
-  ✅ Speed commands werken
-  ✅ Auto-sync met animatie
-  ✅ Auto-reconnect logic
-
-✅ Milestone 2: ESP-NOW KLAAR!
-  ✅ initESPNow() geïmplementeerd (channel 4)
-  ✅ handleBodyESPMessage() - AI overrides
-  ✅ handlePumpUnitMessage() - Vacuum telemetry
-  ✅ handleM5AtomMotionMessage() - Motion sync
-  ✅ sendPumpControlMessages()
-  ✅ sendBodyESPStatusUpdate()
-  ✅ sendM5AtomStatusUpdate()
-  ✅ Safety systeem (timeouts, emergency stop)
-  ✅ Vacuum control (zuigen toggle, lube commands)
-  ✅ Motion blend systeem (syncMotionToAnimation)
-
-Milestone 3: Testing & Integration (Week 1-2) ← TODO!
-  ☐ Nunchuk hardware testen
-  ☐ 4-module integration test
-  ☐ Edge cases verifiëren
-  ☐ UI polish (connection indicators)
-  ☐ 2+ hour stability test
-```
-
-## 📟 M5STICKC PLUS
-```
-Hardware Beslissing (Week 2)
-  ☐ Behoud M5StickC (~€27)
-  ☐ OF vervang door ESP32-C3 (~€13)
-  ☐ Decision made voor PCB design
-```
-
-═══════════════════════════════════════════════════════════════════════════════
-═══════════════════════════════════════════════════════════════════════════════
-
 # 🎯 KRITISCHE PAD SAMENVATTING
 
 ═══════════════════════════════════════════════════════════════════════════════
 
-**Blocking issues die EERSTE gefixt moeten worden:**
-
-1. 🟡 **Body ESP: Rotary encoder** (Week 1)
-   → Nice to have, niet blocking
-   → Systeem werkt volledig zonder!
-
-2. 🟡 **Hooft ESP: Testing & Nunchuk** (Week 1)
-   → Code is klaar, hardware testen
-   → 4-module integration test
-
-3. 🟢 **Full system stability** (Week 2)
-   → 2+ hour stress test
-   → Edge cases
-   → Memory optimization
-
-4. 🟢 **UI Polish** (Week 2)
-   → Connection indicators
-   → Status displays
-   → User feedback
-
 **ECHTE STATUS:**
-- ✅ Keon BLE COMPLEET (keon_ble.cpp)
+- ✅ Keon BLE COMPLEET (8 levels, perfect sync!) 🎉
 - ✅ ESP-NOW COMPLEET (espnow_comm.cpp 800+ regels!)
+- ✅ Vacuum Control COMPLEET (Z toggle + auto vacuum!) 🎉
+- ✅ Vibe Control COMPLEET (Z dubbel-klik!) 🎉
+- ✅ Nunchuk Controls COMPLEET (Y speed + Y/X hold!) 🎉🆕
+- ✅ Orgasm Trigger WERKEND (Y 3 sec → Body ESP!) 🎉🆕
+- ✅ Funscript Toggle WERKEND (X 2 sec → Body ESP!) 🎉🆕
 - ✅ AI System COMPLEET (advanced_stress_manager + ML modules)
 - ✅ Body ESP UI COMPLEET (15+ view modules!)
 - ✅ Pomp Unit COMPLEET (ESP8266)
 - ✅ M5StickC COMPLEET
-- 🔶 Rotary encoder (optioneel upgrade)
-- 🔶 Nunchuk testen (code klaar)
+- ✅ Motion Blend WERKEND (graceful handling)
+- 🔶 4-Module integration test (Week 1-2)
+- 🔶 Rotary encoder Body ESP (optioneel upgrade)
 
-**Project is ~85-90% KLAAR!** 🎉
+**Project is ~94% KLAAR!** 🎉
 
-**Als Week 1 succesvol:** Testing done → 95% klaar!
+**Als Week 1 succesvol:** Integration done → 97% klaar!
 **Als Week 2 succesvol:** Polish done → 100% PRODUCTION READY! 🚀
 
 ═══════════════════════════════════════════════════════════════════════════════
 
                            📋 EINDE MASTER TODO 📋
                                     
-                        Succes met de implementatie! 💪
+                🎉 MASSIVE PROGRESS VANDAAG (20 Nov - FINAL)! 🎉
                         
-                      [Totaal: ~30 TODO items (was 120!)]
-                      [Timeline: 2-3 weken testing (was 4!)]
-                      [Status: 85-90% KLAAR!]
-                      [Reward: Volledig AI-controlled edging systeem!]
+                Keon: ✅ 8 levels + perfect sync
+                Vacuum: ✅ Z toggle werkend + auto pause
+                Vibe: ✅ Z dubbel-klik werkend
+                Nunchuk Y-hold: ✅ 3 sec orgasm trigger 🆕
+                Nunchuk X-hold: ✅ 2 sec funscript toggle 🆕
+                ESP-NOW: ✅ Commands naar Body ESP 🆕
+                ParkToBottom: ✅ Smooth (1.0f)
+                        
+              [Status: 94% KLAAR! (was 92% → nu 94%!)]
+              [Next: 4-module integration test]
+              [Timeline: ~1 week tot 97%, ~2 weken tot 100%!]
                                     
 ═══════════════════════════════════════════════════════════════════════════════

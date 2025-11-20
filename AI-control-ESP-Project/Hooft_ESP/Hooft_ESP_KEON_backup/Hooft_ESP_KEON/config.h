@@ -50,10 +50,10 @@ struct Config {
   bool  vacuumAutoMode = true;     // Auto vacuum volgt animatie (true/false)
   
   // === Motion feedback van M5Atom ===
-  bool  motionBlendEnabled = true; // M5Atom movement feedback aan/uit
-  float userSpeedWeight = 90.0f;   // Nunchuk invloed op snelheid (0-100%)
-  float motionSpeedWeight = 10.0f; // M5Atom invloed op snelheid (0-100%)
-  bool  motionDirectionSync = true;// Animatie richting volgt M5Atom beweging
+  bool  motionBlendEnabled = false; // true M5Atom movement feedback aan/uit
+  float userSpeedWeight = 95.0f;   // Nunchuk invloed op snelheid (0-100%)
+  float motionSpeedWeight = 5.0f; // M5Atom invloed op snelheid (0-100%)
+  bool  motionDirectionSync = false;// true Animatie richting volgt M5Atom beweging
   
   // === Auto vacuum gedrag ===
   uint8_t autoVacuumSpeedThreshold = 6; // Stop auto vacuum bij snelheid >= X (1-10)

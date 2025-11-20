@@ -131,6 +131,136 @@ uint8_t keonGetLevel() {
 float keonGetStrokeFrequency(uint8_t level) {
   if (level > 7) level = 7;
   
+  // KIES ER EEN - uncomment de regel die je wilt testen!
+  
+  // /1.06 - tussen /1.05 en /1.1
+  /*
+  const float frequencies[8] = {
+    0.503f, 0.943f, 1.179f, 1.368f, 1.491f, 1.623f, 1.726f, 1.887f
+  };
+  */
+  
+  // /1.07 - tussen /1.05 en /1.1
+  /*
+  const float frequencies[8] = {
+    0.498f, 0.935f, 1.168f, 1.355f, 1.477f, 1.607f, 1.710f, 1.869f
+  };
+  */
+  
+  // /1.08 - tussen /1.05 en /1.1
+  /*
+  const float frequencies[8] = {
+    0.493f, 0.926f, 1.157f, 1.343f, 1.463f, 1.593f, 1.694f, 1.852f
+  };
+  */
+  
+  // /1.09 - tussen /1.05 en /1.1
+  const float frequencies[8] = {
+    0.489f, 0.917f, 1.147f, 1.330f, 1.450f, 1.578f, 1.679f, 1.835f
+  };
+  
+  return frequencies[level];
+}
+
+/*
+float keonGetStrokeFrequency(uint8_t level) {
+  if (level > 7) level = 7;
+  
+  // Gedeeld door 1.1 - bijna 1:1!
+  const float frequencies[8] = {
+    0.485f,  // L0: pos 0   (0.533 / 1.1)
+    0.909f,  // L1: pos 30  (1.000 / 1.1)
+    1.136f,  // L2: pos 45  (1.250 / 1.1)
+    1.318f,  // L3: pos 55  (1.450 / 1.1)
+    1.436f,  // L4: pos 65  (1.580 / 1.1)
+    1.564f,  // L5: pos 75  (1.720 / 1.1)
+    1.664f,  // L6: pos 85  (1.830 / 1.1)
+    1.818f   // L7: pos 99  (2.000 / 1.1)
+  };
+  
+  return frequencies[level];
+}*/
+
+/*
+float keonGetStrokeFrequency(uint8_t level) {
+  if (level > 7) level = 7;
+  
+  // Gedeeld door 1.1 - bijna 1:1!
+  const float frequencies[8] = {
+    0.485f,  // L0: pos 0   (0.533 / 1.1)
+    0.909f,  // L1: pos 30  (1.000 / 1.1)
+    1.136f,  // L2: pos 45  (1.250 / 1.1)
+    1.318f,  // L3: pos 55  (1.450 / 1.1)
+    1.436f,  // L4: pos 65  (1.580 / 1.1)
+    1.564f,  // L5: pos 75  (1.720 / 1.1)
+    1.664f,  // L6: pos 85  (1.830 / 1.1)
+    1.818f   // L7: pos 99  (2.000 / 1.1)
+  };
+  
+  return frequencies[level];
+}*/
+
+/*
+float keonGetStrokeFrequency(uint8_t level) {
+  if (level > 7) level = 7;
+  
+  // Gedeeld door 1.15 - fine tuning!
+  const float frequencies[8] = {
+    0.463f,  // L0: pos 0   (0.533 / 1.15)
+    0.870f,  // L1: pos 30  (1.000 / 1.15)
+    1.087f,  // L2: pos 45  (1.250 / 1.15)
+    1.261f,  // L3: pos 55  (1.450 / 1.15)
+    1.374f,  // L4: pos 65  (1.580 / 1.15)
+    1.496f,  // L5: pos 75  (1.720 / 1.15)
+    1.591f,  // L6: pos 85  (1.830 / 1.15)
+    1.739f   // L7: pos 99  (2.000 / 1.15)
+  };
+  
+  return frequencies[level];
+}*/
+
+/*
+float keonGetStrokeFrequency(uint8_t level) {
+  if (level > 7) level = 7;
+  
+  // Gedeeld door 1.2
+  const float frequencies[8] = {
+    0.444f,  // L0: pos 0   (0.533 / 1.2)
+    0.833f,  // L1: pos 30  (1.000 / 1.2)
+    1.042f,  // L2: pos 45  (1.250 / 1.2)
+    1.208f,  // L3: pos 55  (1.450 / 1.2)
+    1.317f,  // L4: pos 65  (1.580 / 1.2)
+    1.433f,  // L5: pos 75  (1.720 / 1.2)
+    1.525f,  // L6: pos 85  (1.830 / 1.2)
+    1.667f   // L7: pos 99  (2.000 / 1.2)
+  };
+  
+  return frequencies[level];
+}*/
+
+/*
+float keonGetStrokeFrequency(uint8_t level) {
+  if (level > 7) level = 7;
+  
+  // TEST frequencies - 1:1 met Keon hardware
+  const float frequencies[8] = {
+    0.410f,  // L0: pos 0   (0.533 / 1.3)
+    0.769f,  // L1: pos 30  (1.000 / 1.3)
+    0.962f,  // L2: pos 45  (1.250 / 1.3)
+    1.115f,  // L3: pos 55  (1.450 / 1.3)
+    1.215f,  // L4: pos 65  (1.580 / 1.3)
+    1.323f,  // L5: pos 75  (1.720 / 1.3)
+    1.408f,  // L6: pos 85  (1.830 / 1.3)
+    1.538f   // L7: pos 99  (2.000 / 1.3)
+  };
+  
+  return frequencies[level];
+}*/
+
+/*
+float keonGetStrokeFrequency(uint8_t level) {
+  if (level > 7) level = 7;
+  
   // AANGEPAST voor nieuwe positions (0,30,45,55,65,75,85,99)
   // GEEN halvering meer - 1:1 met Keon strokes!
   const float frequencies[8] = {
@@ -145,7 +275,7 @@ float keonGetStrokeFrequency(uint8_t level) {
   };
   
   return frequencies[level];
-}
+}*/
 /*
 float keonGetStrokeFrequency(uint8_t level) {
   if (level > 7) level = 7;

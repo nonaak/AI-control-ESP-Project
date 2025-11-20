@@ -213,6 +213,10 @@ void triggerLubeShot(float seconds);
 // Zuigen control functions
 void sendToggleZuigenCommand();
 
+// orgasme control
+void sendOrgasmTrigger();
+void sendFunscriptCommand(bool enabled);
+
 // Real-time vacuum control
 void sendImmediateArrowUpdate();
 
