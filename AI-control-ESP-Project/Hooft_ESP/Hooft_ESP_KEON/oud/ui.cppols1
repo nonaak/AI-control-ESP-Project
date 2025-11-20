@@ -1912,14 +1912,35 @@ void uiTick() {
   
   prevArrowFull = goingUp;
 
-  // ========== KEON UPDATE (AUTONOMOUS) ==========
-  // Check connection status
+  // ========== KEON UPDATE (NEW) ==========
+  // Check connection status (lightweight)
   keonCheckConnection();
   
-  // ✅ AUTONOMOUS KEON CONTROL - handles pause/resume internally
+
+  
+  // Only sync Keon when animation is actually running
+  if (keonConnected) {
+    if (paused) {
+      // Animation paused → Keon should be at bottom and still
+      static bool hasParked = false;
+      if (!hasParked) {
+        keonParkToBottom();
+        hasParked = true;
+      }
+   } else {
+  // Animation running → Keon draait onafhankelijk op eigen tempo
+  static bool hasParked = false;
+  hasParked = false;  // Reset flag when unpaused
+  
+
+  // 🚀 NIEUWE ONAFHANKELIJKE KEON CONTROL
   extern void keonIndependentTick();
   keonIndependentTick();
-  // NOTE: keonIndependentTick() checkt zelf 'paused' flag en handled parking
+  
+  // NOTE: keonIndependentTick() gebruikt g_speedStep automatisch
+  // en checkt zelf of paused = true/false
+  }
+}
 
   //if (parkToBottom && capY_draw < (float)CAP_Y_IN && paused) {
   if (parkToBottom && capY_draw < (float)CAP_Y_IN) {  
@@ -1929,8 +1950,10 @@ void uiTick() {
       parkToBottom=false;
       paused=true;
       
-      // ✅ REMOVED: Keon parking handled by keonIndependentTick()
-      // UI animation parks visually, Keon handles itself autonomously
+      // Park Keon to bottom when paused
+      if (keonConnected) {
+        keonParkToBottom();
+      }
     }
   } else if (!parkToBottom) {
     capY_draw = (float)capY;
@@ -1964,7 +1987,7 @@ void uiTick() {
       keonMove(0, 0);
     } else {
       float sleevePercent = getSleevePercentage();
-      //keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
+      keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
     }
   }
 

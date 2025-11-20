@@ -3,23 +3,6 @@
 #include <BLEUtils.h>
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 8 LEVELS - POSITIE = OSCILLATIE FREQUENTIE
-// ═══════════════════════════════════════════════════════════════════════════
-// Keon oscilleert ZELF op deze posities!
-// Geen wisselen tussen 0-99 meer nodig!
-
-const uint8_t KEON_LEVEL_POSITIONS[8] = {
-  0,   // L0: ~32 strokes/min (langzaam)
-  15,  // L1: ~45 strokes/min
-  30,  // L2: ~60 strokes/min
-  45,  // L3: ~75 strokes/min
-  60,  // L4: ~85 strokes/min
-  75,  // L5: ~95 strokes/min
-  85,  // L6: ~110 strokes/min
-  99   // L7: ~120 strokes/min (snel)
-};
-
-// ═══════════════════════════════════════════════════════════════════════════
 // GLOBAL STATE VARIABLES
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -28,12 +11,12 @@ BLERemoteCharacteristic* keonTxCharacteristic = nullptr;
 BLEAddress keonAddress(KEON_MAC_ADDRESS);
 
 bool keonConnected = false;
-uint8_t keonCurrentLevel = 0;
+uint8_t keonCurrentPosition = 50;
+uint8_t keonCurrentSpeed = 0;
 
 static uint32_t lastKeonCommand = 0;
 static bool keonInitialized = false;
 static String lastConnectedMAC = "";
-static bool keonActive = false;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BLE CALLBACK HANDLER
@@ -46,7 +29,6 @@ class KeonClientCallback : public BLEClientCallbacks {
   }
   void onDisconnect(BLEClient* pclient) {
     keonConnected = false;
-    keonActive = false;
     Serial.println("[KEON] BLE Disconnected");
   }
 };
@@ -88,55 +70,33 @@ bool keonMove(uint8_t position, uint8_t speed) {
   if (position > 99) position = 99;
   if (speed > 99) speed = 99;
 
+  keonCurrentPosition = position;
+  keonCurrentSpeed = speed;
+
   uint8_t cmd[5] = {0x04, 0x00, position, 0x00, speed};
   return keonSendCommand(cmd, 5);
 }
 
 bool keonStopAtPosition(uint8_t position) {
   if (position > 99) position = 99;
-  
-  // Meerdere stop commando's voor betrouwbare stop
-  bool success = true;
-  
-  uint8_t cmd[5] = {0x04, 0x00, 50, 0x00, 0x00};  // Eerst naar midden
-  success &= keonSendCommand(cmd, 5);
-  delay(300);
-  
-  success &= keonSendCommand(cmd, 5);  // Herhaal
-  delay(300);
-  
-  cmd[2] = position;  // Dan naar gewenste positie
-  success &= keonSendCommand(cmd, 5);
-  delay(300);
-  
-  return success;
+  uint8_t cmd[5] = {0x04, 0x00, position, 0x00, 0x00};
+  return keonSendCommand(cmd, 5);
 }
 
 bool keonStop() {
-  Serial.println("[KEON] Stopping...");
-  keonActive = false;
-  return keonStopAtPosition(0);
+  return keonStopAtPosition(keonCurrentPosition);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// LEVEL CONTROL (NEW!)
-// ═══════════════════════════════════════════════════════════════════════════
-
-void keonSetLevel(uint8_t level) {
-  if (level > 7) level = 7;
-  keonCurrentLevel = level;
-  
-  Serial.printf("[KEON] Level set to %u (pos %u)\n", 
-                level, KEON_LEVEL_POSITIONS[level]);
-  
-  // Als actief, update direct de positie
-  if (keonActive && keonConnected) {
-    keonMove(KEON_LEVEL_POSITIONS[level], 99);
-  }
+bool keonMoveSlow(uint8_t position) {
+  return keonMove(position, 33);
 }
 
-uint8_t keonGetLevel() {
-  return keonCurrentLevel;
+bool keonMoveMedium(uint8_t position) {
+  return keonMove(position, 66);
+}
+
+bool keonMoveFast(uint8_t position) {
+  return keonMove(position, 99);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -207,11 +167,10 @@ void keonDisconnect() {
   if (keonConnected && keonClient != nullptr) {
     Serial.println("[KEON] Disconnecting...");
     keonStop();
-    delay(500);
+    delay(200);
     keonClient->disconnect();
     keonConnected = false;
     keonTxCharacteristic = nullptr;
-    keonActive = false;
   }
 }
 
@@ -225,7 +184,6 @@ void keonCheckConnection() {
       Serial.println("[KEON] Connection lost!");
       keonConnected = false;
       keonTxCharacteristic = nullptr;
-      keonActive = false;
     }
   }
 }
@@ -235,7 +193,6 @@ void keonReconnect() {
   if (keonConnected) {
     keonDisconnect();
   }
-  delay(1000);
   keonConnect();
 }
 
@@ -248,77 +205,124 @@ void keonSetMAC(const char* mac) {
   Serial.printf("[KEON] MAC set to: %s (requires recompile)\n", mac);
 }
 
+void keonParkToBottom() {
+  if (!keonConnected) return;
+  Serial.println("[KEON] Parking to bottom");
+  keonMove(0, 50);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
-// 🚀 NIEUWE OSCILLATIE-BASED CONTROL - VEEL SIMPELER!
+// 🚀 DUAL-CORE KEON CONTROL - RUNS ON CORE 0!
 // ═══════════════════════════════════════════════════════════════════════════
 
 void keonIndependentTick() {
   if (!keonConnected) return;
   
   extern bool paused;
-  extern uint8_t g_speedStep;
   
+  static bool keonDirection = false;
+  static uint32_t lastCommand = 0;
+  static uint32_t strokeCount = 0;
   static bool wasRunning = false;
-  static uint32_t lastLevelUpdate = 0;
+  
+  uint32_t now = millis();
+  extern uint8_t g_speedStep;
   
   // ═══════════════════════════════════════════════════════════════════════
   // SECTIE 1: PAUSE HANDLING
   // ═══════════════════════════════════════════════════════════════════════
   if (paused) {
-    if (wasRunning || keonActive) {
-      Serial.println("[KEON CORE0] Paused");
-      keonStop();
+    if (wasRunning) {
+      Serial.println("[KEON CORE0] Paused - parking");
+      keonMove(0, 50);
       wasRunning = false;
-      keonActive = false;
+      keonDirection = false;
     }
     return;
   }
   
   // ═══════════════════════════════════════════════════════════════════════
-  // SECTIE 2: RESUME/START HANDLING
+  // SECTIE 2: RESUME HANDLING
   // ═══════════════════════════════════════════════════════════════════════
-  if (!wasRunning && !keonActive) {
-    Serial.println("[KEON CORE0] Starting oscillation");
-    keonActive = true;
+  if (!wasRunning) {
+    Serial.println("[KEON CORE0] Resumed");
     wasRunning = true;
-    
-    // Start met huidige level
-    uint8_t position = KEON_LEVEL_POSITIONS[keonCurrentLevel];
-    keonMove(position, 99);
-    lastLevelUpdate = millis();
-    
-    Serial.printf("[KEON CORE0] Started - Level %u, Pos %u\n", 
-                  keonCurrentLevel, position);
-    return;
+    lastCommand = now - 5000;  // Start meteen
   }
   
   // ═══════════════════════════════════════════════════════════════════════
-  // SECTIE 3: LEVEL UPDATE (alleen als g_speedStep veranderd is!)
+  // SECTIE 3: INTERVAL TIMING (VAST VOOR ALLE LEVELS!)
   // ═══════════════════════════════════════════════════════════════════════
-  if (keonActive && keonCurrentLevel != g_speedStep) {
-    uint32_t now = millis();
+// SECTIE 3: INTERVAL (Lang genoeg voor langzame motor!)
+static uint32_t levelIntervals[8] = {
+  8000,  // Level 0: Veel tijd voor trage motor
+  7000,
+  6000,
+  5000,
+  4000,
+  3500,
+  3000,
+  2500   // Level 7
+};
+
+uint32_t interval = levelIntervals[g_speedStep];
+
+if ((now - lastCommand) < interval) {
+  return;
+}
+
+// SECTIE 4: SPEED (Varieert voor snelheidsverschil!)
+// Level 0: Speed 60 (langzaam, heeft 8s om 0-99 te doen)
+// Level 7: Speed 99 (snel, heeft 2.5s)
+uint8_t motorSpeed = 60 + ((g_speedStep * 39) / 7);
+  /*
+  // ═══════════════════════════════════════════════════════════════════════
+  // SECTIE 3: INTERVAL TIMING (VAST VOOR ALLE LEVELS!)
+  // ═══════════════════════════════════════════════════════════════════════
+  // 5 seconden = genoeg tijd voor langzame motor om volle slag te maken
+  uint32_t interval = 5000;
+  
+  if ((now - lastCommand) < interval) {
+    return;  // Nog niet tijd voor nieuwe command
+  }
+  
+  // ═══════════════════════════════════════════════════════════════════════
+  // SECTIE 4: MOTOR SPEED BEREKENING (VARIEERT PER LEVEL!)
+  // ═══════════════════════════════════════════════════════════════════════
+  // Level 0: Speed 50 (motor beweegt LANGZAAM van 0→99)
+  // Level 7: Speed 99 (motor beweegt SNEL van 0→99)
+  uint8_t motorSpeed = 50 + ((g_speedStep * 49) / 7);
+  */
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SECTIE 5: POSITIE BEPALING (ALTIJD VOLLE SLAG 0↔99!)
+  // ═══════════════════════════════════════════════════════════════════════
+  keonDirection = !keonDirection;  // Toggle richting
+  uint8_t targetPos = keonDirection ? 99 : 0;  // 99=boven, 0=beneden
+  
+  // ═══════════════════════════════════════════════════════════════════════
+  // SECTIE 6: COMMAND VERSTUREN
+  // ═══════════════════════════════════════════════════════════════════════
+  bool sent = keonMove(targetPos, motorSpeed);
+  
+  if (sent) {
+    lastCommand = now;
+    strokeCount++;
     
-    // Rate limiter: niet vaker dan elke seconde updaten
-    if ((now - lastLevelUpdate) >= 1000) {
-      keonCurrentLevel = g_speedStep;
-      uint8_t position = KEON_LEVEL_POSITIONS[keonCurrentLevel];
-      
-      bool sent = keonMove(position, 99);
-      
-      if (sent) {
-        lastLevelUpdate = now;
-        Serial.printf("[KEON CORE0] Level changed → L%u (pos %u, ~%u strokes/min)\n",
-                      keonCurrentLevel, 
-                      position,
-                      position == 0 ? 32 : (position == 99 ? 120 : 32 + (position * 88 / 99)));
-      }
+    Serial.printf("[KEON CORE0 #%u] %s→%u Speed:%u L:%u\n",
+                  strokeCount,
+                  keonDirection ? "UP" : "DOWN",
+                  targetPos,
+                  motorSpeed,
+                  g_speedStep);
+    
+    if (strokeCount % 10 == 0) {
+      Serial.printf("[KEON CORE0] ===== 10 strokes L:%u Speed:%u =====\n", 
+                    g_speedStep, motorSpeed);
     }
+  } else {
+    keonDirection = !keonDirection;  // Rollback bij mislukt commando
   }
-  
-  // ═══════════════════════════════════════════════════════════════════════
-  // KLAAR! Keon oscilleert nu automatisch op de ingestelde positie!
-  // Geen complex timing meer nodig, geen 0↔99 wisselen, gewoon SET & FORGET!
-  // ═══════════════════════════════════════════════════════════════════════
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -331,7 +335,7 @@ void keonTask(void* parameter) {
   while(true) {
     keonCheckConnection();
     keonIndependentTick();
-    vTaskDelay(10 / portTICK_PERIOD_MS);  // 10ms delay
+    vTaskDelay(1 / portTICK_PERIOD_MS);
   }
 }
 
