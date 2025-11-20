@@ -1577,31 +1577,10 @@ void uiTick() {
     }
   }
 
-//CEvent cev = pollCEvent(cNow);
-
-  //CEvent cev = skipCEventThisFrame ? CE_NONE : pollCEvent(cNow);
-  //skipCEventThisFrame = false;  // Reset after use
+  //CEvent cev = pollCEvent(cNow);
 
   CEvent cev = skipCEventThisFrame ? CE_NONE : pollCEvent(cNow);
   skipCEventThisFrame = false;  // Reset after use
-
-  // ═══════════════════════════════════════════════════════════
-  // Z BUTTON VACUUM TOGGLE - DIRECT EN SIMPEL
-  // ═══════════════════════════════════════════════════════════
-  static bool prevZNow = false;
-  if (!zNow && prevZNow && uiMode == MODE_ANIM) {
-    // Z released in animatie mode → toggle vacuum
-    extern bool pompUnitZuigActive;
-    pompUnitZuigActive = !pompUnitZuigActive;
-    Serial.printf("[VACUUM] Toggle: %s\n", pompUnitZuigActive ? "ON" : "OFF");
-    
-    // Send update to Pump Unit
-    //extern void sendImmediateArrowUpdate();
-    extern void sendToggleZuigenCommand();
-    //sendImmediateArrowUpdate();
-    sendToggleZuigenCommand();
-  }
-  prevZNow = zNow;
 
   ZEvent zev = pollZEvent(zNow);
   ZClickType zClick = pollZClick(zNow);
@@ -1611,29 +1590,13 @@ void uiTick() {
                   (zClick == Z_SINGLE) ? "SINGLE" : (zClick == Z_VIBE) ? "VIBE" : "NONE");
   }
   
-bool zEdge = (zev == ZE_SHORT);
-  
-  // ═══════════════════════════════════════════════════════════
-  // Z BUTTON HANDLING - Gebruik alleen zClick systeem
-  // ═══════════════════════════════════════════════════════════
-  
-  // VIBE toggle (dubbele klik)
   if (zClick == Z_VIBE) {
     vibeState = !vibeState;
-    Serial.printf("[Z-VIBE] Vibe toggle: %s\n", vibeState ? "ON" : "OFF");
+    Serial.printf("[Z-VIBE] Vibe toggle: %s -> sending bit 3 to M5StickC Plus\n", 
+                  vibeState ? "ON" : "OFF");
   }
   
-  // VACUUM toggle (enkele klik) - werkt NA timeout (500ms)
-  //if (zClick == Z_SINGLE && uiMode == MODE_ANIM) {
-    //extern bool pompUnitZuigActive;
-    //pompUnitZuigActive = !pompUnitZuigActive;
-    //Serial.printf("[Z-VACUUM] Vacuum toggle: %s (single click confirmed)\n", 
-                  //pompUnitZuigActive ? "ON" : "OFF");
-    
-    // Send ESP-NOW command
-    //extern void sendImmediateArrowUpdate();
-    //sendImmediateArrowUpdate();
-  //}
+  bool zEdge = (zev == ZE_SHORT);
 
   if (nunchukHelpPopupOpen) {
     if (cev == CE_SHORT) {
@@ -2243,4 +2206,3 @@ if (!paused && !parkToBottom) {
   //}
   //delay(1);
 //}
-
