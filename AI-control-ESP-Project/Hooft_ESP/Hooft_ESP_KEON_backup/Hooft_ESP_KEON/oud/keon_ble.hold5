@@ -1,0 +1,58 @@
+#ifndef KEON_BLE_H
+#define KEON_BLE_H
+
+#include <Arduino.h>
+#include <BLEDevice.h>
+#include <BLEClient.h>
+
+// ===============================================================================
+// KEON BLE PROTOCOL CONSTANTS
+// ===============================================================================
+
+// Keon MAC address (configureren met jouw device)
+#define KEON_MAC_ADDRESS "ac:67:b2:25:42:5a"
+
+// BLE Service & Characteristic UUIDs (reverse-engineered via Wireshark)
+#define KEON_SERVICE_UUID "00001900-0000-1000-8000-00805f9b34fb"
+#define KEON_TX_CHAR_UUID "00001902-0000-1000-8000-00805f9b34fb"
+
+#define KEON_COMMAND_DELAY_MS 150
+
+// ═══════════════════════════════════════════════════════════════════════════
+// KEON BLE INTERFACE - DUAL CORE VERSION
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Connection management
+void keonInit();
+bool keonConnect();
+void keonDisconnect();
+bool keonIsConnected();
+void keonCheckConnection();
+void keonReconnect();
+
+// Movement control
+bool keonMove(uint8_t position, uint8_t speed);
+bool keonStop();
+bool keonStopAtPosition(uint8_t position);
+bool keonMoveSlow(uint8_t position);
+bool keonMoveMedium(uint8_t position);
+bool keonMoveFast(uint8_t position);
+void keonParkToBottom();
+
+// MAC address management
+String keonGetLastMAC();
+void keonSetMAC(const char* mac);
+
+// Independent control (DEPRECATED - use task instead!)
+void keonIndependentTick();
+
+// ✅ NEW: FreeRTOS Task functions
+void keonStartTask();  // Start Keon control on Core 0
+void keonStopTask();   // Stop Keon task
+
+// Connection state
+extern bool keonConnected;
+extern uint8_t keonCurrentPosition;
+extern uint8_t keonCurrentSpeed;
+
+#endif

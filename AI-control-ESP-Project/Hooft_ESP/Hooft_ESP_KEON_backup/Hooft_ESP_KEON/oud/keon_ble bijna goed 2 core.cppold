@@ -1,0 +1,334 @@
+#include "keon_ble.h"
+#include "config.h"
+#include <BLEUtils.h>
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GLOBAL STATE VARIABLES
+// ═══════════════════════════════════════════════════════════════════════════
+
+BLEClient* keonClient = nullptr;
+BLERemoteCharacteristic* keonTxCharacteristic = nullptr;
+BLEAddress keonAddress(KEON_MAC_ADDRESS);
+
+bool keonConnected = false;
+uint8_t keonCurrentPosition = 50;
+uint8_t keonCurrentSpeed = 0;
+
+static uint32_t lastKeonCommand = 0;
+static bool keonInitialized = false;
+static String lastConnectedMAC = "";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BLE CALLBACK HANDLER
+// ═══════════════════════════════════════════════════════════════════════════
+
+class KeonClientCallback : public BLEClientCallbacks {
+  void onConnect(BLEClient* pclient) {
+    keonConnected = true;
+    Serial.println("[KEON] BLE Connected");
+  }
+  void onDisconnect(BLEClient* pclient) {
+    keonConnected = false;
+    Serial.println("[KEON] BLE Disconnected");
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMMAND SENDING WITH RATE LIMITER
+// ═══════════════════════════════════════════════════════════════════════════
+
+static bool keonSendCommand(uint8_t* data, size_t length) {
+  if (!keonConnected || keonTxCharacteristic == nullptr) {
+    return false;
+  }
+
+  uint32_t now = millis();
+  if ((now - lastKeonCommand) < KEON_COMMAND_DELAY_MS) {
+    return false;
+  }
+
+  try {
+    keonTxCharacteristic->writeValue(data, length, true);
+    lastKeonCommand = now;
+    return true;
+  } catch (...) {
+    try {
+      keonTxCharacteristic->writeValue(data, length, false);
+      lastKeonCommand = now;
+      return true;
+    } catch (...) {
+      return false;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MOVEMENT CONTROL
+// ═══════════════════════════════════════════════════════════════════════════
+
+bool keonMove(uint8_t position, uint8_t speed) {
+  if (position > 99) position = 99;
+  if (speed > 99) speed = 99;
+
+  keonCurrentPosition = position;
+  keonCurrentSpeed = speed;
+
+  uint8_t cmd[5] = {0x04, 0x00, position, 0x00, speed};
+  return keonSendCommand(cmd, 5);
+}
+
+bool keonStopAtPosition(uint8_t position) {
+  if (position > 99) position = 99;
+  uint8_t cmd[5] = {0x04, 0x00, position, 0x00, 0x00};
+  return keonSendCommand(cmd, 5);
+}
+
+bool keonStop() {
+  return keonStopAtPosition(keonCurrentPosition);
+}
+
+bool keonMoveSlow(uint8_t position) {
+  return keonMove(position, 33);
+}
+
+bool keonMoveMedium(uint8_t position) {
+  return keonMove(position, 66);
+}
+
+bool keonMoveFast(uint8_t position) {
+  return keonMove(position, 99);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONNECTION MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+void keonInit() {
+  if (keonInitialized) return;
+  BLEDevice::init("HoofdESP_KeonController");
+  keonInitialized = true;
+  Serial.println("[KEON] BLE initialized");
+}
+
+bool keonConnect() {
+  if (!keonInitialized) {
+    keonInit();
+  }
+
+  Serial.println("[KEON] Attempting connection...");
+  
+  keonClient = BLEDevice::createClient();
+  keonClient->setClientCallbacks(new KeonClientCallback());
+
+  if (!keonClient->connect(keonAddress)) {
+    Serial.println("[KEON] Connection failed!");
+    return false;
+  }
+
+  delay(500);
+
+  BLERemoteService* pRemoteService = keonClient->getService(KEON_SERVICE_UUID);
+  if (pRemoteService == nullptr) {
+    Serial.println("[KEON] Service not found!");
+    keonClient->disconnect();
+    return false;
+  }
+
+  keonTxCharacteristic = pRemoteService->getCharacteristic(KEON_TX_CHAR_UUID);
+
+  if (keonTxCharacteristic == nullptr) {
+    Serial.println("[KEON] TX Characteristic not found, searching...");
+    std::map<std::string, BLERemoteCharacteristic*>* characteristics = pRemoteService->getCharacteristics();
+    if (characteristics != nullptr) {
+      for (auto &entry : *characteristics) {
+        BLERemoteCharacteristic* pChar = entry.second;
+        if (pChar->canWrite() || pChar->canWriteNoResponse()) {
+          keonTxCharacteristic = pChar;
+          Serial.println("[KEON] Found writable characteristic!");
+          break;
+        }
+      }
+    }
+  }
+
+  if (keonTxCharacteristic == nullptr) {
+    Serial.println("[KEON] No writable characteristic found!");
+    keonClient->disconnect();
+    return false;
+  }
+
+  keonConnected = true;
+  lastConnectedMAC = String(KEON_MAC_ADDRESS);
+  Serial.printf("[KEON] Connected successfully to %s\n", KEON_MAC_ADDRESS);
+  return true;
+}
+
+void keonDisconnect() {
+  if (keonConnected && keonClient != nullptr) {
+    Serial.println("[KEON] Disconnecting...");
+    keonStop();
+    delay(200);
+    keonClient->disconnect();
+    keonConnected = false;
+    keonTxCharacteristic = nullptr;
+  }
+}
+
+bool keonIsConnected() {
+  return keonConnected && keonClient != nullptr && keonTxCharacteristic != nullptr;
+}
+
+void keonCheckConnection() {
+  if (keonConnected && keonClient != nullptr) {
+    if (!keonClient->isConnected()) {
+      Serial.println("[KEON] Connection lost!");
+      keonConnected = false;
+      keonTxCharacteristic = nullptr;
+    }
+  }
+}
+
+void keonReconnect() {
+  Serial.println("[KEON] Manual reconnect...");
+  if (keonConnected) {
+    keonDisconnect();
+  }
+  keonConnect();
+}
+
+String keonGetLastMAC() {
+  return lastConnectedMAC;
+}
+
+void keonSetMAC(const char* mac) {
+  lastConnectedMAC = String(mac);
+  Serial.printf("[KEON] MAC set to: %s (requires recompile)\n", mac);
+}
+
+void keonParkToBottom() {
+  if (!keonConnected) return;
+  Serial.println("[KEON] Parking to bottom");
+  keonMove(0, 50);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🚀 DUAL-CORE KEON CONTROL - RUNS ON CORE 0!
+// ═══════════════════════════════════════════════════════════════════════════
+
+void keonIndependentTick() {
+  if (!keonConnected) return;
+  
+  extern bool paused;
+  
+  static bool keonDirection = false;
+  static uint32_t lastCommand = 0;
+  static uint32_t strokeCount = 0;
+  static bool wasRunning = false;
+  
+  uint32_t now = millis();
+  extern uint8_t g_speedStep;
+  
+  // PAUSE HANDLING
+  if (paused) {
+    if (wasRunning) {
+      Serial.println("[KEON CORE0] Paused - parking");
+      keonMove(0, 50);
+      wasRunning = false;
+      keonDirection = false;
+    }
+    return;
+  }
+  
+  // RESUME
+  if (!wasRunning) {
+    Serial.println("[KEON CORE0] Resumed");
+    wasRunning = true;
+    lastCommand = now - 2000;
+  }
+  
+  // INTERVALS
+  static uint32_t levelIntervals[8] = {
+    2200, 2100, 2000, 1800, 1700, 1600, 1500, 1400
+  };
+  
+  uint32_t interval = levelIntervals[g_speedStep];
+  
+  if ((now - lastCommand) < interval) {
+    return;
+  }
+  
+  // TOGGLE & SEND
+  keonDirection = !keonDirection;
+  uint8_t targetPos = keonDirection ? 99 : 0;
+  
+  bool sent = keonMove(targetPos, 99);
+  
+  if (sent) {
+    lastCommand = now;
+    strokeCount++;
+    
+    Serial.printf("[KEON CORE0 #%u] %s→%u L:%u\n",
+                  strokeCount,
+                  keonDirection ? "UP" : "DOWN",
+                  targetPos,
+                  g_speedStep);
+    
+    if (strokeCount % 10 == 0) {
+      Serial.printf("[KEON CORE0] ===== 10 strokes L:%u =====\n", g_speedStep);
+    }
+  } else {
+    keonDirection = !keonDirection;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FREERTOS TASK - DEDICATED KEON CONTROL ON CORE 0
+// ═══════════════════════════════════════════════════════════════════════════
+
+void keonTask(void* parameter) {
+  Serial.println("[KEON TASK] Started on Core 0");
+  
+  while(true) {
+    keonCheckConnection();
+    keonIndependentTick();
+    vTaskDelay(1 / portTICK_PERIOD_MS);  // 1ms delay
+  }
+}
+
+// Task handle (global zodat we hem kunnen stoppen als nodig)
+static TaskHandle_t keonTaskHandle = NULL;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// START KEON TASK ON CORE 0
+// ═══════════════════════════════════════════════════════════════════════════
+
+void keonStartTask() {
+  if (keonTaskHandle != NULL) {
+    Serial.println("[KEON TASK] Already running!");
+    return;
+  }
+  
+  xTaskCreatePinnedToCore(
+    keonTask,           // Task functie
+    "KeonTask",         // Naam
+    4096,               // Stack size
+    NULL,               // Parameter
+    1,                  // Priority (1 = laag, goed voor achtergrond)
+    &keonTaskHandle,    // Task handle
+    0                   // Core 0 (Core 1 = Arduino loop)
+  );
+  
+  Serial.println("[KEON TASK] Created on Core 0!");
+}
+
+void keonStopTask() {
+  if (keonTaskHandle != NULL) {
+    vTaskDelete(keonTaskHandle);
+    keonTaskHandle = NULL;
+    Serial.println("[KEON TASK] Stopped");
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EINDE KEON_BLE.CPP
+// ═══════════════════════════════════════════════════════════════════════════
