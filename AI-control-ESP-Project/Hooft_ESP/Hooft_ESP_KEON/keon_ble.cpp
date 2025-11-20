@@ -3,24 +3,34 @@
 #include <BLEUtils.h>
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 8 LEVELS - POSITIE = OSCILLATIE FREQUENTIE
+// 8 LEVELS
 // ═══════════════════════════════════════════════════════════════════════════
-// Keon oscilleert ZELF op deze posities!
-// Geen wisselen tussen 0-99 meer nodig!
+
 
 const uint8_t KEON_LEVEL_POSITIONS[8] = {
-  0,   // L0: ~32 strokes/min (langzaam)
+  0,   // L0: ~32 strokes/min (LANGZAAMST)
+  30,  // L1: ~60 strokes/min (+28/min verschil!)
+  45,  // L2: ~75 strokes/min
+  55,  // L3: ~85 strokes/min  
+  65,  // L4: ~95 strokes/min
+  75,  // L5: ~103 strokes/min
+  85,  // L6: ~110 strokes/min
+  99   // L7: ~120 strokes/min (SNELST)
+};
+/*
+const uint8_t KEON_LEVEL_POSITIONS[8] = {
+  0,   // L0: ~32 strokes/min
   15,  // L1: ~45 strokes/min
   30,  // L2: ~60 strokes/min
   45,  // L3: ~75 strokes/min
   60,  // L4: ~85 strokes/min
   75,  // L5: ~95 strokes/min
   85,  // L6: ~110 strokes/min
-  99   // L7: ~120 strokes/min (snel)
-};
+  99   // L7: ~120 strokes/min
+};*/
 
 // ═══════════════════════════════════════════════════════════════════════════
-// GLOBAL STATE VARIABLES
+// GLOBAL STATE
 // ═══════════════════════════════════════════════════════════════════════════
 
 BLEClient* keonClient = nullptr;
@@ -30,96 +40,70 @@ BLEAddress keonAddress(KEON_MAC_ADDRESS);
 bool keonConnected = false;
 uint8_t keonCurrentLevel = 0;
 
-static uint32_t lastKeonCommand = 0;
 static bool keonInitialized = false;
 static String lastConnectedMAC = "";
 static bool keonActive = false;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// BLE CALLBACK HANDLER
+// BLE CALLBACK
 // ═══════════════════════════════════════════════════════════════════════════
 
 class KeonClientCallback : public BLEClientCallbacks {
   void onConnect(BLEClient* pclient) {
     keonConnected = true;
-    Serial.println("[KEON] BLE Connected");
+    Serial.println("[KEON] ✅ BLE Connected");
   }
   void onDisconnect(BLEClient* pclient) {
     keonConnected = false;
     keonActive = false;
-    Serial.println("[KEON] BLE Disconnected");
+    Serial.println("[KEON] ❌ BLE Disconnected");
   }
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// COMMAND SENDING WITH RATE LIMITER
-// ═══════════════════════════════════════════════════════════════════════════
-
-static bool keonSendCommand(uint8_t* data, size_t length) {
-  if (!keonConnected || keonTxCharacteristic == nullptr) {
-    return false;
-  }
-
-  uint32_t now = millis();
-  if ((now - lastKeonCommand) < KEON_COMMAND_DELAY_MS) {
-    return false;
-  }
-
-  try {
-    keonTxCharacteristic->writeValue(data, length, true);
-    lastKeonCommand = now;
-    return true;
-  } catch (...) {
-    try {
-      keonTxCharacteristic->writeValue(data, length, false);
-      lastKeonCommand = now;
-      return true;
-    } catch (...) {
-      return false;
-    }
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// MOVEMENT CONTROL
+// MOVEMENT - ZOALS ESP32-C3 (direct send, delay erna!)
 // ═══════════════════════════════════════════════════════════════════════════
 
 bool keonMove(uint8_t position, uint8_t speed) {
+  if (!keonConnected || keonTxCharacteristic == nullptr) {
+    return false;
+  }
+  
   if (position > 99) position = 99;
   if (speed > 99) speed = 99;
 
   uint8_t cmd[5] = {0x04, 0x00, position, 0x00, speed};
-  return keonSendCommand(cmd, 5);
-}
-
-bool keonStopAtPosition(uint8_t position) {
-  if (position > 99) position = 99;
   
-  // Meerdere stop commando's voor betrouwbare stop
-  bool success = true;
+  Serial.printf("[KEON] Move: pos=%u, speed=%u\n", position, speed);
   
-  uint8_t cmd[5] = {0x04, 0x00, 50, 0x00, 0x00};  // Eerst naar midden
-  success &= keonSendCommand(cmd, 5);
-  delay(300);
-  
-  success &= keonSendCommand(cmd, 5);  // Herhaal
-  delay(300);
-  
-  cmd[2] = position;  // Dan naar gewenste positie
-  success &= keonSendCommand(cmd, 5);
-  delay(300);
-  
-  return success;
+  try {
+    keonTxCharacteristic->writeValue(cmd, 5, true);
+    delay(200);  // Delay ERNA, zoals ESP32-C3!
+    return true;
+  } catch (...) {
+    return false;
+  }
 }
 
 bool keonStop() {
+  if (!keonConnected) return false;
+  
   Serial.println("[KEON] Stopping...");
   keonActive = false;
-  return keonStopAtPosition(0);
+  
+  // Meerdere stop commando's
+  keonMove(50, 0);
+  delay(100);
+  keonMove(50, 0);
+  delay(100);
+  keonMove(0, 0);
+  
+  Serial.println("[KEON] ✅ Stopped");
+  return true;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// LEVEL CONTROL (NEW!)
+// LEVEL CONTROL
 // ═══════════════════════════════════════════════════════════════════════════
 
 void keonSetLevel(uint8_t level) {
@@ -129,7 +113,7 @@ void keonSetLevel(uint8_t level) {
   Serial.printf("[KEON] Level set to %u (pos %u)\n", 
                 level, KEON_LEVEL_POSITIONS[level]);
   
-  // Als actief, update direct de positie
+  // Als actief, direct update!
   if (keonActive && keonConnected) {
     keonMove(KEON_LEVEL_POSITIONS[level], 99);
   }
@@ -140,37 +124,42 @@ uint8_t keonGetLevel() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ANIMATION SYNC - GET OSCILLATION FREQUENCY
+// ANIMATION SYNC
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * Get Keon oscillation frequency in Hz for a given level
- * Based on 30-second test results:
- * - Pos 0:  16 strokes/30sec = 32/min  = 0.533 Hz
- * - Pos 99: 60 strokes/30sec = 120/min = 2.0 Hz
- * 
- * Use this to sync animation timing with Keon hardware!
- */
+
 float keonGetStrokeFrequency(uint8_t level) {
   if (level > 7) level = 7;
   
-  // Measured frequencies from test (strokes/min → Hz)
+  // NIEUWE positions: 0,30,45,55,65,75,85,99
+  // Gehalveerd (1 Keon stroke = 1 animation cycle)
   const float frequencies[8] = {
-    0.533f,  // L0: pos 0   = ~32 strokes/min
-    0.750f,  // L1: pos 15  = ~45 strokes/min
-    1.000f,  // L2: pos 30  = ~60 strokes/min
-    1.250f,  // L3: pos 45  = ~75 strokes/min
-    1.417f,  // L4: pos 60  = ~85 strokes/min
-    1.583f,  // L5: pos 75  = ~95 strokes/min
-    1.833f,  // L6: pos 85  = ~110 strokes/min
-    2.000f   // L7: pos 99  = ~120 strokes/min
+    0.267f,  // L0: pos 0   = 32/min  → 0.533 Hz → /2
+    0.500f,  // L1: pos 30  = 60/min  → 1.0 Hz   → /2
+    0.625f,  // L2: pos 45  = 75/min  → 1.25 Hz  → /2
+    0.725f,  // L3: pos 55  = 87/min  → 1.45 Hz  → /2
+    0.790f,  // L4: pos 65  = 95/min  → 1.58 Hz  → /2
+    0.860f,  // L5: pos 75  = 103/min → 1.72 Hz  → /2
+    0.915f,  // L6: pos 85  = 110/min → 1.83 Hz  → /2
+    1.000f   // L7: pos 99  = 120/min → 2.0 Hz   → /2
   };
   
   return frequencies[level];
 }
+/*
+float keonGetStrokeFrequency(uint8_t level) {
+  if (level > 7) level = 7;
+  
+  const float frequencies[8] = {
+    0.133f, 0.188f, 0.250f, 0.313f,
+    0.354f, 0.396f, 0.458f, 0.500f
+  };
+  
+  return frequencies[level];
+}*/
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CONNECTION MANAGEMENT
+// CONNECTION
 // ═══════════════════════════════════════════════════════════════════════════
 
 void keonInit() {
@@ -181,9 +170,7 @@ void keonInit() {
 }
 
 bool keonConnect() {
-  if (!keonInitialized) {
-    keonInit();
-  }
+  if (!keonInitialized) keonInit();
 
   Serial.println("[KEON] Attempting connection...");
   
@@ -229,7 +216,7 @@ bool keonConnect() {
 
   keonConnected = true;
   lastConnectedMAC = String(KEON_MAC_ADDRESS);
-  Serial.printf("[KEON] Connected successfully to %s\n", KEON_MAC_ADDRESS);
+  Serial.printf("[KEON] ✅ Connected to %s\n", KEON_MAC_ADDRESS);
   return true;
 }
 
@@ -278,8 +265,16 @@ void keonSetMAC(const char* mac) {
   Serial.printf("[KEON] MAC set to: %s (requires recompile)\n", mac);
 }
 
+bool keonStopAtPosition(uint8_t position) {
+  if (position > 99) position = 99;
+  keonMove(50, 0);
+  keonMove(50, 0);
+  keonMove(position, 0);
+  return true;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
-// 🚀 NIEUWE OSCILLATIE-BASED CONTROL - VEEL SIMPELER!
+// CORE 0 TICK - SIMPEL ZOALS ESP32-C3!
 // ═══════════════════════════════════════════════════════════════════════════
 
 void keonIndependentTick() {
@@ -289,14 +284,11 @@ void keonIndependentTick() {
   extern uint8_t g_speedStep;
   
   static bool wasRunning = false;
-  static uint32_t lastLevelUpdate = 0;
   
-  // ═══════════════════════════════════════════════════════════════════════
-  // SECTIE 1: PAUSE HANDLING
-  // ═══════════════════════════════════════════════════════════════════════
+  // PAUSE
   if (paused) {
     if (wasRunning || keonActive) {
-      Serial.println("[KEON CORE0] Paused");
+      Serial.println("[KEON CORE0] ⏸️ Paused");
       keonStop();
       wasRunning = false;
       keonActive = false;
@@ -304,55 +296,34 @@ void keonIndependentTick() {
     return;
   }
   
-  // ═══════════════════════════════════════════════════════════════════════
-  // SECTIE 2: RESUME/START HANDLING
-  // ═══════════════════════════════════════════════════════════════════════
+  // START
   if (!wasRunning && !keonActive) {
-    Serial.println("[KEON CORE0] Starting oscillation");
+    Serial.println("[KEON CORE0] ▶️ Starting");
     keonActive = true;
     wasRunning = true;
     
-    // Start met huidige level
-    uint8_t position = KEON_LEVEL_POSITIONS[keonCurrentLevel];
-    keonMove(position, 99);
-    lastLevelUpdate = millis();
+    keonCurrentLevel = g_speedStep;
     
-    Serial.printf("[KEON CORE0] Started - Level %u, Pos %u\n", 
-                  keonCurrentLevel, position);
+    Serial.printf("[KEON CORE0] Level %u (pos %u)\n", 
+                  keonCurrentLevel, KEON_LEVEL_POSITIONS[keonCurrentLevel]);
+    
+    keonMove(KEON_LEVEL_POSITIONS[keonCurrentLevel], 99);
     return;
   }
   
-  // ═══════════════════════════════════════════════════════════════════════
-  // SECTIE 3: LEVEL UPDATE (alleen als g_speedStep veranderd is!)
-  // ═══════════════════════════════════════════════════════════════════════
+  // LEVEL CHANGE - Direct zoals ESP32-C3!
   if (keonActive && keonCurrentLevel != g_speedStep) {
-    uint32_t now = millis();
+    keonCurrentLevel = g_speedStep;
     
-    // Rate limiter: niet vaker dan elke seconde updaten
-    if ((now - lastLevelUpdate) >= 1000) {
-      keonCurrentLevel = g_speedStep;
-      uint8_t position = KEON_LEVEL_POSITIONS[keonCurrentLevel];
-      
-      bool sent = keonMove(position, 99);
-      
-      if (sent) {
-        lastLevelUpdate = now;
-        Serial.printf("[KEON CORE0] Level changed → L%u (pos %u, ~%u strokes/min)\n",
-                      keonCurrentLevel, 
-                      position,
-                      position == 0 ? 32 : (position == 99 ? 120 : 32 + (position * 88 / 99)));
-      }
-    }
+    Serial.printf("[KEON CORE0] → L%u (pos %u)\n",
+                  keonCurrentLevel, KEON_LEVEL_POSITIONS[keonCurrentLevel]);
+    
+    keonMove(KEON_LEVEL_POSITIONS[keonCurrentLevel], 99);
   }
-  
-  // ═══════════════════════════════════════════════════════════════════════
-  // KLAAR! Keon oscilleert nu automatisch op de ingestelde positie!
-  // Geen complex timing meer nodig, geen 0↔99 wisselen, gewoon SET & FORGET!
-  // ═══════════════════════════════════════════════════════════════════════
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// FREERTOS TASK - DEDICATED KEON CONTROL ON CORE 0
+// FREERTOS TASK
 // ═══════════════════════════════════════════════════════════════════════════
 
 void keonTask(void* parameter) {
@@ -361,15 +332,11 @@ void keonTask(void* parameter) {
   while(true) {
     keonCheckConnection();
     keonIndependentTick();
-    vTaskDelay(10 / portTICK_PERIOD_MS);  // 10ms delay
+    vTaskDelay(10 / portTICK_PERIOD_MS);
   }
 }
 
 static TaskHandle_t keonTaskHandle = NULL;
-
-// ═══════════════════════════════════════════════════════════════════════════
-// START/STOP KEON TASK ON CORE 0
-// ═══════════════════════════════════════════════════════════════════════════
 
 void keonStartTask() {
   if (keonTaskHandle != NULL) {
@@ -384,7 +351,7 @@ void keonStartTask() {
     NULL,
     1,
     &keonTaskHandle,
-    0  // Core 0!
+    0
   );
   
   Serial.println("[KEON TASK] Created on Core 0!");
