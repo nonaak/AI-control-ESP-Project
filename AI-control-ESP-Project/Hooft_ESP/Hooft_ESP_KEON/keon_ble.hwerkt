@@ -52,7 +52,6 @@ bool keonStopAtPosition(uint8_t position);
 // Level control (NEW - oscillation based!)
 void keonSetLevel(uint8_t level);  // 0-7
 uint8_t keonGetLevel();
-float keonGetStrokeFrequency(uint8_t level);  // Get Hz for animation sync
 
 // MAC address management
 String keonGetLastMAC();

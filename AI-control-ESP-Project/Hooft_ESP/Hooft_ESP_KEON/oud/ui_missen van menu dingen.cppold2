@@ -1015,8 +1015,10 @@ void uiTick() {
   float dt = (nowUs - lastUs) / 1e6f;
   lastUs = nowUs;
 
-  float step01 = (CFG.SPEED_STEPS<=1)?0.0f : (float)g_speedStep/(float)(CFG.SPEED_STEPS-1);
-  float instF = CFG.MIN_SPEED_HZ + step01 * (CFG.MAX_SPEED_HZ - CFG.MIN_SPEED_HZ);
+  //float step01 = (CFG.SPEED_STEPS<=1)?0.0f : (float)g_speedStep/(float)(CFG.SPEED_STEPS-1);
+  //float instF = CFG.MIN_SPEED_HZ + step01 * (CFG.MAX_SPEED_HZ - CFG.MIN_SPEED_HZ);
+  // NIEUW:
+  float instF = keonGetStrokeFrequency(g_speedStep);
 
   if (!paused && !parkToBottom) {
     phase += TAU * instF * dt * CFG.ANIM_SPEED_FACTOR;

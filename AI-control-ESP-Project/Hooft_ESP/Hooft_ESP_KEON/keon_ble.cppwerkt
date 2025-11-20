@@ -140,36 +140,6 @@ uint8_t keonGetLevel() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ANIMATION SYNC - GET OSCILLATION FREQUENCY
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * Get Keon oscillation frequency in Hz for a given level
- * Based on 30-second test results:
- * - Pos 0:  16 strokes/30sec = 32/min  = 0.533 Hz
- * - Pos 99: 60 strokes/30sec = 120/min = 2.0 Hz
- * 
- * Use this to sync animation timing with Keon hardware!
- */
-float keonGetStrokeFrequency(uint8_t level) {
-  if (level > 7) level = 7;
-  
-  // Measured frequencies from test (strokes/min → Hz)
-  const float frequencies[8] = {
-    0.533f,  // L0: pos 0   = ~32 strokes/min
-    0.750f,  // L1: pos 15  = ~45 strokes/min
-    1.000f,  // L2: pos 30  = ~60 strokes/min
-    1.250f,  // L3: pos 45  = ~75 strokes/min
-    1.417f,  // L4: pos 60  = ~85 strokes/min
-    1.583f,  // L5: pos 75  = ~95 strokes/min
-    1.833f,  // L6: pos 85  = ~110 strokes/min
-    2.000f   // L7: pos 99  = ~120 strokes/min
-  };
-  
-  return frequencies[level];
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // CONNECTION MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════════════
 
