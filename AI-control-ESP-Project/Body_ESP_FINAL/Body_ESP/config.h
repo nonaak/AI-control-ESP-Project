@@ -181,6 +181,41 @@
 #define AUTO_RECORD_SESSIONS      true       // Automatisch CSV bestanden opnemen voor sessies
 
 // ================================================================================
+// EMERGENCY PAUSE & WARM-UP CONFIGURATIE
+// ================================================================================
+// Als je tijdens een sessie pauzeerd (C knop kort), kan de AI je helpen met
+// een geleidelijke warm-up terug naar je vorige stress level.
+// Dit voorkomt dat je direct weer op hoog niveau start na een pauze.
+
+// Emergency pause visuele feedback
+#define EMERGENCY_PAUSE_ROOD_SCHERM   true    // Toon rood volledig scherm bij pauze
+                                              // true = rood scherm + "PAUZE" tekst
+                                              // false = normale pauze UI
+
+// Warm-up na emergency pause
+#define EMERGENCY_WARMUP_ENABLED      true    // Automatische warm-up aan/uit
+                                              // true = graduele opbouw na pauze
+                                              // false = direct terug naar vorige level
+
+#define WARMUP_DURATION_MS            10000   // Totale warm-up tijd in milliseconden
+                                              // 10000 = 10 seconden (aanbevolen)
+                                              // Voorbeeld: Level 0 → Level 5 in 10 sec
+                                              // = ~2 seconden per level
+                                              // 5000 = 5 sec (snel, agressief)
+                                              // 15000 = 15 sec (langzaam, voorzichtig)
+
+#define WARMUP_VIBE_ENABLED           false   // Vibe uit tijdens warm-up
+                                              // true = geen trillingen tijdens opwarmen
+                                              // false = vibe blijft actief
+
+#define WARMUP_SUCTION_ENABLED        true    // Zuigen AAN tijdens warm-up!
+                                              // true = geen vacuum tijdens opwarmen
+                                              // false = zuigen blijft actief
+
+#define WARMUP_START_LEVEL            0       // Altijd starten bij Level 0 (langzaam)
+                                              // Dit is veilig en voorkomt schrikken
+
+// ================================================================================
 // KALIBRATIE
 // ================================================================================
 // Kalibratie gebeurt via het menu systeem:

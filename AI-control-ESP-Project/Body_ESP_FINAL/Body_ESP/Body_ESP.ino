@@ -32,6 +32,7 @@
 #include <Wire.h>
 #include <Arduino_GFX_Library.h>
 #include <FT6X36.h>
+//#include <U8g2lib.h>
 #include <Adafruit_ADS1X15.h>  // ADS1115 sensor library
 #include <RTClib.h>             // RTC DS3231 library
 #include <SD_MMC.h>             // SD card voor CSV recording (SD_MMC mode)
@@ -256,6 +257,13 @@ bool isPlaying = false;
 bool menuActive = false;
 bool aiOverruleActive = false;
 
+// ===== Emergency Pause & Warm-up State =====
+static bool emergencyPauseActive = false;
+static bool emergencyPauseScreenDrawn = false;
+static uint8_t levelBeforePause = 0;
+static uint32_t warmupStartTime = 0;
+static bool warmupActive = false;
+
 // ===== CSV Recording =====
 File csvFile;
 String csvFilename = "";
@@ -441,7 +449,7 @@ static void onESPNowReceive(const esp_now_recv_info *info, const uint8_t *incomi
     esp_now_receive_message_t message;
     memcpy(&message, incomingData, sizeof(message));
     
-    // Update machine parameters
+// Update machine parameters
     trustSpeed = message.trust;
     sleeveSpeed = message.sleeve;
     suctionLevel = message.suction;
@@ -449,6 +457,26 @@ static void onESPNowReceive(const esp_now_recv_info *info, const uint8_t *incomi
     zuigActive = message.zuigActive;
     vacuumMbar = message.vacuumMbar;
     pauseActive = message.pauseActive;
+    
+    // DETECTEER PAUSE STATUS CHANGE
+    static bool wasPaused = false;
+    if (message.pauseActive && !wasPaused && aiOverruleActive) {
+      // Pauze net geactiveerd EN AI is actief → Emergency pause!
+      Serial.println("[PAUSE] ⚠️ Emergency pause detected!");
+
+      levelBeforePause = message.currentSpeedStep;
+      //extern AdvancedStressManager stressManager;
+      //StressDecision decision = stressManager.getStressDecision();
+      //levelBeforePause = decision.currentLevel;
+      
+      Serial.printf("[PAUSE] Was op Level %d\n", levelBeforePause);
+      
+      if (EMERGENCY_PAUSE_ROOD_SCHERM) {
+        emergencyPauseActive = true;
+      }
+      
+    }
+    wasPaused = message.pauseActive;
     
     // Lube sync systeem
     if (message.lubeTrigger && !lubeTrigger) {
@@ -496,9 +524,9 @@ static void onESPNowReceive(const esp_now_recv_info *info, const uint8_t *incomi
       // TODO: Stuurt COOLDOWN_OVERRIDE naar Hooft ESP
     }  
     else if (strcmp(message.command, "COOLDOWN_COMPLETE") == 0) {
-       Serial.println("[CMD] ✅ COOLDOWN_COMPLETE - hervat AI overrides");
+      Serial.println("[CMD] ✅ COOLDOWN_COMPLETE - hervat AI overrides");
   
-       // AI hervat normale overrides
+      // AI hervat normale overrides
       if (!aiOverruleActive) {
         aiOverruleActive = true;
         Serial.println("[AI] Overrides RESUMED - AI mag weer ingrijpen");
@@ -780,6 +808,34 @@ void touchCallback(TPoint point, TEvent e) {
     return;  // Andere events negeren
   }
   
+  // ═══════════════════════════════════════════════════════════
+  // EMERGENCY PAUSE RESUME - ALTIJD EERST CHECKEN!
+  // ═══════════════════════════════════════════════════════════
+  
+  if (emergencyPauseActive) {
+    Serial.println("[PAUSE] Touch detected - resuming session");
+    
+    // Start warm-up sequence (als enabled)
+    if (EMERGENCY_WARMUP_ENABLED) {
+      warmupActive = true;
+      warmupStartTime = millis();
+      Serial.printf("[WARMUP] Starting %dms warm-up to Level %d\n", 
+                    WARMUP_DURATION_MS, levelBeforePause);
+    }
+    
+    emergencyPauseActive = false;
+    emergencyPauseScreenDrawn = false;
+    
+    // Stuur RESUME naar Hooft ESP
+    sendESPNowMessage(0, 0, false, "RESUME_SESSION", 0, false, false);
+    
+    // Herstel normaal scherm
+    body_gfx4_clear();
+    body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
+    
+    return;  // Stop hier, verwerk geen andere touches
+  }
+
   // Raw coordinaten (touch is native 320x480 portrait)
   int16_t rawX = point.x;
   int16_t rawY = point.y;
@@ -1215,6 +1271,52 @@ void setup() {
 }
 
 void loop() {
+
+  // ═══════════════════════════════════════════════════════════
+  // EMERGENCY PAUSE SCREEN - Teken in main loop (niet in callback!)
+  // ═══════════════════════════════════════════════════════════
+
+  if (emergencyPauseActive && !emergencyPauseScreenDrawn) {
+    Serial.println("[PAUSE] Drawing red screen...");
+  
+    body_gfx->fillScreen(0xF800);  // Rood
+    body_gfx->setTextColor(0xFFFF);
+  
+    // "Nood Pauze" - grote letters, gecentreerd
+    body_gfx->setTextSize(4);
+    body_gfx->setCursor(65, 100);
+    body_gfx->println("Nood Pauze");
+  
+    // "Raak scherm aan" - kleinere letters
+    body_gfx->setTextSize(2);
+    body_gfx->setCursor(100, 180);
+    body_gfx->println("Raak scherm aan");
+  
+    emergencyPauseScreenDrawn = true;
+  }
+  /*
+  if (emergencyPauseActive && !emergencyPauseScreenDrawn) {
+    Serial.println("[PAUSE] Drawing red screen...");
+  
+    body_gfx->fillScreen(0xF800);  // Rood
+    body_gfx->setTextColor(0xFFFF);
+  
+    // U8g2 smooth fonts (veel mooier!)
+    body_gfx->setFont(u8g2_font_helvB24_tf);  // Helvetica Bold 24
+    body_gfx->setCursor(80, 130);
+    body_gfx->println("Nood Pauze");
+  
+    body_gfx->setFont(u8g2_font_helvR12_tf);  // Helvetica Regular 12
+    body_gfx->setCursor(130, 190);
+    body_gfx->println("Raak scherm aan");
+  
+    // Reset naar standaard font
+    body_gfx->setFont();
+  
+    emergencyPauseScreenDrawn = true;
+  }
+  */
+
   esp_task_wdt_reset();  // 🔥 Reset watchdog elke loop iteratie
 
   // 🧪 TEST: Uncomment om watchdog te testen (ESP reset na 10 sec)
@@ -1255,7 +1357,8 @@ void loop() {
   
   // ===== ECHTE SENSOR DATA (zie config.h voor interval) =====
   // ALLEEN in MAIN mode (NIET tijdens playback - playback gebruikt CSV data)
-  if (currentMode == MODE_MAIN && !isPlayback && millis() - lastSensorPush > SENSOR_INTERVAL_MS) {
+  //if (currentMode == MODE_MAIN && !isPlayback && millis() - lastSensorPush > SENSOR_INTERVAL_MS) {
+    if (currentMode == MODE_MAIN && !isPlayback && !emergencyPauseActive && millis() - lastSensorPush > SENSOR_INTERVAL_MS) {
     if (adsAvailable) {
       // Lees alle ADS1115 sensoren
       ads1115_readAll();
@@ -1267,35 +1370,70 @@ void loop() {
       body_gfx4_pushSample(G4_TEMP, sensorData.temperature);        // Temp: °C
       body_gfx4_pushSample(G4_ADEMHALING, sensorData.breathValue);  // Ademhaling: 0-100%
 
-            // ═══════════════════════════════════════════════════════════
-      // AI STRESS MANAGER UPDATE - Alleen als AI knop AAN
+      // ═══════════════════════════════════════════════════════════
+      // AI STRESS MANAGER UPDATE & WARM-UP
       // ═══════════════════════════════════════════════════════════
       
-      if (aiOverruleActive) {
-        // Update stress manager met biometric data
+      if (warmupActive) {
+        // WARM-UP NA EMERGENCY PAUSE
+        uint32_t elapsed = millis() - warmupStartTime;
+  
+        if (elapsed >= WARMUP_DURATION_MS) {
+          warmupActive = false;
+          Serial.println("[WARMUP] Complete! Returning to normal AI control");
+        } else {
+          float progress = elapsed / (float)WARMUP_DURATION_MS;
+          //uint8_t currentWarmupLevel = WARMUP_START_LEVEL + (uint8_t)(progress * (levelBeforePause - WARMUP_START_LEVEL));
+          uint8_t currentWarmupLevel = WARMUP_START_LEVEL + (uint8_t)(progress * (levelBeforePause - WARMUP_START_LEVEL) + 0.5f);
+  
+          // Level naar speed mapping
+          const float levelSpeeds[8] = {0.1, 0.4, 0.6, 0.8, 1.0, 1.3, 1.6, 2.0};
+          float trustSpeed = levelSpeeds[currentWarmupLevel];
+  
+          sendESPNowMessage(
+            trustSpeed,
+            trustSpeed,
+            true,
+            "AI_WARMUP",  // ← Verander naar AI_WARMUP!
+            currentWarmupLevel,
+            WARMUP_VIBE_ENABLED,
+            WARMUP_SUCTION_ENABLED
+          );
+  
+          // Debug output (elke seconde)
+          static uint32_t lastWarmupDebug = 0;
+          if (millis() - lastWarmupDebug > 1000) {
+            Serial.printf("[WARMUP] Progress: %.0f%% → Level %d/%d (via AI_WARMUP)\n", 
+                          progress * 100, currentWarmupLevel, levelBeforePause);
+            lastWarmupDebug = millis();
+          }
+        }
+      }
+      else if (aiOverruleActive) {
+        // NORMALE AI UPDATES
         extern AdvancedStressManager stressManager;
-        
+  
         BiometricData bio;
         bio.heartRate = sensorData.BPM;
         bio.temperature = sensorData.temperature;
         bio.gsrValue = sensorData.gsrSmooth;
         bio.timestamp = millis();
-        
+  
         stressManager.update(bio);
         
         // Haal AI beslissing op
         StressDecision decision = stressManager.getStressDecision();
         
-        // Stuur AI override naar Hooft ESP (elke 5 seconden)
+        // Stuur AI override (elke seconde)
         static uint32_t lastAIUpdate = 0;
         if (millis() - lastAIUpdate > 1000) {
-          float trustOverride = decision.recommendedSpeed / 7.0f;  // 0-1 range
-          float sleeveOverride = trustOverride;  // Same for now
+          float trustOverride = decision.recommendedSpeed / 7.0f;
+          float sleeveOverride = trustOverride;
           
           sendESPNowMessage(
             trustOverride,
             sleeveOverride,
-            true,  // overruleActive
+            true,
             "AI_OVERRIDE",
             decision.currentLevel,
             decision.vibeRecommended,

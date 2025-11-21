@@ -227,25 +227,13 @@ void handleBodyESPMessage(const bodyESP_message_t &msg) {
   
   // AI override functies
   if (strcmp(msg.command, "AI_OVERRIDE") == 0) {
-    // Normale AI - GEEN level forceren (subtiele aanpassingen only)
+    // AI override actief - pas trust/sleeve factors aan
     bodyESP_trustOverride = (msg.newTrust < 0.0f) ? 0.0f : (msg.newTrust > 1.0f) ? 1.0f : msg.newTrust;
     bodyESP_sleeveOverride = (msg.newSleeve < 0.0f) ? 0.0f : (msg.newSleeve > 1.0f) ? 1.0f : msg.newSleeve;
     aiOverruleActive = msg.overruleActive;
     
-    Serial.printf("[AI Override] Trust: %.2f, Sleeve: %.2f (factors only)\n", 
+    Serial.printf("[AI Override] Trust factor: %.2f, Sleeve factor: %.2f\n", 
                   bodyESP_trustOverride, bodyESP_sleeveOverride);
-  }
-  else if (strcmp(msg.command, "AI_WARMUP") == 0) {
-    // Warmup na emergency pause - MAG level forceren!
-    bodyESP_trustOverride = (msg.newTrust < 0.0f) ? 0.0f : (msg.newTrust > 1.0f) ? 1.0f : msg.newTrust;
-    bodyESP_sleeveOverride = (msg.newSleeve < 0.0f) ? 0.0f : (msg.newSleeve > 1.0f) ? 1.0f : msg.newSleeve;
-    aiOverruleActive = msg.overruleActive;
-    
-    extern uint8_t g_speedStep;
-    g_speedStep = msg.stressLevel;  // Forceer speed tijdens warmup
-    
-    Serial.printf("[AI Warmup] Speed: %d, Trust: %.2f, Sleeve: %.2f\n", 
-                  g_speedStep, bodyESP_trustOverride, bodyESP_sleeveOverride);
   }
   else if (strcmp(msg.command, "HEARTBEAT") == 0) {
     // Heartbeat update - connection status al bijgewerkt
@@ -408,13 +396,10 @@ void handleBodyESPMessage(const bodyESP_message_t &msg) {
     Serial.println("[AI EMERGENCY] Safe mode actief - gebruiker heeft volledige controle");
   }
   else if (strcmp(msg.command, "RESUME_SESSION") == 0) {
-      Serial.println("[PAUSE] Resume ontvangen van Body ESP - unpause!");
-    
-      extern void resetPauseState();
-      resetPauseState();  // Roep ui.cpp functie aan
-    
-      Serial.println("[PAUSE] Resume complete!");
-    }
+    Serial.println("[PAUSE] Resume ontvangen van Body ESP - unpause!");
+    extern bool paused;
+    paused = false;  // Unpause de sessie
+  }
   else {
     // Unknown command - log for debugging
     Serial.printf("[WARNING] Unknown command from Body ESP: '%s' (Trust:%.2f, Sleeve:%.2f, StressLevel:%d, Vibe:%d, Zuigen:%d)\n", 

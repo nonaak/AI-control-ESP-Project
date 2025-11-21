@@ -273,6 +273,45 @@ Level 7: MAXIMUM EDGE ZONE (AI blijft actief bij 85%+ ML Eigenwil!)
   - < 85% = AI mag NIET orgasme triggeren
   - ≥ 85% = AI mag orgasme triggeren (hoge vrijheid)
   - 100% = AI maximale experimentele vrijheid
+------------------------------------------------------------------------
+0% - AI UIT:
+
+❌ Geen AI
+✅ Alleen jij via nunchuk
+
+1-25% - "AI KIJKT MEE":
+
+✅ Subtiele aanpassingen BINNEN hetzelfde level
+✅ Trust/sleeve factors (max 25% aanpassing)
+❌ Geen level changes
+❌ Geen vibe/zuig forceren
+❌ Geen Level 7 toegang
+❌ Geen orgasme trigger
+
+26-49% - "AI ADVISEERT":
+
+✅ Iets sterkere aanpassingen (max 49%)
+✅ Vibe/zuig suggesties
+❌ Nog geen level forceren (jij bent meerderheid)
+❌ Geen Level 7 toegang
+❌ Geen orgasme trigger
+
+50-84% - "AI MEDE-BESLISSER":
+
+✅ AI heeft meerderheid
+✅ Mag levels veranderen (6→5 of 4→5)
+✅ Mag vibe/zuig aan/uit
+✅ Sterke invloed
+❌ Nog geen Level 7 toegang
+❌ Nog geen orgasme trigger
+
+85-100% - "AI VOLLEDIGE CONTROLE":
+
+✅ AI mag naar Level 7 brengen
+✅ AI mag orgasme triggeren
+✅ Maximale experimentele vrijheid
+✅ Alle bevoegdheden
+-------------------------------------------------------------------------------
 
 **Menu functies:**
 - ML Eigenwil instellen (0-100%)
