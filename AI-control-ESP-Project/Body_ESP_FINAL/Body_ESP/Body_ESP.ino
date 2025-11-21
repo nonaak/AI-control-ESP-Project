@@ -1178,6 +1178,12 @@ void setup() {
     Serial.println("[ESP-NOW] FAILED - continuing without ESP-NOW");
   }
   
+  // ===== Stress Manager Initialisatie =====
+  Serial.println("\n[AI] Initializing Stress Manager...");
+  extern AdvancedStressManager stressManager;
+  stressManager.begin();
+  Serial.println("[AI] Stress Manager ready!");
+
   // ===== Body GFX4 Initialisatie =====
   Serial.println("\n[BODY_GFX4] Initializing graphics system...");
   body_gfx4_begin();
@@ -1260,6 +1266,50 @@ void loop() {
       body_gfx4_pushSample(G4_HUID, sensorData.gsrSmooth / GSR_SCHAAL_FACTOR);  // GSR: zie config.h
       body_gfx4_pushSample(G4_TEMP, sensorData.temperature);        // Temp: °C
       body_gfx4_pushSample(G4_ADEMHALING, sensorData.breathValue);  // Ademhaling: 0-100%
+
+            // ═══════════════════════════════════════════════════════════
+      // AI STRESS MANAGER UPDATE - Alleen als AI knop AAN
+      // ═══════════════════════════════════════════════════════════
+      
+      if (aiOverruleActive) {
+        // Update stress manager met biometric data
+        extern AdvancedStressManager stressManager;
+        
+        BiometricData bio;
+        bio.heartRate = sensorData.BPM;
+        bio.temperature = sensorData.temperature;
+        bio.gsrValue = sensorData.gsrSmooth;
+        bio.timestamp = millis();
+        
+        stressManager.update(bio);
+        
+        // Haal AI beslissing op
+        StressDecision decision = stressManager.getStressDecision();
+        
+        // Stuur AI override naar Hooft ESP (elke 5 seconden)
+        static uint32_t lastAIUpdate = 0;
+        if (millis() - lastAIUpdate > 1000) {
+          float trustOverride = decision.recommendedSpeed / 7.0f;  // 0-1 range
+          float sleeveOverride = trustOverride;  // Same for now
+          
+          sendESPNowMessage(
+            trustOverride,
+            sleeveOverride,
+            true,  // overruleActive
+            "AI_OVERRIDE",
+            decision.currentLevel,
+            decision.vibeRecommended,
+            decision.suctionRecommended
+          );
+          
+          Serial.printf("[AI] Override sent: Speed=%d, Level=%d, Vibe=%d, Suction=%d\n",
+                        decision.recommendedSpeed, decision.currentLevel,
+                        decision.vibeRecommended, decision.suctionRecommended);
+          
+          lastAIUpdate = millis();
+        }
+      }
+
     } else {
       // Fallback: dummy data als ADS1115 niet beschikbaar
       float t = millis() / 1000.0f;
