@@ -1,0 +1,263 @@
+# 📋 GESPREK SAMENVATTING - 20 November 2025 (SESSIE 3)
+**Project:** AI-Control-ESP-Project - Hooft ESP (CYD 2.8")  
+**Status:** 96% compleet → Cooldown systeem + Visual feedback + Stroke control toegevoegd
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🎉 WAT ER VANDAAG IS GEDAAN (SESSIE 3)
+
+### **1. COOLDOWN SYSTEEM COMPLEET ✅**
+
+**Wat toegevoegd:**
+1. **Time-based cooldown:**
+   - 30 seconden default (10-300 sec configurabel)
+   - Cooldown start na C-button tijdens orgasm
+   - Auto resume na tijd compleet
+
+2. **Strokes-based cooldown:**
+   - 10 strokes default (10-200 strokes configurabel)
+   - Telt punches tijdens cooldown
+   - Auto resume na strokes bereikt
+
+3. **Both mode:**
+   - Whichever completes first wins
+   - Configurabel via `cooldownMode` (0/1/2)
+
+**Bug fixes:**
+- ✅ Extern `punchCount` declaratie cleanup (3x → 1x per scope)
+- ✅ Stroke counting werkt correct tijdens cooldown
+- ✅ Boolean logic voor mode selection gefixt
+- ✅ Debug logging toegevoegd voor troubleshooting
+
+**Config.h settings:**
+```cpp
+uint32_t cooldownDefaultSeconds = 30;  // 10-300 sec
+uint32_t cooldownDefaultStrokes = 10;  // 10-200 strokes
+uint8_t  cooldownMode = 1;             // 0=tijd, 1=strokes, 2=beide
+bool     orgasmAutoLevel0 = true;      // Auto level 0 na orgasm
+```
+
+**Testing:**
+- ✅ Time mode (30 sec) → werkt
+- ✅ Strokes mode (10 strokes) → werkt!
+- ✅ Both mode → werkt
+- ✅ Auto resume na cooldown → werkt
+
+---
+
+### **2. ORGASM VISUAL FEEDBACK ✅**
+
+**Wat toegevoegd:**
+- Rood-zwart knipperende achtergrond tijdens orgasm
+- 300ms interval voor dramatic effect
+- Alleen in animatie canvas (niet in menu)
+- Auto stop bij cooldown/normale sessie
+
+**Implementation:**
+```cpp
+// In ui.cpp:
+static uint16_t getOrgasmBackgroundColor() {
+  if (orgasmState != ORGASM_TRIGGERED && orgasmState != ORGASM_ACTIVE) {
+    return CFG.COL_BG;  // Normaal
+  }
+  
+  // Knipper rood-zwart (300ms)
+  static uint32_t lastFlashToggle = 0;
+  static bool flashRed = true;
+  
+  uint32_t now = millis();
+  if (now - lastFlashToggle > 300) {
+    flashRed = !flashRed;
+    lastFlashToggle = now;
+  }
+  
+  return flashRed ? 0xF800 : 0x0000;  // Rood : Zwart
+}
+
+// In animatie:
+uint16_t bgColor = getOrgasmBackgroundColor();
+cv->fillScreen(bgColor);
+```
+
+**Testing:**
+- ✅ Knippert tijdens ORGASM_TRIGGERED
+- ✅ Knippert tijdens ORGASM_ACTIVE
+- ✅ Stopt bij cooldown
+- ✅ Geen interferentie met menu
+
+---
+
+### **3. STROKE RANGE CONTROL ✅**
+
+**Wat toegevoegd:**
+- Configureerbare stroke depth in config.h
+- Top en bottom limits apart instelbaar
+- Motor safe ranges gedocumenteerd (0-95% aanbevolen)
+
+**Config.h settings:**
+```cpp
+// STROKE RANGE CONTROL
+float strokeTopLimit = 0.0f;      // 0-100% (0 = helemaal boven)
+float strokeBottomLimit = 95.0f;  // 0-100% (100 = helemaal onder)
+```
+
+**Voorbeelden:**
+```cpp
+// Huidige range (safe voor motor):
+strokeTopLimit = 0.0f;
+strokeBottomLimit = 95.0f;  // ✅ SAFE!
+
+// Volle strokes (voorzichtig!):
+strokeTopLimit = 0.0f;
+strokeBottomLimit = 98.0f;  // ⚠️ Motor limiet
+
+// TE VEEL (motor kreeg het zwaar):
+strokeBottomLimit = 100.0f;  // ❌ TE ZWAAR!
+
+// Halve strokes:
+strokeTopLimit = 25.0f;
+strokeBottomLimit = 75.0f;
+
+// Kleine strokes (onderkant):
+strokeTopLimit = 70.0f;
+strokeBottomLimit = 90.0f;
+```
+
+**Implementation:**
+```cpp
+// In ui.cpp (2 plekken: uiTick() + uiInit()):
+float topPercent = CFG.strokeTopLimit / 100.0f;
+float bottomPercent = CFG.strokeBottomLimit / 100.0f;
+CAP_Y_OUT = (int)round(CAP_Y_OUT_BASE + (CAP_Y_IN_BASE - CAP_Y_OUT_BASE) * topPercent);
+CAP_Y_IN  = (int)round(CAP_Y_OUT_BASE + (CAP_Y_IN_BASE - CAP_Y_OUT_BASE) * bottomPercent);
+DRAW_BASELINE_Y = (int)round(CAP_Y_OUT_BASE + (BL - CAP_Y_OUT_BASE) * bottomPercent);
+```
+
+**Testing:**
+- ✅ 0-95% range → werkt perfect
+- ✅ 0-98% range → werkt, motor OK
+- ❌ 0-100% range → motor te zwaar!
+- ✅ Verschillende ranges getest
+
+---
+
+## 🎯 HUIDIGE STATUS: 96% COMPLEET
+
+**Hooft ESP Features (COMPLEET):**
+✅ Keon BLE (8 levels, perfect sync)
+✅ ESP-NOW communicatie (800+ lines)
+✅ Vacuum control (Z single click)
+✅ Vibe control (Z double click)
+✅ Nunchuk speed control (Y-axis, 8 levels)
+✅ Nunchuk Y-hold 3 sec → Orgasm trigger
+✅ Nunchuk X-hold 2 sec → Funscript toggle
+✅ C-button pause/resume + orgasm complete
+✅ Orgasm state machine
+✅ Cooldown systeem (tijd + strokes modes) 🆕
+✅ Orgasm visual feedback (rood-zwart) 🆕
+✅ Stroke range control (top/bottom) 🆕
+
+**Project completion:** ~96%
+
+---
+
+## 📡 ESP-NOW MESSAGES (UPDATED)
+
+**Hooft ESP → Body ESP:**
+- `"ORGASM_TRIGGER"` - Y hold 3 sec detected
+- `"FUNSCRIPT_OFF"` - X hold 2 sec left
+- `"FUNSCRIPT_ON"` - X hold 2 sec right
+- `"ORGASM_COMPLETE"` - C button pressed after orgasm
+- `"COOLDOWN_COMPLETE"` - Cooldown finished (tijd OF strokes)
+- `"STATUS_UPDATE"` - Regular status (existing)
+
+**Body ESP → Hooft ESP (FUTURE):**
+- `"COOLDOWN_OVERRIDE"` - AI calculated cooldown time
+- AI can pause overrides during orgasm/cooldown
+- AI resumes after cooldown complete
+
+---
+
+## 🔧 CONFIG.H SETTINGS (UPDATED)
+
+```cpp
+// ORGASM & COOLDOWN SYSTEEM
+uint32_t cooldownDefaultSeconds = 30;   // 10-300 sec
+uint32_t cooldownDefaultStrokes = 10;   // 10-200 strokes
+uint8_t  cooldownMode = 1;              // 0=tijd, 1=strokes, 2=beide
+bool     orgasmAutoLevel0 = true;       // Auto level 0 na orgasm
+bool     allowAICooldownOverride = true; // Body ESP AI override
+
+// STROKE RANGE CONTROL
+float strokeTopLimit = 0.0f;      // 0-100% (0 = boven)
+float strokeBottomLimit = 95.0f;  // 0-100% (safe voor motor!)
+
+// Cooldown modes:
+// 0 = Time only (30 sec)
+// 1 = Strokes only (10 strokes)
+// 2 = Both (whichever completes first)
+```
+
+---
+
+## 📝 VOLGENDE STAPPEN
+
+**Testing (Week 1):**
+1. ✅ Orgasm trigger (Y 3 sec) → GETEST
+2. ✅ Funscript toggle (X 2 sec) → GETEST
+3. ✅ Cooldown time mode (30 sec) → GETEST
+4. ✅ Cooldown strokes mode (10 strokes) → GETEST
+5. ✅ Cooldown both mode → GETEST
+6. ✅ Orgasm visual feedback → GETEST
+7. ✅ Stroke range control → GETEST
+8. ☐ 4-module integration test
+9. ☐ Stability testing (2+ uur)
+
+**Integration (Week 1-2):**
+1. Body ESP command handling toevoegen
+2. AI cooldown override implementeren
+3. 4-module integration test
+4. Edge case testing (disconnects)
+
+**Polish (Week 2):**
+1. UI indicators (orgasm state, cooldown progress)
+2. Connection status displays
+3. Debug spam reduction
+4. Cooldown progress bar (optioneel)
+
+---
+
+## 💾 BELANGRIJKE FILES
+
+**Modified vandaag:**
+- `config.h` - Added cooldown + stroke range settings
+- `ui.cpp` - State machine, cooldown check, visual feedback, stroke control
+- `espnow_comm.cpp` - sendOrgasmTrigger(), sendFunscriptCommand()
+- `espnow_comm.h` - Function declarations
+
+**Saved outputs:**
+- `/mnt/user-data/outputs/ESP_PROJECT_TODO_ALLES_UPDATED_20NOV_FINAL.txt`
+- `/mnt/user-data/outputs/ui_cooldown_fix.cpp` (debug versie)
+- `/mnt/user-data/outputs/COOLDOWN_DEBUG_GUIDE.txt`
+
+---
+
+## 🚀 VOOR NIEUW GESPREK
+
+**Context om te geven:**
+"Ik werk aan Hooft ESP project. We hebben vandaag cooldown systeem (tijd + strokes modes), orgasm visual feedback (rood-zwart flash), en stroke range control (top/bottom limits) toegevoegd. Alles getest en werkend. Status: 96% compleet, klaar voor 4-module integration testing."
+
+**Belangrijke achievements vandaag:**
+- ✅ Cooldown system compleet (3 modes werkend)
+- ✅ Orgasm visual feedback (dramatic rood-zwart)
+- ✅ Stroke range control (motor safe 0-95%)
+- ✅ Alle bugs gefixt (extern declaraties, scope issues)
+- ✅ Comprehensive debug logging toegevoegd
+
+**Known issues:**
+- ⚠️ Stroke range >98% kan motor te zwaar belasten
+- ⚠️ Keon code NIET aanraken (2 weken werk!)
+
+═══════════════════════════════════════════════════════════════════════════════
+                              📋 EINDE SAMENVATTING 📋
+═══════════════════════════════════════════════════════════════════════════════

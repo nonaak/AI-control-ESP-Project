@@ -2381,8 +2381,7 @@ if (!paused && !parkToBottom) {
   }
 
   int capYnow = (int)round(capY_draw);
-  //const int DRAW_BASELINE_Y = (int)round(CAP_Y_MID + (BL - CAP_Y_MID) * RANGE_SCALE);
-  const int DRAW_BASELINE_Y = (int)round(CAP_Y_OUT_BASE + (BL - CAP_Y_OUT_BASE) * bottomPercent);  // ✅ GOED!
+  const int DRAW_BASELINE_Y = (int)round(CAP_Y_MID + (BL - CAP_Y_MID) * RANGE_SCALE);
   
   uint16_t rodCol = lerp_rgb565_u8(CFG.rodSlowR,CFG.rodSlowG,CFG.rodSlowB,
                                    CFG.rodFastR,CFG.rodFastG,CFG.rodFastB, step01);

@@ -2381,15 +2381,53 @@ if (!paused && !parkToBottom) {
   }
 
   int capYnow = (int)round(capY_draw);
-  //const int DRAW_BASELINE_Y = (int)round(CAP_Y_MID + (BL - CAP_Y_MID) * RANGE_SCALE);
-  const int DRAW_BASELINE_Y = (int)round(CAP_Y_OUT_BASE + (BL - CAP_Y_OUT_BASE) * bottomPercent);  // ✅ GOED!
+const int DRAW_BASELINE_Y = (int)round(CAP_Y_OUT_BASE + (BL - CAP_Y_OUT_BASE) * bottomPercent);
+
+uint16_t rodCol = lerp_rgb565_u8(CFG.rodSlowR,CFG.rodSlowG,CFG.rodSlowB,
+                                 CFG.rodFastR,CFG.rodFastG,CFG.rodFastB, step01);
+
+// ✅ ORGASM: Alleen tijdens orgasm hele scherm vullen
+if (orgasmState == ORGASM_TRIGGERED || orgasmState == ORGASM_ACTIVE) {
+  uint16_t bgColor = getOrgasmBackgroundColor();
+  gfx->fillRect(0, 0, R_WIN_X, 240, bgColor);
+  drawLeftFrame();  // Teken frame opnieuw
+}
   
+if (uiMode == MODE_ANIM) {
+  uint16_t bgColor = getOrgasmBackgroundColor();  // Kan normaal zwart zijn buiten orgasm
+  cv->fillScreen(bgColor);
+  drawSleeveFixedTop(capYnow, CFG.COL_TAN);
+  drawRodFromCap_Vinside_NoSeam(capYnow, DRAW_BASELINE_Y, rodCol, 0xE946);
+  
+  // Draw vibe and suction indicators
+  drawVibeLightning(true);
+  drawVibeLightning(false);
+  drawSuctionSymbol(true);
+  drawSuctionSymbol(false);
+  
+  cv->flush();
+  drawVacArrowHeader(goingUp);
+}
+
+/*
+  int capYnow = (int)round(capY_draw);
+  // ✅ FIX: DRAW_BASELINE_Y moet ook nieuwe stroke range gebruiken
+  const int DRAW_BASELINE_Y = (int)round(CAP_Y_OUT_BASE + (BL - CAP_Y_OUT_BASE) * bottomPercent);
+
   uint16_t rodCol = lerp_rgb565_u8(CFG.rodSlowR,CFG.rodSlowG,CFG.rodSlowB,
                                    CFG.rodFastR,CFG.rodFastG,CFG.rodFastB, step01);
+
+  // ✅ ORGASM: Vul HELE linker scherm (achter frame borders)
+  uint16_t bgColor = getOrgasmBackgroundColor();
+  //gfx->fillRect(0, 0, L_WIN_W, L_WIN_H, bgColor);
+  //gfx->fillRect(0, 0, L_CANVAS_W, SCREEN_H, bgColor);  
+  //gfx->fillRect(0, 0, R_WIN_X, SCREEN_H, bgColor); 
+  //gfx->fillRect(0, 0, R_WIN_X, gfx->height(), bgColor);
+  gfx->fillRect(0, 0, R_WIN_X, 240, bgColor);
+  drawLeftFrame();                          
   
   if (uiMode == MODE_ANIM) {
-    uint16_t bgColor = getOrgasmBackgroundColor();  // ✅ NIEUW
-    cv->fillScreen(bgColor);                        // ✅ NIEUW
+    cv->fillScreen(bgColor);
     drawSleeveFixedTop(capYnow, CFG.COL_TAN);
     drawRodFromCap_Vinside_NoSeam(capYnow, DRAW_BASELINE_Y, rodCol, 0xE946);
     
@@ -2401,7 +2439,7 @@ if (!paused && !parkToBottom) {
     
     cv->flush();
     drawVacArrowHeader(goingUp);
-  }
+  }*/
   // ========== KEON SYNC (FIXED!) ==========
   keonCheckConnection();
   

@@ -175,24 +175,6 @@ bool bodyConnected   = false;
 
 bool vibeState = false;
 
-// ═══════════════════════════════════════════════════════════
-// ORGASM & COOLDOWN STATE MACHINE
-// ═══════════════════════════════════════════════════════════
-
-enum OrgasmState {
-  ORGASM_NONE = 0,        // Normale sessie
-  ORGASM_TRIGGERED = 1,   // Y-hold 3 sec gedetecteerd → MAX speed
-  ORGASM_ACTIVE = 2,      // Wacht op C-button ("ik ben klaar!")
-  COOLDOWN_ACTIVE = 3     // Level 0, cooldown timer/counter loopt
-};
-
-static OrgasmState orgasmState = ORGASM_NONE;
-static uint32_t orgasmTriggerTime = 0;
-static uint32_t cooldownStartTime = 0;
-static uint32_t cooldownStartStrokes = 0;
-static uint32_t cooldownSeconds = 0;  // Wordt gevuld vanuit CFG of Body ESP
-static uint32_t cooldownStrokes = 0;
-
 float getSleevePercentage() {
   const int BL = L_CANVAS_H - 4;
   const int MIN_ROD_VIS_IN = max(2, (int)round(12*1.25f) - 4);
@@ -244,6 +226,19 @@ static void startKeonConnection() {
     Serial.println("[KEON] Connected successfully!");
   }
 }
+
+//static void startKeonConnection() {
+  //Serial.println("[CONNECTION] Starting Keon connection attempt...");
+  //connectionInProgress = true;
+  //connectionStartTime = millis();
+  
+  // Start actual BLE connection
+  //if (keonConnect()) {
+    //keonConnected = true;
+    //connectionInProgress = false;
+    //Serial.println("[KEON] Connected successfully!");
+  //}
+//}
 
 static bool checkKeonConnectionProgress() {
   if (!connectionInProgress) return false;
@@ -379,29 +374,6 @@ static void setMenuFontItem(){
 }
 
 // ================== Kleuren-menu items ==================
-
-// ═══════════════════════════════════════════════════════════
-// ORGASM BACKGROUND FLASH
-// ═══════════════════════════════════════════════════════════
-static uint16_t getOrgasmBackgroundColor() {
-  // Normale achtergrond als niet in orgasm mode
-  if (orgasmState != ORGASM_TRIGGERED && orgasmState != ORGASM_ACTIVE) {
-    return CFG.COL_BG;
-  }
-  
-  // Knipper tussen rood en zwart (300ms interval)
-  static uint32_t lastFlashToggle = 0;
-  static bool flashRed = true;
-  
-  uint32_t now = millis();
-  if (now - lastFlashToggle > 300) {
-    flashRed = !flashRed;
-    lastFlashToggle = now;
-  }
-  
-  return flashRed ? 0xF800 : 0x0000;  // Rood : Zwart
-}
-
 enum ColorItemType { C_RGB565, C_U8TRIPLE };
 struct ColorItem { const char *label; ColorItemType type; uint16_t *p565; uint8_t *pr,*pg,*pb; };
 
@@ -1556,16 +1528,10 @@ void uiInit() {
   const int SL_CAP_H = (int)round(32*1.25f);
   const int CAP_Y_IN_BASE  = (BL - MIN_ROD_VIS_IN) - SL_CAP_H;
   const int CAP_Y_MID      = (CAP_Y_IN_BASE + CAP_Y_OUT_BASE) / 2;
-  // ✅ NIEUWE STROKE RANGE CONTROL
-  float topPercent = CFG.strokeTopLimit / 100.0f;
-  float bottomPercent = CFG.strokeBottomLimit / 100.0f;
-  CAP_Y_OUT = (int)round(CAP_Y_OUT_BASE + (CAP_Y_IN_BASE - CAP_Y_OUT_BASE) * topPercent);
-  CAP_Y_IN  = (int)round(CAP_Y_OUT_BASE + (CAP_Y_IN_BASE - CAP_Y_OUT_BASE) * bottomPercent);
-  DRAW_BASELINE_Y = (int)round(CAP_Y_OUT_BASE + (BL - CAP_Y_OUT_BASE) * bottomPercent);
-  //const float RANGE_SCALE  = 0.90f;
-  //CAP_Y_IN  = (int)round(CAP_Y_MID + (CAP_Y_IN_BASE  - CAP_Y_MID) * RANGE_SCALE);
-  //CAP_Y_OUT = (int)round(CAP_Y_MID + (CAP_Y_OUT_BASE - CAP_Y_MID) * RANGE_SCALE);
-  //DRAW_BASELINE_Y = (int)round(CAP_Y_MID + (BL - CAP_Y_MID) * RANGE_SCALE);
+  const float RANGE_SCALE  = 0.90f;
+  CAP_Y_IN  = (int)round(CAP_Y_MID + (CAP_Y_IN_BASE  - CAP_Y_MID) * RANGE_SCALE);
+  CAP_Y_OUT = (int)round(CAP_Y_MID + (CAP_Y_OUT_BASE - CAP_Y_MID) * RANGE_SCALE);
+  DRAW_BASELINE_Y = (int)round(CAP_Y_MID + (BL - CAP_Y_MID) * RANGE_SCALE);
 
   capY_draw = (float)CAP_Y_IN;
   prevCapY  = INT_MIN;
@@ -1611,31 +1577,10 @@ void uiTick() {
     }
   }
 
-//CEvent cev = pollCEvent(cNow);
-
-  //CEvent cev = skipCEventThisFrame ? CE_NONE : pollCEvent(cNow);
-  //skipCEventThisFrame = false;  // Reset after use
+  //CEvent cev = pollCEvent(cNow);
 
   CEvent cev = skipCEventThisFrame ? CE_NONE : pollCEvent(cNow);
   skipCEventThisFrame = false;  // Reset after use
-
-  // ═══════════════════════════════════════════════════════════
-  // Z BUTTON VACUUM TOGGLE - DIRECT EN SIMPEL
-  // ═══════════════════════════════════════════════════════════
-  static bool prevZNow = false;
-  if (!zNow && prevZNow && uiMode == MODE_ANIM) {
-    // Z released in animatie mode → toggle vacuum
-    extern bool pompUnitZuigActive;
-    pompUnitZuigActive = !pompUnitZuigActive;
-    Serial.printf("[VACUUM] Toggle: %s\n", pompUnitZuigActive ? "ON" : "OFF");
-    
-    // Send update to Pump Unit
-    //extern void sendImmediateArrowUpdate();
-    extern void sendToggleZuigenCommand();
-    //sendImmediateArrowUpdate();
-    sendToggleZuigenCommand();
-  }
-  prevZNow = zNow;
 
   ZEvent zev = pollZEvent(zNow);
   ZClickType zClick = pollZClick(zNow);
@@ -1645,147 +1590,15 @@ void uiTick() {
                   (zClick == Z_SINGLE) ? "SINGLE" : (zClick == Z_VIBE) ? "VIBE" : "NONE");
   }
   
-  bool zEdge = (zev == ZE_SHORT);
-  
-  // ═══════════════════════════════════════════════════════════
-  // Z BUTTON HANDLING - Gebruik alleen zClick systeem
-  // ═══════════════════════════════════════════════════════════
-  
-  // VIBE toggle (dubbele klik)
   if (zClick == Z_VIBE) {
     vibeState = !vibeState;
-    Serial.printf("[Z-VIBE] Vibe toggle: %s\n", vibeState ? "ON" : "OFF");
+    Serial.printf("[Z-VIBE] Vibe toggle: %s -> sending bit 3 to M5StickC Plus\n", 
+                  vibeState ? "ON" : "OFF");
   }
+  
+  bool zEdge = (zev == ZE_SHORT);
 
-  // ═══════════════════════════════════════════════════════════
-  // Y-AXIS HOLD DETECTION (3 sec) - ORGASM TRIGGER
-  // ═══════════════════════════════════════════════════════════
-
-  static uint32_t yHoldStart = 0;
-  static bool yHoldTriggered = false;
-
-  if (jy > JY_HI && !paused && uiMode == MODE_ANIM && orgasmState == ORGASM_NONE) {  
-    // Y omhoog, niet gepauzeerd, alleen in normale sessie
-    if (yHoldStart == 0) {
-      yHoldStart = millis();
-      Serial.printf("[NUNCHUK] Y hold started! jy=%d > JY_HI=%d\n", jy, JY_HI);
-    }
-  
-    uint32_t holdTime = millis() - yHoldStart;
-  
-    // Debug elke seconde
-    static uint32_t lastHoldDebug = 0;
-    if (millis() - lastHoldDebug > 1000) {
-      Serial.printf("[Y-HOLD] Holding... %lu ms / 3000 ms\n", holdTime);
-      lastHoldDebug = millis();
-    }
-  
-    // Trigger na 3 seconden
-    if (holdTime >= 3000 && !yHoldTriggered) {
-      // ═══ ORGASM TRIGGER! ═══
-      orgasmState = ORGASM_TRIGGERED;
-      orgasmTriggerTime = millis();
-      g_speedStep = CFG.SPEED_STEPS - 1;  // MAX speed (7)
-      yHoldTriggered = true;
-    
-      // Stuur naar Body ESP
-      extern void sendOrgasmTrigger();
-      sendOrgasmTrigger();
-    
-      Serial.println("[ORGASM] ✅ TRIGGERED! Speed → MAX. Press C when done.");
-    
-     // State transitions happen automatically:
-    // TRIGGERED → ACTIVE (direct)
-      orgasmState = ORGASM_ACTIVE;
-    }
-  } else {
-    // Reset als Y niet meer omhoog
-   if (yHoldStart != 0) {
-    Serial.printf("[NUNCHUK] Y hold released after %lu ms\n", millis() - yHoldStart);
-    }
-    yHoldStart = 0;
-    yHoldTriggered = false;
-}
-
-  // ═══════════════════════════════════════════════════════════
-  // NUNCHUK JOYSTICK HOLD DETECTION
-  // ═══════════════════════════════════════════════════════════
-  // Y-axis hold detection (4 seconds) - ORGASM TRIGGER
-  //static uint32_t yHoldStart = 0;
-  //static bool yHoldTriggered = false;
-  
-  //if (jy > JY_HI && !paused && uiMode == MODE_ANIM) {  // ← GEBRUIK JY_HI!
-    //if (yHoldStart == 0) {
-      //yHoldStart = millis();
-      //Serial.printf("[NUNCHUK] Y hold started! jy=%d > JY_HI=%d\n", jy, JY_HI);
-    //}
-    
-    //uint32_t holdTime = millis() - yHoldStart;
-    
-    // Debug elke seconde
-    //static uint32_t lastHoldDebug = 0;
-    //if (millis() - lastHoldDebug > 1000) {
-      //Serial.printf("[Y-HOLD] Holding... %lu ms / 3000 ms\n", holdTime);
-      //lastHoldDebug = millis();
-    //}
-    
-    // Trigger na 3 seconden
-    //if (holdTime >= 3000 && !yHoldTriggered) {
-      //Serial.println("[ORGASM] ✅ Y held 3 sec - Triggering orgasm!");
-      //extern void sendOrgasmTrigger();
-      //sendOrgasmTrigger();
-      //yHoldTriggered = true;
-    //}
-  //} else {
-    // Reset als Y niet meer omhoog
-    //if (yHoldStart != 0) {
-      //Serial.printf("[NUNCHUK] Y hold released after %lu ms\n", millis() - yHoldStart);
-    //}
-    //yHoldStart = 0;
-    //yHoldTriggered = false;
-  //}
-  
-  // X-axis hold detection (2 seconds) - FUNSCRIPT TOGGLE
-  static uint32_t xHoldStart = 0;
-  static int8_t xHoldDir = 0;  // -1=links, +1=rechts, 0=center
-  static bool xHoldTriggered = false;
-  
-  if (jx < JX_LO && xHoldDir != -1 && uiMode == MODE_ANIM) {  // X links
-    xHoldStart = millis();
-    xHoldDir = -1;
-    xHoldTriggered = false;
-    Serial.println("[NUNCHUK] X hold LEFT started...");
-  } else if (jx > JX_HI && xHoldDir != 1 && uiMode == MODE_ANIM) {  // X rechts
-    xHoldStart = millis();
-    xHoldDir = 1;
-    xHoldTriggered = false;
-    Serial.println("[NUNCHUK] X hold RIGHT started...");
-  } else if (jx >= JX_LO && jx <= JX_HI) {  // X center
-    // Check of hold lang genoeg was
-    if (xHoldDir != 0 && !xHoldTriggered) {
-      uint32_t holdTime = millis() - xHoldStart;
-      
-      if (holdTime >= 2000) {
-        // Trigger funscript command
-        extern void sendFunscriptCommand(bool enabled);
-        
-        if (xHoldDir == -1) {
-          Serial.println("[FUNSCRIPT] ✅ X LEFT 2 sec - Funscript OFF");
-          sendFunscriptCommand(false);
-        } else {
-          Serial.println("[FUNSCRIPT] ✅ X RIGHT 2 sec - Funscript ON");
-          sendFunscriptCommand(true);
-        }
-        xHoldTriggered = true;
-      } else {
-        Serial.printf("[NUNCHUK] X hold released after %lu ms (too short)\n", holdTime);
-      }
-    }
-    xHoldDir = 0;
-    xHoldStart = 0;
-  }
-
-if (nunchukHelpPopupOpen) {
+  if (nunchukHelpPopupOpen) {
     if (cev == CE_SHORT) {
       nunchukHelpPopupOpen = false;
       drawRightMenu();
@@ -1794,85 +1607,6 @@ if (nunchukHelpPopupOpen) {
     return;
   }
   
-  // ← VERWIJDER DE LOSSE } HIER!
-  
-  if (paletteOpen && cev==CE_SHORT){  // ← MOET 'if' zijn!
-    cancelColorEdit_globalIndex(editingGlobalIdx);
-    paletteOpen=false; colorEdit=false; editingGlobalIdx=-1;
-    drawRightMenu();
-    
-  } else if (cev==CE_LONG){
-    uiMode = (uiMode==MODE_MENU)? MODE_ANIM : MODE_MENU;
-    menuEdit = false; colorEdit=false; paletteOpen=false;
-    drawRightMenu();
-    
-  } else if (cev==CE_SHORT && !paletteOpen){
-    
-    // ═══════════════════════════════════════════════════════════
-    // C-BUTTON: ORGASM COMPLETE OF PAUSE/UNPAUSE
-    // ═══════════════════════════════════════════════════════════
-    
-    if (orgasmState == ORGASM_ACTIVE) {
-      // ═══ ORGASM COMPLETE → START COOLDOWN ═══
-      Serial.println("[ORGASM] C pressed - User signaled orgasm complete!");
-      
-      orgasmState = COOLDOWN_ACTIVE;
-      cooldownStartTime = millis();
-      
-      // Haal punch count op (extern in animatie code)
-      extern uint32_t punchCount;
-      cooldownStartStrokes = punchCount;
-      
-      // Laad cooldown settings uit config
-      cooldownSeconds = CFG.cooldownDefaultSeconds;
-      cooldownStrokes = CFG.cooldownDefaultStrokes;
-      
-      // Auto naar level 0 als enabled
-      if (CFG.orgasmAutoLevel0) {
-        g_speedStep = 0;
-        Serial.println("[COOLDOWN] Auto level 0 enabled");
-      }
-      
-      // Stuur naar Body ESP
-      machineStatus_message_t cooldownMsg;
-      memset(&cooldownMsg, 0, sizeof(cooldownMsg));
-      strcpy(cooldownMsg.command, "ORGASM_COMPLETE");
-      extern void sendBodyESPStatusUpdate(const machineStatus_message_t &msg);
-      sendBodyESPStatusUpdate(cooldownMsg);
-      
-      Serial.printf("[COOLDOWN] Started: %u sec OR %u strokes (mode %u)\n", 
-                    cooldownSeconds, cooldownStrokes, CFG.cooldownMode);
-      
-    } else {
-      // ═══ NORMALE PAUSE/UNPAUSE ═══
-      if (!paused) {
-        parkToBottom = true;
-        paused = true;
-        
-        // STOP AUTO VACUUM BIJ PAUSE!
-        extern bool arrowFull;
-        arrowFull = false;
-        extern void sendImmediateArrowUpdate();
-        sendImmediateArrowUpdate();
-        Serial.println("[PAUSE] arrowFull=false sent to stop auto vacuum");
-        
-        Serial.println("[DEBUG] parkToBottom set to TRUE here! ui_cpp");
-        keonSyncEnabled = false;
-        
-      } else {
-        paused = false;
-        parkToBottom = false;
-        phase = -1.5707963f;
-        velEMA = 0.0f;
-        keonSyncEnabled = true;
-        
-        Serial.println("[UNPAUSE] velEMA reset for crispy auto vacuum response");
-        Serial.printf("[UNPAUSE DEBUG] paused=%d parkToBottom=%d phase=%.2f\n", paused, parkToBottom, phase);
-      }
-    }
-  }
-
-  /*
   if (paletteOpen && cev==CE_SHORT){
     cancelColorEdit_globalIndex(editingGlobalIdx);
     paletteOpen=false; colorEdit=false; editingGlobalIdx=-1;
@@ -1885,12 +1619,6 @@ if (nunchukHelpPopupOpen) {
     if (!paused) {
       parkToBottom = true;
       paused = true;
-      // STOP AUTO VACUUM BIJ PAUSE!
-      extern bool arrowFull;
-      arrowFull = false;
-      extern void sendImmediateArrowUpdate();
-      sendImmediateArrowUpdate();
-      Serial.println("[PAUSE] arrowFull=false sent to stop auto vacuum");
       Serial.println("[DEBUG] parkToBottom set to TRUE here! ui_cpp");
       keonSyncEnabled = false;
     }else { 
@@ -1903,7 +1631,7 @@ if (nunchukHelpPopupOpen) {
       Serial.println("[UNPAUSE] velEMA reset for crispy auto vacuum response");
       Serial.printf("[UNPAUSE DEBUG] paused=%d parkToBottom=%d phase=%.2f\n", paused, parkToBottom, phase);
     }
-  }*/
+  }
 
   // Check connection progress
   if (connectionPopupOpen && connectionInProgress) {
@@ -2285,14 +2013,9 @@ if (!paused && !parkToBottom) {
   const int SL_CAP_H = (int)round(32*1.25f);
   const int CAP_Y_IN_BASE  = (BL - MIN_ROD_VIS_IN) - SL_CAP_H;
   const int CAP_Y_MID      = (CAP_Y_IN_BASE + CAP_Y_OUT_BASE) / 2;
-  // ✅ NIEUWE STROKE RANGE CONTROL
-  float topPercent = CFG.strokeTopLimit / 100.0f;
-  float bottomPercent = CFG.strokeBottomLimit / 100.0f;
-  int CAP_Y_OUT = (int)round(CAP_Y_OUT_BASE + (CAP_Y_IN_BASE - CAP_Y_OUT_BASE) * topPercent);
-  int CAP_Y_IN  = (int)round(CAP_Y_OUT_BASE + (CAP_Y_IN_BASE - CAP_Y_OUT_BASE) * bottomPercent);
-  //const float RANGE_SCALE  = 0.90f;
-  //int CAP_Y_IN  = (int)round(CAP_Y_MID + (CAP_Y_IN_BASE  - CAP_Y_MID) * RANGE_SCALE);
-  //int CAP_Y_OUT = (int)round(CAP_Y_MID + (CAP_Y_OUT_BASE - CAP_Y_MID) * RANGE_SCALE);
+  const float RANGE_SCALE  = 0.90f;
+  int CAP_Y_IN  = (int)round(CAP_Y_MID + (CAP_Y_IN_BASE  - CAP_Y_MID) * RANGE_SCALE);
+  int CAP_Y_OUT = (int)round(CAP_Y_MID + (CAP_Y_OUT_BASE - CAP_Y_MID) * RANGE_SCALE);
   
   int capY_phase = (int)round((float)CAP_Y_IN + ease*(float)(CAP_Y_OUT - CAP_Y_IN));
   int capY = parkToBottom ? (int)round(capY_draw) : (!paused ? capY_phase : (int)round(capY_draw));
@@ -2367,7 +2090,7 @@ if (!paused && !parkToBottom) {
   //if (parkToBottom && capY_draw < (float)CAP_Y_IN && paused) {
   if (parkToBottom && capY_draw < (float)CAP_Y_IN) {  
     //capY_draw += 0.5f;
-    capY_draw += 1.0f;
+    capY_draw += 8.0f;
     if (capY_draw > (float)CAP_Y_IN) {
       capY_draw = (float)CAP_Y_IN;
       parkToBottom=false;
@@ -2381,15 +2104,13 @@ if (!paused && !parkToBottom) {
   }
 
   int capYnow = (int)round(capY_draw);
-  //const int DRAW_BASELINE_Y = (int)round(CAP_Y_MID + (BL - CAP_Y_MID) * RANGE_SCALE);
-  const int DRAW_BASELINE_Y = (int)round(CAP_Y_OUT_BASE + (BL - CAP_Y_OUT_BASE) * bottomPercent);  // ✅ GOED!
+  const int DRAW_BASELINE_Y = (int)round(CAP_Y_MID + (BL - CAP_Y_MID) * RANGE_SCALE);
   
   uint16_t rodCol = lerp_rgb565_u8(CFG.rodSlowR,CFG.rodSlowG,CFG.rodSlowB,
                                    CFG.rodFastR,CFG.rodFastG,CFG.rodFastB, step01);
   
   if (uiMode == MODE_ANIM) {
-    uint16_t bgColor = getOrgasmBackgroundColor();  // ✅ NIEUW
-    cv->fillScreen(bgColor);                        // ✅ NIEUW
+    cv->fillScreen(CFG.COL_BG);
     drawSleeveFixedTop(capYnow, CFG.COL_TAN);
     drawRodFromCap_Vinside_NoSeam(capYnow, DRAW_BASELINE_Y, rodCol, 0xE946);
     
@@ -2414,89 +2135,74 @@ if (!paused && !parkToBottom) {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // COOLDOWN CHECK - Check of cooldown compleet is
-  // ═══════════════════════════════════════════════════════════
-
-  if (orgasmState == COOLDOWN_ACTIVE) {
-    extern uint32_t punchCount;
-
-    bool timeComplete = false;
-    bool strokesComplete = false;
-    
-    // Check tijd
-    if (CFG.cooldownMode == 0 || CFG.cooldownMode == 2) {
-      timeComplete = (millis() - cooldownStartTime) >= (cooldownSeconds * 1000);
-    }
-
-    // Check strokes
-    if (CFG.cooldownMode == 1 || CFG.cooldownMode == 2) {
-      strokesComplete = (punchCount - cooldownStartStrokes) >= cooldownStrokes;
-  
-      // ✅ DEBUG ELKE SECONDE!
-      static uint32_t lastStrokeCheck = 0;
-      if (millis() - lastStrokeCheck > 1000) {
-        Serial.printf("[STROKE-DBG] NOW=%u START=%u DIFF=%u TARGET=%u DONE=%d\n",
-                      punchCount, cooldownStartStrokes, 
-                      (punchCount - cooldownStartStrokes), cooldownStrokes, strokesComplete);
-        lastStrokeCheck = millis();
-      }
-    }
-    
-    /*// Check strokes
-    if (CFG.cooldownMode == 1 || CFG.cooldownMode == 2) {
-      //extern uint32_t punchCount;
-      strokesComplete = (punchCount - cooldownStartStrokes) >= cooldownStrokes;
-    }*/
-    
-    // Bepaal of cooldown klaar is
-    bool cooldownDone = false;
-    if (CFG.cooldownMode == 0) {
-      cooldownDone = timeComplete;
-    } else if (CFG.cooldownMode == 1) {
-      cooldownDone = strokesComplete;
-    } else if (CFG.cooldownMode == 2) {
-      cooldownDone = (timeComplete || strokesComplete);  // Eerste wint
-    }
-    
-    // Cooldown compleet!
-    if (cooldownDone) {
-      orgasmState = ORGASM_NONE;
-
-      // ✅ ZET OP PAUZE!
-      paused = true;
-      parkToBottom = true;
-  
-      // Stop auto vacuum
-      extern bool arrowFull;
-      arrowFull = false;
-      extern void sendImmediateArrowUpdate();
-      sendImmediateArrowUpdate();
-      
-      // Stuur naar Body ESP
-      machineStatus_message_t resumeMsg;
-      memset(&resumeMsg, 0, sizeof(resumeMsg));
-      strcpy(resumeMsg.command, "COOLDOWN_COMPLETE");
-      extern void sendBodyESPStatusUpdate(const machineStatus_message_t &msg);
-      sendBodyESPStatusUpdate(resumeMsg);
-      
-      Serial.println("[COOLDOWN] ✅ Complete! → PAUSED");
-    }
-    
-    // Debug elke 5 seconden
-    static uint32_t lastCooldownDebug = 0;
-    if (millis() - lastCooldownDebug > 5000) {
-      //extern uint32_t punchCount;
-      uint32_t elapsedSec = (millis() - cooldownStartTime) / 1000;
-      uint32_t elapsedStrokes = punchCount - cooldownStartStrokes;
-      Serial.printf("[COOLDOWN] Progress: %u/%u sec, %u/%u strokes\n",
-                    elapsedSec, cooldownSeconds, elapsedStrokes, cooldownStrokes);
-      lastCooldownDebug = millis();
-    }
-  }
-
   delay(1);
 }
+    // ========== KEON SYNC (FIXED! v4) ==========
+  //keonCheckConnection();
+  
+  //f (keonConnected) {
+    //if (paused || parkToBottom) {
+      // Paused → Park to bottom (has internal rate limiting)
+      //keonMove(0, 0);
+    //} else {
+      // Running → Sync to animation
+      //float sleevePercent = getSleevePercentage();
+      //keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
+    //}
+  //}
 
+  //delay(1);
+//}
+   // ========== KEON SYNC (FIXED!) ==========
+  ///keonCheckConnection();
+  
+  //if (keonConnected) {
+    //if (paused || parkToBottom) {
+      // Paused → Park to bottom (has internal rate limiting)
+      //keonMove(0, 0);
+    //} else {
+      // Running → Sync to animation
+      //float sleevePercent = getSleevePercentage();
+      //keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
+    //}
+  //}
 
+  //delay(1);
+//}
+    // ========== KEON SYNC (FIXED! v2) ==========
+  //keonCheckConnection();
+  
+  //if (keonConnected) {
+    //if (paused || parkToBottom) {
+      //keonMove(0, 0);  // Park to bottom
+    //} else {
+      //float sleevePercent = getSleevePercentage();
+      //keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
+    //}
+  //}
 
+  //delay(1);
+//}
+    // ========== KEON SYNC (FIXED!) ==========
+  //keonCheckConnection();
+  
+  //if (keonConnected) {
+    //if (paused || parkToBottom) {
+      //static bool hasParked = false;
+      //if (!hasParked) {
+        //Serial.println("[KEON] Paused - parking");
+        //keonParkToBottom();
+        //hasParked = true;
+      //}
+    //} else {
+      //static bool hasParkedPrev = true;
+      //if (hasParkedPrev) {
+        //Serial.println("[KEON] Sync enabled");
+        //hasParkedPrev = false;
+      //}
+      //float sleevePercent = getSleevePercentage();
+      //keonSyncToAnimation(g_speedStep, CFG.SPEED_STEPS, sleevePercent);
+    //}
+  //}
+  //delay(1);
+//}
