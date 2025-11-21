@@ -461,6 +461,52 @@ static void onESPNowReceive(const esp_now_recv_info *info, const uint8_t *incomi
     hoofdESPSpeedStep = message.currentSpeedStep;
     
     lastCommTime = millis();
+
+    // ═══════════════════════════════════════════════════════════
+    // COMMAND HANDLING - Hooft ESP Commands
+    // ═══════════════════════════════════════════════════════════
+    
+    // Check command type
+    if (strcmp(message.command, "STATUS_UPDATE") == 0) {
+      // Normale status update - niks extra doen
+    }
+    else if (strcmp(message.command, "ORGASM_TRIGGER") == 0) {
+      Serial.println("[CMD] ✅ ORGASM_TRIGGER ontvangen!");
+  
+      // AI stopt met overrides (geen commands naar Hooft ESP)
+      // MAAR: sensors blijven lezen, CSV blijft loggen, ML blijft leren
+      if (aiOverruleActive) {
+        aiOverruleActive = false;
+        Serial.println("[AI] Overrides PAUSED - monitoring blijft actief");
+      }
+  
+      // TODO: Log event voor ML training
+    }
+    else if (strcmp(message.command, "FUNSCRIPT_ON") == 0) {
+      funscriptEnabled = true;
+      Serial.println("[CMD] ✅ Funscript ENABLED door Hooft ESP");
+    }
+    else if (strcmp(message.command, "FUNSCRIPT_OFF") == 0) {
+      funscriptEnabled = false;
+      Serial.println("[CMD] ✅ Funscript DISABLED door Hooft ESP");
+    }
+    else if (strcmp(message.command, "ORGASM_COMPLETE") == 0) {
+      Serial.println("[CMD] ✅ ORGASM_COMPLETE - User drukte C knop");
+      // TODO: AI berekent optimale cooldown tijd
+      // TODO: Stuurt COOLDOWN_OVERRIDE naar Hooft ESP
+    }  
+    else if (strcmp(message.command, "COOLDOWN_COMPLETE") == 0) {
+       Serial.println("[CMD] ✅ COOLDOWN_COMPLETE - hervat AI overrides");
+  
+       // AI hervat normale overrides
+      if (!aiOverruleActive) {
+        aiOverruleActive = true;
+        Serial.println("[AI] Overrides RESUMED - AI mag weer ingrijpen");
+      }
+    }
+    else {
+      Serial.printf("[CMD] ⚠️ Unknown command: %s\n", message.command);
+    }
     
     Serial.printf("[ESP-NOW] RX: T:%.1f S:%.1f Su:%.1f V:%d Z:%d Vac:%.1f P:%d Lube:%d Cyc:%.1fs Pos:%.0f%% Step:%d Cmd:%s\n", 
                   trustSpeed, sleeveSpeed, suctionLevel, vibeOn, zuigActive, vacuumMbar,
