@@ -31,10 +31,12 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <Arduino_GFX_Library.h>
-#include <FT6X36.h>
-//#include <U8g2lib.h>
-#include <Adafruit_ADS1X15.h>  // ADS1115 sensor library
+#include <FT6X36.h>             // Display Driver
+#include "Fonts/FreeSansBold18pt7b.h" // Rood scherm text
+#include "Fonts/FreeSans12pt7b.h"     // Rood scherm text
+#include <Adafruit_ADS1X15.h>   // ADS1115 sensor library
 #include <RTClib.h>             // RTC DS3231 library
+#include <Adafruit_seesaw.h>    // I2C Rotory Encoder
 #include <SD_MMC.h>             // SD card voor CSV recording (SD_MMC mode)
 #include <esp_now.h>            // ESP-NOW communicatie
 #include <WiFi.h>               // WiFi voor ESP-NOW
@@ -93,6 +95,7 @@ extern Arduino_GFX *body_gfx;
 #define TOUCH_INT -1  // Polling mode
 
 FT6X36 *ts = nullptr;
+//U8G2_FOR_ADAFRUIT_GFX u8g2_fonts;
 
 // ===== ADS1115 Sensor (Wire1 - GPIO 10/11) =====
 #define SENSOR_SDA 10
@@ -109,6 +112,12 @@ bool rtcAvailable = false;
 // A0=A1=A2=GND → adres 0x50
 bool eepromAvailable = false;
 #define EEPROM_ADDR 0x50
+
+// ===== Rotary Encoder (Wire1 - I2C address 0x36) =====
+Adafruit_seesaw encoder(&Wire1);
+#define ENCODER_ADDR 0x36
+bool encoderAvailable = false;
+int32_t encoderPosition = 0;
 
 // ===== ESP-NOW Communicatie =====
 // MAC adressen van het netwerk
@@ -1028,6 +1037,9 @@ void setup() {
   // ===== Display initialisatie =====
   gfx->begin();
   gfx->setRotation(1);  // Landscape
+
+  //u8g2_fonts.begin(*gfx);
+  //Serial.println("[U8G2] Font renderer initialized");
   
   // Backlight aan
   pinMode(GFX_BL, OUTPUT);
@@ -1213,6 +1225,27 @@ void setup() {
     Serial.println("[EEPROM] Test PASSED - EEPROM fully functional!");
   }
   
+  // Test 4: Rotary Encoder (0x36)
+  Serial.println("[I2C] Testing Rotary Encoder (0x36)...");
+  if (encoder.begin(ENCODER_ADDR)) {
+    Serial.println("[I2C] Rotary Encoder OK!");
+    encoderAvailable = true;
+  
+    // Configureer encoder
+    encoder.pinMode(24, INPUT_PULLUP);  // Encoder button
+    encoder.setGPIOInterrupts((uint32_t)1 << 24, 1);  // Enable button interrupt
+    encoder.enableEncoderInterrupt();
+  
+    // Reset positie naar 0
+    encoder.setEncoderPosition(0);
+    encoderPosition = 0;
+  
+    Serial.println("[ENCODER] Configured and ready!");
+  } else {
+    Serial.println("[I2C] Rotary Encoder NOT found");
+    encoderAvailable = false;
+  }
+
   // ===== SD Card Initialisatie (SD_MMC mode) =====
   Serial.println("\n[SD CARD] Initializing SD_MMC...");
   SD_MMC.setPins(39, 40, 38);  // CLK, CMD, D0
@@ -1276,25 +1309,29 @@ void loop() {
   // EMERGENCY PAUSE SCREEN - Teken in main loop (niet in callback!)
   // ═══════════════════════════════════════════════════════════
 
-  /*if (emergencyPauseActive && !emergencyPauseScreenDrawn) {
-    Serial.println("[PAUSE] Drawing red screen...");
-  
-    body_gfx->fillScreen(0xF800);  // Rood
-  
-    // "Nood Pauze" - grote letters
-    body_gfx->setTextSize(4);
+  if (emergencyPauseActive && !emergencyPauseScreenDrawn) {
+    Serial.println("[PAUSE] Drawing red screen with smooth fonts...");
+
+    body_gfx->fillScreen(0xF800);
     body_gfx->setTextColor(0xFFFF);
-    body_gfx->setCursor(90, 110);
-    body_gfx->println("Nood Pauze");
   
-    // "Raak scherm aan" - kleinere letters
-    body_gfx->setTextSize(2);
-    body_gfx->setCursor(120, 190);
-    body_gfx->println("Raak scherm aan");
+    // "Nood Pauze" - grote smooth font
+    body_gfx->setFont(&FreeSansBold18pt7b);
+    body_gfx->setCursor(140, 100);
+    body_gfx->print("Nood Pauze");
+  
+    // "Raak scherm aan" - kleinere smooth font
+    body_gfx->setFont(&FreeSans12pt7b);
+    body_gfx->setCursor(150, 150);
+    body_gfx->print("Raak scherm aan");
+  
+    // Reset naar default font
+    body_gfx->setFont();
   
     emergencyPauseScreenDrawn = true;
-  }*/
+  }
 
+  /*
   if (emergencyPauseActive && !emergencyPauseScreenDrawn) {
     Serial.println("[PAUSE] Drawing red screen...");
   
@@ -1310,27 +1347,6 @@ void loop() {
     body_gfx->setTextSize(2);
     body_gfx->setCursor(100, 180);
     body_gfx->println("Raak scherm aan");
-  
-    emergencyPauseScreenDrawn = true;
-  }
-  /*
-  if (emergencyPauseActive && !emergencyPauseScreenDrawn) {
-    Serial.println("[PAUSE] Drawing red screen...");
-  
-    body_gfx->fillScreen(0xF800);  // Rood
-    body_gfx->setTextColor(0xFFFF);
-  
-    // U8g2 smooth fonts (veel mooier!)
-    body_gfx->setFont(u8g2_font_helvB24_tf);  // Helvetica Bold 24
-    body_gfx->setCursor(80, 130);
-    body_gfx->println("Nood Pauze");
-  
-    body_gfx->setFont(u8g2_font_helvR12_tf);  // Helvetica Regular 12
-    body_gfx->setCursor(130, 190);
-    body_gfx->println("Raak scherm aan");
-  
-    // Reset naar standaard font
-    body_gfx->setFont();
   
     emergencyPauseScreenDrawn = true;
   }
@@ -1608,12 +1624,34 @@ void loop() {
     
     // Toon MultiFunPlayer status
     if (funscriptEnabled) {
-      Serial.printf("[MFP] Status: %s | Actions: %d | ML Overrides: %d (%.1f%%)\n",
+Serial.printf("[MFP] Status: %s | Actions: %d | ML Overrides: %d (%.1f%%)\n",
                     mfpClient.isConnected() ? "Connected" : "Disconnected",
                     mfpClient.getTotalActions(),
                     mfpClient.getMLOverrides(),
                     mfpClient.getMLOverridePercentage());
     }
+  }
+  
+  // ===== ENCODER TEST (elke 100ms) =====
+  static uint32_t lastEncoderRead = 0;
+  static bool lastButtonState = false;
+  if (encoderAvailable && millis() - lastEncoderRead > 100) {
+    int32_t newPosition = encoder.getEncoderPosition();
+    bool buttonPressed = !encoder.digitalRead(24);  // Button is active LOW
+    
+    // Position changed?
+    if (newPosition != encoderPosition) {
+      Serial.printf("[ENCODER] Position: %d (delta: %d)\n", newPosition, newPosition - encoderPosition);
+      encoderPosition = newPosition;
+    }
+    
+    // Button state changed?
+    if (buttonPressed != lastButtonState) {
+      Serial.printf("[ENCODER] Button: %s\n", buttonPressed ? "PRESSED" : "RELEASED");
+      lastButtonState = buttonPressed;
+    }
+    
+    lastEncoderRead = millis();
   }
   
   delay(10);  // Kleine delay voor stabiele polling
