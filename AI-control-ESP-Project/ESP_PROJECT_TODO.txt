@@ -3,7 +3,7 @@
 AI-Controlled ESP32 Edging System - Complete Overzicht
 ═══════════════════════════════════════════════════════════════════════════════
 
-**Datum:** 22 November 2025 - EMERGENCY PAUSE & AI EIGENWIL! 🎉
+**Datum:** 22 November 2025 - 🆕 AI BEVOEGDHEID UPDATE v1.1!
 **Project:** AI-Control-ESP-Project
 **Owner:** Aak
 
@@ -13,17 +13,110 @@ AI-Controlled ESP32 Edging System - Complete Overzicht
 
 ```
 Pomp Unit (ESP8266):       ████████████████████ 100% ✅ KLAAR!
-Body ESP (SC01 Plus):      ████████████████████  98% ✅ AI + PAUSE SYSTEEM! 🆕
-Hooft ESP (CYD 2.8"):      ████████████████████  99% ✅ EMERGENCY PAUSE WERKEND! 🆕
+Body ESP (SC01 Plus):      ████████████████████  96% ✅ AI + PAUSE + v1.1! 🆕
+Hooft ESP (CYD 2.8"):      ████████████████████  97% ✅ EMERGENCY PAUSE + v1.1 support! 🆕
 M5StickC Plus:             ████████████████████ 100% ✅ KLAAR (hardware twijfel)
 ```
 
-**Totaal Project:** ~99% compleet (Emergency pause + AI warmup nu actief!)
+**Totaal Project:** ~97% compleet (Emergency pause + AI warmup + AI Bevoegdheid v1.1!)
 
 ═══════════════════════════════════════════════════════════════════════════════
 ═══════════════════════════════════════════════════════════════════════════════
 
-# 🎉 VANDAAG GEFIXT (22 Nov 2025) - EMERGENCY PAUSE SYSTEEM!
+# 🎉 VANDAAG GEFIXT (22 Nov 2025) - AI BEVOEGDHEID SCHAAL v1.1! 🆕
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ✅ AI BEVOEGDHEID SCHAAL v1.1 - DEFINITIEVE VERSIE!
+
+**Status:** MAJOR UPDATE - 10 NIVEAUS + CONFIGUREERBAAR! 🚀🎊
+
+### ✅ 10-NIVEAU SCHAAL (100%):
+  ✅ 0% → AI uit (alleen observeren)
+  ✅ 10% → AI leert (geen controle)
+  ✅ 20% → Levels 0-2
+  ✅ 30% → Levels 0-3 + vibe/zuig
+  ✅ 40% → Levels 0-4 + tijdelijk L5 (configureerbaar!)
+  ✅ 50% → Levels 0-5 + tijdelijk L6 (configureerbaar!)
+  ✅ 60% → Levels 0-6 (volledige controle tot L6)
+  ✅ 70% → Levels 0-7 (max edges configureerbaar 1-10, default 3)
+  ✅ 80% → Levels 0-7 (max edges configureerbaar 1-15, default 5)
+  ✅ 90% → Levels 0-7+ (AI mag orgasme triggeren ≥85%)
+  ✅ 100% → Absolute controle (maximale vrijheid)
+
+**Belangrijke wijzigingen:**
+```
+Oude schaal: Vage ranges (1-15%, 16-30%, etc)
+Nieuwe schaal: Duidelijke 10% stappen (0, 10, 20, ..., 100)
+
+Oude: "Bepaalde aantal edge momenten" (vaag)
+Nieuwe: Configureerbaar in menu (70%=1-10, 80%=1-15)
+
+Oude: Geen tijdelijke dip concept
+Nieuwe: Bij 40%/50% AI mag tijdelijk naar L5/L6 (instelbare timer)
+```
+
+### ✅ CONFIGUREERBARE PARAMETERS (100%):
+  ✅ Level 5 Dip Timer (40% AI): 5-60 sec (default 30 sec)
+  ✅ Level 6 Dip Timer (50% AI): 5-90 sec (default 45 sec)
+  ✅ Edge Limiet bij 70% AI: 1-10 edges (default 3)
+  ✅ Edge Limiet bij 80% AI: 1-15 edges (default 5)
+  ✅ Edge Limiet bij 90%+: Onbeperkt (niet instelbaar)
+
+**Menu locatie:**
+```
+HOOFDMENU → AI SETTINGS → AI PARAMETERS [NIEUW!]
+  ├─ Tijdelijke Dip Timers
+  │   ├─ Level 5 Timer (40% AI)
+  │   └─ Level 6 Timer (50% AI)
+  └─ Edge Limieten
+      ├─ 70% AI Max Edges
+      └─ 80% AI Max Edges
+```
+
+### ✅ CODE STRUCT (gereed voor implementatie):
+```cpp
+struct AIConfig {
+    uint8_t mlEigenwil = 0;               // 0, 10, 20, ..., 100
+    uint16_t level5DipTimer = 30000;      // 30 sec default (40% AI)
+    uint16_t level6DipTimer = 45000;      // 45 sec default (50% AI)
+    uint8_t edgeLimit_70pct = 3;          // 1-10 range
+    uint8_t edgeLimit_80pct = 5;          // 1-15 range
+    uint8_t currentEdgeCount = 0;         // Runtime counter (reset per sessie)
+};
+
+// EEPROM save/load functies gedocumenteerd
+// AI logica code voorbeelden gedocumenteerd
+// Menu UI flow gedocumenteerd
+```
+
+### ✅ NUNCHUK OVERRIDE VERDUIDELIJKT (100%):
+  ✅ Y-as: ALTIJD prioriteit (alle AI %)
+  ✅ C knop context-aware:
+     - Level 0-6: Emergency pauze (rood scherm)
+     - Level 7 (na orgasme): Cooldown trigger
+  ✅ Z 1x: Zuig override (altijd)
+  ✅ Z 2x: Vibe override (altijd)
+  ✅ Y omhoog 3-4 sec: Orgasme trigger (ALTIJD, zelfs na PONR!)
+     - Belangrijk voor PONR edge case training!
+     - "Gewoon omdat je het wilt" - geen vage redenen
+
+### ✅ EMERGENCY PAUZE SCENARIOS VERDUIDELIJKT (100%):
+  ✅ Scenario 1: "Hij floept eruit" (realistisch!)
+  ✅ Scenario 2: VR bril verschuift
+  ✅ Scenario 3: Oncomfortabele positie
+  ✅ Scenario 4: Random irritatie
+  ✅ Alle scenarios: Rood scherm → Fix → Touch → Warmup → Resume
+
+**Documentatie:**
+- SYSTEEM_OVERZICHT_FINAL.txt updated met volledige 10-niveau schaal
+- Code voorbeelden voor dip timers en edge limieten
+- Menu UI ontwerp compleet
+- EEPROM save/load struct gedocumenteerd
+
+═══════════════════════════════════════════════════════════════════════════════
+
+# 🎉 OOK VANDAAG GEFIXT (22 Nov 2025) - EMERGENCY PAUSE SYSTEEM!
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -350,7 +443,19 @@ strokeBottomLimit = 75.0f;
 
 ═══════════════════════════════════════════════════════════════════════════════
 
-### BODY ESP (95% compleet - bijna klaar!)
+### BODY ESP (96% compleet - AI parameters menu!)
+
+☐ **🆕 AI Parameters Menu (v1.1):**
+  ☐ Tijdelijke Dip Timers submenu
+     ☐ Level 5 Timer slider (5-60 sec, default 30)
+     ☐ Level 6 Timer slider (5-90 sec, default 45)
+  ☐ Edge Limieten submenu
+     ☐ 70% AI Max Edges (1-10, default 3)
+     ☐ 80% AI Max Edges (1-15, default 5)
+  ☐ EEPROM save/load voor nieuwe config
+  ☐ UI implementatie (touchscreen sliders)
+  ☐ Edge counter implementatie (runtime reset per sessie)
+  ☐ Tijdelijke dip timer logica (40%/50% AI)
 
 ☐ **Optionele Features:**
   ☐ Rotary encoder toevoegen (hardware upgrade)
@@ -363,16 +468,26 @@ strokeBottomLimit = 75.0f;
   ✅ AI operationeel - COMPLEET!
   ✅ ESP-NOW communicatie - COMPLEET!
   ✅ Stress calculation - COMPLEET!
+  ✅ Emergency pause + rood scherm - COMPLEET!
+  ✅ AI bevoegdheid schaal v1.1 - GEDOCUMENTEERD!
+  ☐ AI parameters menu - TODO! (hoogste prioriteit)
 
 ═══════════════════════════════════════════════════════════════════════════════
 
 ### HOOFT ESP (97% compleet - polish fase)
+
+☐ **🆕 AI Bevoegdheid v1.1 Support:**
+  ☐ Edge counter ontvangen van Body ESP
+  ☐ Tijdelijke dip level enforcement (40%/50% AI)
+  ☐ Edge limiet check voor 70%/80% AI
+  ☐ Display edge count op scherm (optioneel)
 
 ☐ **UI Polish:**
   ☐ Cooldown progress indicator
   ☐ AI status display (stress level, override active)
   ☐ Connection status indicators (Body/Pump/M5)
   ☐ Vacuum telemetry display
+  ☐ Edge counter display (huidige/max)
 
 ☐ **Edge Cases:**
   ☐ Body ESP disconnect → fallback manual control
@@ -386,6 +501,8 @@ strokeBottomLimit = 75.0f;
   ✅ Orgasm/cooldown - COMPLEET!
   ✅ ESP-NOW - COMPLEET!
   ✅ AI integration - COMPLEET!
+  ✅ Emergency pause support - COMPLEET!
+  ☐ AI bevoegdheid v1.1 edge enforcement - TODO!
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -415,8 +532,12 @@ strokeBottomLimit = 75.0f;
      ✅ Vibe toggle (Z 2x) (GETEST!)
      ✅ Zuigen toggle (Z 1x) (GETEST!)
      ✅ Orgasm trigger (Y 3 sec) (GETEST!)
+     ✅ Emergency pause (C button) (GETEST!) 🆕
      ✅ Cooldown phase (10 strokes/30 sec) (GETEST!)
      ✅ Funscript toggle (X 2 sec) (GETEST!)
+     ☐ AI parameters configuratie (NIEUW v1.1)
+     ☐ Tijdelijke dip testing (40%/50% AI)
+     ☐ Edge limiet testing (70%/80% AI)
      ☐ Session complete met AI data
      ☐ Post-session rapport
   ```
@@ -432,6 +553,7 @@ strokeBottomLimit = 75.0f;
   ☐ Sensors disconnected → graceful degradation
   ☐ Multiple simultaneous commands
   ☐ Cooldown tijdens disconnect scenarios
+  ☐ Edge limiet bereikt → AI gedrag verificatie
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -439,17 +561,29 @@ strokeBottomLimit = 75.0f;
 
 ═══════════════════════════════════════════════════════════════════════════════
 
-**WEEK 1 (High Priority):**
+**WEEK 1 (High Priority - DEZE WEEK!):**
 1. ✅ Body ESP AI operationeel maken - COMPLEET! 🎉
-2. ☐ Pipboy arm setup ontwerpen + 3D printen
-3. ☐ Sensor calibratie workflow (GSR, HR, Temp)
-4. ☐ Full system test met echte biometric data
+2. ✅ Emergency pause + warmup systeem - COMPLEET! 🎉
+3. ✅ AI bevoegdheid schaal v1.1 definiëren - COMPLEET! 🎉
+4. ☐ **🆕 AI Parameters Menu implementeren (Body ESP):**
+   ☐ Dip timers UI (Level 5/6)
+   ☐ Edge limieten UI (70%/80%)
+   ☐ EEPROM save/load
+5. ☐ **🆕 Hooft ESP AI v1.1 support:**
+   ☐ Edge counter implementatie
+   ☐ Tijdelijke dip enforcement
+   ☐ Edge limiet check
+6. ☐ Pipboy arm setup ontwerpen + 3D printen
+7. ☐ Sensor calibratie workflow (GSR, HR, Temp)
 
 **WEEK 2 (Medium Priority):**
-5. ☐ UI polish (cooldown progress, AI status)
-6. ☐ Edge case testing (disconnects, timeouts)
-7. ☐ Stability test (2+ uur sessie)
-8. ☐ Documentation updates
+8. ☐ Full system test met AI parameters
+9. ☐ Tijdelijke dip testing (40%/50% AI levels)
+10. ☐ Edge limiet testing (70%/80% AI levels)
+11. ☐ UI polish (cooldown progress, AI status, edge counter)
+12. ☐ Edge case testing (disconnects, timeouts)
+13. ☐ Stability test (2+ uur sessie)
+14. ☐ Documentation updates
 
 **WEEK 3+ (Nice to Have):**
 9. ☐ AI cooldown berekening (advanced feature)
@@ -468,9 +602,12 @@ strokeBottomLimit = 75.0f;
 ✅ **Milestone 3:** ESP-NOW 4-module netwerk (COMPLEET - 18 Nov)
 ✅ **Milestone 4:** Nunchuk controls + hold detection (COMPLEET - 19 Nov)
 ✅ **Milestone 5:** Orgasm trigger + cooldown (COMPLEET - 20 Nov)
-✅ **Milestone 6:** Body ESP AI operationeel (COMPLEET - 21 Nov) 🎉🆕
-☐ **Milestone 7:** Full system test met echte sensors (VOLGENDE!)
-☐ **Milestone 8:** Production ready v1.0 (Target: eind November)
+✅ **Milestone 6:** Body ESP AI operationeel (COMPLEET - 21 Nov) 🎉
+✅ **Milestone 7:** Emergency pause + warmup (COMPLEET - 22 Nov) 🎉
+✅ **Milestone 8:** AI bevoegdheid schaal v1.1 (COMPLEET - 22 Nov) 🎉🆕
+☐ **Milestone 9:** AI Parameters Menu (TARGET: Deze week!)
+☐ **Milestone 10:** Full system test met echte sensors (VOLGENDE!)
+☐ **Milestone 11:** Production ready v1.0 (Target: eind November)
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -479,8 +616,8 @@ strokeBottomLimit = 75.0f;
 ═══════════════════════════════════════════════════════════════════════════════
 
 **Code Development:**
-- Hooft ESP: 97% ✅ (3% = UI polish + edge cases)
-- Body ESP: 95% ✅ (5% = optionele features)
+- Hooft ESP: 97% ✅ (3% = AI v1.1 support + UI polish)
+- Body ESP: 96% ✅ (4% = AI parameters menu)
 - Pomp Unit: 100% ✅
 - M5StickC: 100% ✅
 
@@ -489,17 +626,36 @@ strokeBottomLimit = 75.0f;
 - Bidirectionele commands: 100% ✅
 - AI decision tree: 100% ✅
 - Sensor processing: 100% ✅
+- Emergency pause systeem: 100% ✅ 🆕
+- AI bevoegdheid v1.1: 100% (gedocumenteerd) ✅ 🆕
+- AI parameters menu: 0% (TODO!)
 - Hardware testing: 60% (needs real sensors!)
 
-**Overall Project:** ~98% compleet! 🚀
+**Overall Project:** ~97% compleet! 🚀
 
-**Ready for:** Echte sensor testing + full system integration!
+**Ready for:** AI Parameters Menu implementatie + Full system testing!
 
 ═══════════════════════════════════════════════════════════════════════════════
 
 ## 💬 NOTES & DECISIONS
 
 ═══════════════════════════════════════════════════════════════════════════════
+
+**22 Nov 2025 - AI Bevoegdheid v1.1:**
+- Schaal uitgebreid van vage ranges naar 10 duidelijke niveaus (0%, 10%, ..., 100%)
+- Tijdelijke dip concept geïntroduceerd (40%=L5 tijdelijk, 50%=L6 tijdelijk)
+- Edge limieten configureerbaar gemaakt (70%=1-10, 80%=1-15, 90%+=onbeperkt)
+- AI Parameters submenu ontworpen (dip timers + edge limieten)
+- EEPROM/NVS storage struct gedocumenteerd (AIConfig)
+- Nunchuk override verduidelijkt (ALTIJD prioriteit, inclusief Y-trigger voor PONR training)
+- Emergency scenarios verduidelijkt ("hij floept eruit" = realistisch!)
+
+**22 Nov 2025 - Emergency Pause:**
+- Warmup duration: 10 seconden (configureerbaar)
+- Warmup start level: 0 (veilig)
+- Rood scherm werkt perfect (smooth fonts)
+- Touch resume → warmup → normale AI
+- AI blijft AAN tijdens pause (blijft leren!)
 
 **21 Nov 2025:**
 - AI update interval: 5000ms → 1000ms (5x sneller response!)
@@ -531,12 +687,20 @@ strokeBottomLimit = 75.0f;
 - AI update 1 sec interval (balans tussen responsiveness en stabiliteit)
 - Cooldown strokes mode preferred (meer consistent dan tijd)
 - Stroke range 0-95% (veilig voor motor, volle sensatie)
+- AI bevoegdheid 10-niveau schaal (duidelijker dan vage ranges) 🆕
+- Configureerbare parameters (finetuning per gebruiker) 🆕
+- Tijdelijke dips (experimenteel zonder permanent commitment) 🆕
+- Edge limieten instelbaar (safety + gradual trust building) 🆕
 
 ═══════════════════════════════════════════════════════════════════════════════
 ═══════════════════════════════════════════════════════════════════════════════
 
-**STATUS:** Body ESP AI nu OPERATIONEEL! 🎉 Klaar voor hardware testing!
+**STATUS:** AI Bevoegdheid v1.1 GEDOCUMENTEERD! Emergency Pause WERKEND! 🎉
 
-**NEXT:** Pipboy arm setup + sensor calibratie → Full system test!
+**NEXT:** AI Parameters Menu implementeren → Full system test!
+
+**VERSIE:** v1.1 (22 Nov 2025)
+**PROJECT COMPLETION:** ~97%
+**READY FOR:** AI Parameters Menu + Hardware Testing
 
 ═══════════════════════════════════════════════════════════════════════════════

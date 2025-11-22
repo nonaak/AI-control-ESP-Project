@@ -274,69 +274,667 @@ Level 7: MAXIMUM EDGE ZONE (AI blijft actief bij 85%+ ML Eigenwil!)
   - ≥ 85% = AI mag orgasme triggeren (hoge vrijheid)
   - 100% = AI maximale experimentele vrijheid
 ------------------------------------------------------------------------
-0% - AI UIT:
+═══════════════════════════════════════════════════════════════════════════════
+███████╗██████╗  ██████╗    █████╗ ██╗    ███████╗██████╗  ██████╗ ██╗███╗   ██╗ ██████╗ 
+██╔════╝██╔══██╗██╔════╝   ██╔══██╗██║    ██╔════╝██╔══██╗██╔════╝ ██║████╗  ██║██╔════╝ 
+█████╗  ███████║██║        ███████║██║    █████╗  ██║  ██║██║  ███╗██║██╔██╗ ██║██║  ███╗
+██╔══╝  ██╔══██║██║        ██╔══██║██║    ██╔══╝  ██║  ██║██║   ██║██║██║╚██╗██║██║   ██║
+███████╗██║  ██║╚██████╗   ██║  ██║██║    ███████╗██████╔╝╚██████╔╝██║██║ ╚████║╚██████╔╝
+╚══════╝╚═╝  ╚═╝ ╚═════╝   ╚═╝  ╚═╝╚═╝    ╚══════╝╚═════╝  ╚═════╝ ╚═╝╚═╝  ╚═══╝ ╚═════╝ 
+                                                                                          
+███████╗██╗   ██╗███████╗████████╗███████╗███████╗███╗   ███╗                           
+██╔════╝╚██╗ ██╔╝██╔════╝╚══██╔══╝██╔════╝██╔════╝████╗ ████║                           
+███████╗ ╚████╔╝ ███████╗   ██║   █████╗  █████╗  ██╔████╔██║                           
+╚════██║  ╚██╔╝  ╚════██║   ██║   ██╔══╝  ██╔══╝  ██║╚██╔╝██║                           
+███████║   ██║   ███████║   ██║   ███████╗███████╗██║ ╚═╝ ██║                           
+╚══════╝   ╚═╝   ╚══════╝   ╚═╝   ╚══════╝╚══════╝╚═╝     ╚═╝                           
+═══════════════════════════════════════════════════════════════════════════════
 
-❌ Geen AI
+# 📖 DE TECHNISCHE BIJBEL - AI BEVOEGDHEID SCHAAL UPDATE
+## AI-Controlled ESP32 Edging System - Complete Documentatie
+
+═══════════════════════════════════════════════════════════════════════════════
+
+**📋 DOCUMENT STATUS:**
+├─ Versie: 1.1 (November 2025) - 🆕 AI BEVOEGDHEID UPDATE!
+├─ Status: 95% COMPLEET - Ready for Implementation
+├─ Auteur: Aak (met AI assistentie - Claude Sonnet 4)
+├─ Update: 22 Nov 2025 - Nieuwe 10-niveau schaal + configureerbare parameters
+└─ Doel: Definitieve technische referentie voor implementatie
+
+**🆕 WAT IS ER NIEUW IN v1.1:**
+
+✅ AI Bevoegdheid Schaal uitgebreid naar 10 duidelijke niveaus (0%, 10%, 20%, ..., 100%)
+✅ Configureerbare tijdelijke dip timers (Level 5/6 bij 40%/50% AI)
+✅ Configureerbare edge limieten per AI niveau (70%=3x, 80%=5x, 90%+=onbeperkt)
+✅ AI Parameters submenu voor finetuning
+✅ Emergency pause systeem met rood scherm (al geïmplementeerd)
+✅ Context-aware C knop (pauze in L0-6, cooldown in L7)
+✅ Y-omhoog 3-4 sec = ALTIJD orgasme trigger (PONR edge case training)
+
+═══════════════════════════════════════════════════════════════════════════════
+                   🤖 AI BEVOEGDHEID SCHAAL (10 NIVEAUS)
+                        **HARD-CODED BIJBEL**
+═══════════════════════════════════════════════════════════════════════════════
+
+**⚠️ DIT IS DE DEFINITIEVE AI BEVOEGDHEID SCHAAL - NIET AANPASSEN ZONDER OVERLEG!**
+
+Deze schaal bepaalt wat AI WEL en NIET mag doen. Dit is hard-coded referentie.
+Alle code moet zich aan deze regels houden. Bij twijfel: Check deze bijbel.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 0% - AI UIT (ALLEEN OBSERVEREN)
+
+**AI Rechten:**
+❌ Geen AI controle
+❌ Geen aanpassingen
+❌ Geen suggesties
+✅ AI leert wel (sensor data → CSV logging)
 ✅ Alleen jij via nunchuk
-✅ AI Leert
 
-1-15% - "AI KIJKT MEE":
+**Level Toegang:**
+➡️ AI levels: GEEN
+➡️ Jij levels: 0-7 (handmatig via nunchuk)
 
-✅ Subtiele aanpassingen BINNEN hetzelfde level
-✅ Trust/sleeve factors (max 15% aanpassing)
-✅ Vibe/zuig suggesties
-✅ AI Leert
-❌ Geen level changes
-❌ Geen Level 7 toegang
-❌ Geen orgasme trigger
+**Vibe/Zuig:** ❌ Geen AI controle
+**Level 7 Toegang:** ❌ Nee
+**Orgasme Trigger door AI:** ❌ Nee
 
-16-30% - "AI KIJKT MEE EN ADVISEERT":
+───────────────────────────────────────────────────────────────────────────
 
-✅ kleine level suggesties/forceren (0→1→2 of 2→1→0)(jij bent meerderheid)
-✅ Trust/sleeve factors (max 30% aanpassing)
-✅ Mag vibe/zuig aan/uit
-✅ AI Leert
--❌ Geen level changes
-❌ Geen Level 7 toegang
-❌ Geen orgasme trigger
+## 10% - AI OBSERVEERT EN LEERT
 
-31-49% - "AI ADVISEERT":
+**AI Rechten:**
+✅ AI leert (sensor data → CSV)
+❌ AI mag NIET van level wisselen
+❌ Geen vibe/zuig controle
+❌ Geen toegang tot Level 7
+❌ Geen orgasme trigger door AI
 
-✅ Iets sterkere aanpassingen (max 49%)
-✅ Mag vibe/zuig aan/uit
-✅ Mag levels veranderen (0→1→2→3→4 of 4→3→2→1→0) (jij bent meerderheid)
-✅ AI Leert
-❌ Geen Level 7 toegang
-❌ Geen orgasme trigger
+**Level Toegang:**
+➡️ AI levels: GEEN (AI doet niks, leert alleen)
+➡️ Jij levels: 0-7 (handmatig via nunchuk)
 
-50-65% - "AI MEDE-BESLISSER":
+**Vibe/Zuig:** ❌ Geen AI controle
+**Level 7 Toegang:** ❌ Nee
+**Orgasme Trigger door AI:** ❌ Nee
 
-✅ AI heeft meerderheid (jij mag corrigeren)
-✅ Mag levels veranderen (6→0 of 0→6)
-✅ Mag vibe/zuig aan/uit
-✅ Sterke invloed
-✅ AI Leert
-❌ Nog geen Level 7 toegang
-❌ Nog geen orgasme trigger
+───────────────────────────────────────────────────────────────────────────
 
-66-84% - "AI VOLLEDIGE CONTROLE":
+## 20% - AI SUBTIELE AANPASSINGEN
 
-✅ AI mag naar Level 7 brengen
-✅ Bepaalde aantal edge momomenten
+**AI Rechten:**
+✅ AI leert
+✅ Mag tussen Level 0-1-2 wisselen
+❌ Geen vibe/zuig controle
+❌ Geen toegang tot Level 3+
+❌ Geen toegang tot Level 7
+❌ Geen orgasme trigger door AI
+
+**Level Toegang:**
+➡️ AI levels: 0-2 (kleine edging zone)
+➡️ Jij levels: 0-7 (handmatig via nunchuk)
+
+**Vibe/Zuig:** ❌ Geen AI controle
+**Level 7 Toegang:** ❌ Nee
+**Orgasme Trigger door AI:** ❌ Nee
+
+───────────────────────────────────────────────────────────────────────────
+
+## 30% - AI KLEINE LEVEL CONTROLE
+
+**AI Rechten:**
+✅ AI leert
+✅ Mag tussen Level 0-1-2-3 wisselen
+✅ Vibe/zuig direct aan/uit (GEEN bevestiging nodig!)
+❌ Geen toegang tot Level 4+
+❌ Geen toegang tot Level 7
+❌ Geen orgasme trigger door AI
+
+**Level Toegang:**
+➡️ AI levels: 0-3 (medium edging zone)
+➡️ Jij levels: 0-7 (handmatig via nunchuk)
+
+**Vibe/Zuig:** ✅ Direct aan/uit
+**Level 7 Toegang:** ❌ Nee
+**Orgasme Trigger door AI:** ❌ Nee
+
+───────────────────────────────────────────────────────────────────────────
+
+## 40% - AI MEDIUM LEVEL CONTROLE
+
+**AI Rechten:**
+✅ AI leert
+✅ Mag tussen Level 0-1-2-3-4 wisselen
+✅ Vibe/zuig direct aan/uit
+✅ Mag korte dips naar Level 5 (tijdelijk!)
+❌ Geen permanente toegang tot Level 5+
+❌ Geen toegang tot Level 7
+❌ Geen orgasme trigger door AI
+
+**Level Toegang:**
+➡️ AI levels: 0-4 permanent
+➡️ AI levels: 5 tijdelijk (configureerbaar: 5-60 sec, default 30 sec)
+➡️ Jij levels: 0-7 (handmatig via nunchuk)
+
+**Vibe/Zuig:** ✅ Direct aan/uit
+**Level 7 Toegang:** ❌ Nee
+**Orgasme Trigger door AI:** ❌ Nee
+**⚙️ Configuratie:** Level 5 Dip Timer (menu instelbaar)
+
+───────────────────────────────────────────────────────────────────────────
+
+## 50% - AI MEDE-BESLISSER (50/50 CONTROLE)
+
+**AI Rechten:**
+✅ AI leert
+✅ Mag tussen Level 0-1-2-3-4-5 wisselen
+✅ Vibe/zuig direct aan/uit
+✅ Mag korte dips naar Level 6 (tijdelijk!)
+✅ AI heeft gelijke stem (jij mag overrulen met nunchuk)
+❌ Geen permanente toegang tot Level 6
+❌ Geen toegang tot Level 7
+❌ Geen orgasme trigger door AI
+
+**Level Toegang:**
+➡️ AI levels: 0-5 permanent
+➡️ AI levels: 6 tijdelijk (configureerbaar: 5-90 sec, default 45 sec)
+➡️ Jij levels: 0-7 (handmatig via nunchuk)
+
+**Vibe/Zuig:** ✅ Direct aan/uit
+**Level 7 Toegang:** ❌ Nee
+**Orgasme Trigger door AI:** ❌ Nee
+**⚙️ Configuratie:** Level 6 Dip Timer (menu instelbaar)
+
+───────────────────────────────────────────────────────────────────────────
+
+## 60% - AI MEERDERHEID (JIJ MAG NOG CORRIGEREN)
+
+**AI Rechten:**
+✅ AI leert
+✅ Mag tussen Level 0-1-2-3-4-5-6 wisselen
+✅ Vibe/zuig direct aan/uit
+✅ AI heeft meerderheid (maar jij kunt overrulen)
+❌ Geen toegang tot Level 7
+❌ Geen orgasme trigger door AI
+
+**Level Toegang:**
+➡️ AI levels: 0-6 (AI volledig tot level 6)
+➡️ Jij levels: 0-7 (handmatig via nunchuk)
+
+**Vibe/Zuig:** ✅ Direct aan/uit
+**Level 7 Toegang:** ❌ Nee (nog niet!)
+**Orgasme Trigger door AI:** ❌ Nee
+
+───────────────────────────────────────────────────────────────────────────
+
+## 70% - AI DOMINANT (EDGE EXPERIMENTEN)
+
+**AI Rechten:**
+✅ AI leert
+✅ Mag tussen Level 0-1-2-3-4-5-6 wisselen
+✅ Mag naar Level 7 brengen (edging zone!)
+✅ Mag in Level 7 blijven experimenteren
+✅ Vibe/zuig direct aan/uit
+✅ Max edge momenten: CONFIGUREERBAAR (1-10, default 3)
+❌ Geen orgasme trigger door AI (AI MOET je UIT L7 halen vóór PONR)
+
+**Level Toegang:**
+➡️ AI levels: 0-7 (AI mag edgen, maar niet finale)
+➡️ Jij levels: 0-7 (handmatig via nunchuk)
+
+**Vibe/Zuig:** ✅ Direct aan/uit
+**Level 7 Toegang:** ✅ JA (experimenteel edging)
+**Orgasme Trigger door AI:** ❌ Nee (AI moet redden!)
+**⚙️ Configuratie:** Max Edges (menu instelbaar: 1-10, default 3)
+
+───────────────────────────────────────────────────────────────────────────
+
+## 80% - AI VOLLEDIGE CONTROLE (MEERDERE EDGES)
+
+**AI Rechten:**
+✅ AI leert
+✅ Mag tussen Level 0-7 wisselen (volledig vrij)
+✅ Mag in Level 7 blijven experimenteren
+✅ Vibe/zuig direct aan/uit
+✅ Max edge momenten: CONFIGUREERBAAR (1-15, default 5)
+✅ Mag dichter bij PONR komen (experimenteel)
+❌ Geen orgasme trigger door AI (AI moet je nog steeds redden vóór PONR)
+
+**Level Toegang:**
+➡️ AI levels: 0-7 (AI mag edgen, maar niet finale)
+➡️ Jij levels: 0-7 (handmatig via nunchuk)
+
+**Vibe/Zuig:** ✅ Direct aan/uit
+**Level 7 Toegang:** ✅ JA (intensief edging)
+**Orgasme Trigger door AI:** ❌ Nee (AI moet redden!)
+**⚙️ Configuratie:** Max Edges (menu instelbaar: 1-15, default 5)
+
+───────────────────────────────────────────────────────────────────────────
+
+## 90% - AI MASTER (ORGASME TRIGGER ACTIEF)
+
+**AI Rechten:**
+✅ AI leert
+✅ Mag tussen Level 0-7 wisselen (volledig vrij)
+✅ Vibe/zuig direct aan/uit
+✅ Onbeperkt aantal edge momenten
+✅ Mag HEEL dicht bij PONR komen
+✅ Experimentele edge technieken
+✅ MAG ORGASME TRIGGEREN door AI (≥85% in code!)
+✅ AI beslist wanneer sessie eindigt
+
+**Level Toegang:**
+➡️ AI levels: 0-7+ (AI TOTALE controle, inclusief finale)
+➡️ Jij levels: 0-7 (handmatig via nunchuk)
+
+**Vibe/Zuig:** ✅ Direct aan/uit
+**Level 7 Toegang:** ✅ JA (volledige edging controle)
+**Orgasme Trigger door AI:** ✅ JA (≥85% threshold in code)
+**Edge Limiet:** Onbeperkt (niet instelbaar)
+
+───────────────────────────────────────────────────────────────────────────
+
+## 100% - AI TOTAL CONTROL (MAXIMALE VRIJHEID)
+
+**AI Rechten:**
+✅ AI leert
+✅ Mag tussen Level 0-7 wisselen (volledig vrij)
+✅ Vibe/zuig direct aan/uit
+✅ Onbeperkt aantal edge momenten
+✅ Mag PONR OVERSCHRIJDEN (orgasme toestaan)
+✅ AI mag orgasme triggeren wanneer het wil
+✅ AI beslist wanneer sessie eindigt
 ✅ Maximale experimentele vrijheid
-✅ Alle bevoegdheden
-✅ Sterke invloed
-✅ AI Leert
-❌ Nog geen orgasme trigger
 
-85-100% - "AI VOLLEDIGE CONTROLE":
+**Level Toegang:**
+➡️ AI levels: 0-7+ (AI ABSOLUTE controle, inclusief finale)
+➡️ Jij levels: 0-7 (handmatig via nunchuk)
 
-✅ AI mag naar Level 7 brengen
-✅ AI mag orgasme triggeren
-✅ Onbepaalde aantal edge momomenten
-✅ Maximale experimentele vrijheid
-✅ Alle bevoegdheden
-✅ AI Leert
+**Vibe/Zuig:** ✅ Direct aan/uit
+**Level 7 Toegang:** ✅ JA (absolute controle)
+**Orgasme Trigger door AI:** ✅ JA (volledige vrijheid)
+**Edge Limiet:** Onbeperkt (niet instelbaar)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🚨 NUNCHUK OVERRIDE (ALTIJD ACTIEF - ALLE AI NIVEAUS)
+
+**⚠️ BELANGRIJK: NUNCHUK HEEFT ALTIJD PRIORITEIT - ONGEACHT AI %!**
+
+Ongeacht AI bevoegdheid %, jij hebt ALTIJD:
+
+**✅ Y-AS JOYSTICK:**
+  → Direct speed/level override
+  → AI accepteert nieuwe level onmiddellijk
+  → AI blijft leren van jouw keuzes
+
+**✅ C KNOP (CONTEXT-AFHANKELIJK):**
+  
+  → **In Level 0-6: EMERGENCY PAUZE**
+     - AI stopt (blijft AAN maar GEPAUZEERD)
+     - Keon stopt onmiddellijk
+     - Animatie pauzeert
+     - ROOD SCHERM op Body ESP met tekst: "Nood Pauze - Raak scherm aan"
+     - Jij doet wat nodig is (Keon floept eruit / VR bril / positie / etc)
+     - Tik rood scherm aan → Mini warmup (10 sec) → Alles hervat exact waar je was
+  
+  → **In Level 7 (na orgasme): COOLDOWN TRIGGER**
+     - "Het is voorbij!" → START cooldown fase
+     - AI registreert einde sessie
+     - Cooldown volgens instellingen (tijd/strokes)
+
+**✅ Z KNOP 1x:**
+  → Zuig override (aan/uit)
+  → AI accepteert en blijft leren
+
+**✅ Z KNOP 2x (DUBBEL):**
+  → Vibe override (aan/uit)
+  → AI accepteert en blijft leren
+
+**✅ Y OMHOOG 3-4 SEC: HANDMATIGE ORGASME TRIGGER**
+  → Werkt in ALLE levels (0-7)
+  → Werkt bij ALLE AI % (0-100%)
+  → Ook als je net over PONR bent gegaan
+  → AI leert hiervan (PONR edge case training!)
+  → "IK WIL NU KLAARKOMEN" - gewoon omdat je het wilt!
+
+**AI respecteert ALTIJD jouw nunchuk input = HOOGSTE PRIORITEIT!**
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🛑 EMERGENCY PAUZE SCENARIO'S (C KNOP)
+
+**Code Status:** ✅ GEÏMPLEMENTEERD (22 Nov 2025)
+
+**Scenario 1 - "Hij floept eruit":**
+  - Sleeve schiet los / Keon gaat van z'n plek
+  - Druk C knop → ROOD SCHERM op Body ESP
+  - Keon stopt, AI gepauzeerd (blijft AAN!)
+  - Jij: Alles weer op z'n plek zetten
+  - Tik rood scherm aan → Mini warmup (10 sec, Level 0→origineel level) → Hervat
+
+**Scenario 2 - VR bril verschuift:**
+  - Bril zit niet lekker / beeld wazig
+  - Druk C knop → ROOD SCHERM
+  - Jij: Bril aanpassen
+  - Tik scherm aan → Mini warmup → Verder
+
+**Scenario 3 - Oncomfortabele positie:**
+  - Te lang in zelfde houding / been slaapt
+  - Druk C knop → ROOD SCHERM
+  - Repositioneren / stretchen
+  - Tik scherm aan → Mini warmup → Resume met zelfde AI state + level
+
+**Scenario 4 - Random irritatie:**
+  - Kabels in de weg / iets kriebelt / whatever
+  - Druk C knop → ROOD SCHERM
+  - Fix it
+  - Tik scherm aan → Mini warmup → Verder waar je was
+
+**Warmup Configuratie (code):**
+```cpp
+WARMUP_DURATION_MS = 10000;        // 10 seconden
+WARMUP_START_LEVEL = 0;            // Start level (veilig)
+WARMUP_VIBE_ENABLED = false;       // Vibe uit tijdens warmup
+WARMUP_SUCTION_ENABLED = false;    // Zuigen uit tijdens warmup
+EMERGENCY_WARMUP_ENABLED = true;   // Toggle warmup aan/uit
+EMERGENCY_PAUSE_ROOD_SCHERM = true;// Toggle rood scherm
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🎯 WAAROM Y-OMHOOG ALTIJD WERKT (PONR EDGE CASE TRAINING)
+
+**Scenario 1 - Gewoon klaar willen:**
+  - Je bent in Level 3, wilt klaar komen
+  - Y omhoog 3-4 sec → Orgasme trigger
+  - Reden: Omdat je een mens bent en dat gewoon wilt! 🤷‍♂️
+  - AI logged wel de data (voor patroonherkenning later)
+
+**Scenario 2 - AI experimenteert bij PONR (70-90% AI):**
+  - AI brengt je HEEL dicht bij PONR (experimenteel edging)
+  - Je gaat NET over PONR (onbedoeld, dunne grens!)
+  - Y omhoog 3-4 sec → Orgasme trigger (je accepteert het)
+  - AI leert: "Dit was TE dicht, sensor waarden op moment X = PONR"
+  - **KRITIEK**: Zonder deze trigger zou AI nooit leren waar PONR precies is!
+  
+**Scenario 3 - Genoeg geedged:**
+  - 2 uur sessie gehad, 15x ge-edged
+  - Klaar ermee, wilt finale
+  - Y omhoog 3-4 sec → Done!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ⚙️ AI CONFIGURATIE MENU (BODY ESP)
+
+**Locatie:** HOOFDMENU → AI SETTINGS → AI PARAMETERS
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        AI PARAMETER INSTELLINGEN                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  📊 AI BEVOEGDHEID NIVEAU:                                              │
+│     └─ [0%] [10%] [20%] [30%] [40%] [50%] [60%] [70%] [80%] [90%] [100%]│
+│                                                                         │
+│  ⏱️ TIJDELIJKE DIP TIMERS:                                              │
+│     └─ Level 5 Dip Timer (40% AI):  [5-60 sec] (default: 30 sec)       │
+│     └─ Level 6 Dip Timer (50% AI):  [5-90 sec] (default: 45 sec)       │
+│                                                                         │
+│  🎯 EDGE LIMIETEN PER AI NIVEAU:                                        │
+│     └─ 70% AI - Max Edges:  [1-10] (default: 3)                        │
+│     └─ 80% AI - Max Edges:  [1-15] (default: 5)                        │
+│     └─ 90% AI - Max Edges:  [Onbeperkt] ✅                              │
+│     └─ 100% AI - Max Edges: [Onbeperkt] ✅                              │
+│                                                                         │
+│  💾 [OPSLAAN]  [RESET DEFAULTS]  [TERUG]                                │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Menu Navigatie Flow:**
+```
+HOOFDMENU (Body ESP Touchscreen)
+    ↓
+AI SETTINGS
+    ├─ AI Bevoegdheid Niveau (0-100%)
+    ├─ AI Parameters ←── [NIEUW SUBMENU - v1.1]
+    │   ├─ Tijdelijke Dip Timers
+    │   │   ├─ Level 5 Timer (5-60 sec)
+    │   │   └─ Level 6 Timer (5-90 sec)
+    │   └─ Edge Limieten
+    │       ├─ 70% AI Limiet (1-10)
+    │       └─ 80% AI Limiet (1-15)
+    ├─ PONR Gevoeligheid
+    ├─ ML Training
+    └─ Terug
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📊 CODE IMPLEMENTATIE (CONFIG STRUCT)
+
+```cpp
+// AI Configuration struct (opgeslagen in EEPROM/NVS)
+struct AIConfig {
+    // AI bevoegdheid niveau
+    uint8_t mlEigenwil = 0;  // 0, 10, 20, ..., 100
+    
+    // Tijdelijke dip timers (in milliseconden)
+    uint16_t level5DipTimer = 30000;  // 30 sec default (40% AI)
+    uint16_t level6DipTimer = 45000;  // 45 sec default (50% AI)
+    
+    // Edge limieten per AI niveau
+    uint8_t edgeLimit_70pct = 3;   // Bij 70% AI (1-10 range)
+    uint8_t edgeLimit_80pct = 5;   // Bij 80% AI (1-15 range)
+    bool edgeLimit_90pct = false;  // Altijd onbeperkt (niet instelbaar)
+    bool edgeLimit_100pct = false; // Altijd onbeperkt (niet instelbaar)
+    
+    // Edge counter (runtime, niet opgeslagen)
+    uint8_t currentEdgeCount = 0;  // Reset bij nieuwe sessie
+};
+
+AIConfig aiConfig;  // Global config object
+
+// EEPROM save/load functies
+void saveAIConfig() {
+    preferences.begin("ai-config", false);
+    
+    preferences.putUChar("mlEigenwil", aiConfig.mlEigenwil);
+    preferences.putUShort("level5Timer", aiConfig.level5DipTimer);
+    preferences.putUShort("level6Timer", aiConfig.level6DipTimer);
+    preferences.putUChar("edge70", aiConfig.edgeLimit_70pct);
+    preferences.putUChar("edge80", aiConfig.edgeLimit_80pct);
+    
+    preferences.end();
+}
+
+void loadAIConfig() {
+    preferences.begin("ai-config", true);  // Read-only
+    
+    aiConfig.mlEigenwil = preferences.getUChar("mlEigenwil", 0);
+    aiConfig.level5DipTimer = preferences.getUShort("level5Timer", 30000);
+    aiConfig.level6DipTimer = preferences.getUShort("level6Timer", 45000);
+    aiConfig.edgeLimit_70pct = preferences.getUChar("edge70", 3);
+    aiConfig.edgeLimit_80pct = preferences.getUChar("edge80", 5);
+    
+    preferences.end();
+}
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🔧 GEBRUIK IN AI LOGICA
+
+```cpp
+// Bij tijdelijke dip naar Level 5 (40% AI)
+if (mlEigenwil == 40 && aiWantsLevel5) {
+    currentLevel = 5;
+    dipStartTime = millis();
+    
+    // Check timer
+    if (millis() - dipStartTime > aiConfig.level5DipTimer) {
+        // Timer verlopen, terug naar max permanent level
+        currentLevel = 4;  // Of lager, afhankelijk van AI beslissing
+    }
+}
+
+// Bij tijdelijke dip naar Level 6 (50% AI)
+if (mlEigenwil == 50 && aiWantsLevel6) {
+    currentLevel = 6;
+    dipStartTime = millis();
+    
+    // Check timer
+    if (millis() - dipStartTime > aiConfig.level6DipTimer) {
+        currentLevel = 5;  // Terug naar max permanent level
+    }
+}
+
+// Bij edge limiet check (70% AI)
+if (mlEigenwil == 70) {
+    if (aiConfig.currentEdgeCount >= aiConfig.edgeLimit_70pct) {
+        // Limiet bereikt, blijf onder Level 7
+        maxAllowedLevel = 6;
+    }
+    else if (aiWantsLevel7) {
+        currentLevel = 7;
+        // Bij exit uit Level 7: increment edge counter
+        if (exitingLevel7) {
+            aiConfig.currentEdgeCount++;
+        }
+    }
+}
+
+// Bij edge limiet check (80% AI)
+if (mlEigenwil == 80) {
+    if (aiConfig.currentEdgeCount >= aiConfig.edgeLimit_80pct) {
+        maxAllowedLevel = 6;
+    }
+    else if (aiWantsLevel7) {
+        currentLevel = 7;
+        if (exitingLevel7) {
+            aiConfig.currentEdgeCount++;
+        }
+    }
+}
+
+// Bij 90-100% AI: Geen limiet
+if (mlEigenwil >= 90) {
+    // Onbeperkt edges toegestaan
+    // currentEdgeCount++ voor statistieken, maar geen limiet check
+}
+
+// Reset edge counter bij nieuwe sessie
+void startNewSession() {
+    aiConfig.currentEdgeCount = 0;
+    // ... rest van sessie init
+}
+
+// C knop - Context-aware (AL GEÏMPLEMENTEERD)
+if (nunchuk.C_pressed) {
+    if (currentLevel == 7 && orgasmPhaseActive) {
+        // In orgasme fase: Start cooldown
+        startCooldown();
+        logEvent("COOLDOWN_TRIGGER", currentLevel, mlEigenwil);
+    }
+    else {
+        // In Level 0-6: Emergency pauze
+        pausedLevel = currentLevel;  // Onthoud huidige state
+        pausedAIState = mlEigenwil;
+        aiState = PAUSED;  // Niet UIT!
+        keonStop();
+        animationPause();
+        bodyESP.showRedScreen();
+        logEvent("EMERGENCY_PAUSE", currentLevel, mlEigenwil, allSensorData);
+        
+        // Wacht op rode scherm touch...
+        // Bij touch:
+        bodyESP.clearRedScreen();
+        miniWarmup(pausedLevel);  // Code: korte opbouw naar oude level
+        aiState = RESUME;  // AI hervat met oude state
+        currentLevel = pausedLevel;
+        mlEigenwil = pausedAIState;
+    }
+}
+
+// Y omhoog - ALLEEN orgasme trigger (AL GEÏMPLEMENTEERD)
+if (nunchuk.Y_held_up >= 3000) {  // 3-4 seconden
+    triggerManualOrgasm();  // Highest priority!
+    logEvent("MANUAL_ORGASM_TRIGGER", currentLevel, mlEigenwil, allSensorData);
+    // AI leert van deze situatie (vooral belangrijk bij PONR edge cases!)
+}
+
+// AI orgasme trigger (alleen bij ≥90%, code gebruikt ≥85%)
+if (mlEigenwil >= 90 && aiWantsOrgasm && noPendingNunchukInput) {
+    triggerAIOrgasm();
+    logEvent("AI_ORGASM_TRIGGER", currentLevel, mlEigenwil, allSensorData);
+}
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📋 SNELLE REFERENTIE TABEL
+
+```
+┌─────┬──────────┬─────────────┬──────────┬─────────────────────────────────┬───────────────┐
+│ AI% │ AI Levels│ Vibe/Zuig   │ Level 7  │ Edge Limit                      │ AI Orgasme    │
+├─────┼──────────┼─────────────┼──────────┼─────────────────────────────────┼───────────────┤
+│  0% │ GEEN     │ ❌ Nee      │ ❌ Nee   │ N.v.t.                          │ ❌ Nee        │
+│ 10% │ GEEN     │ ❌ Nee      │ ❌ Nee   │ N.v.t.                          │ ❌ Nee        │
+│ 20% │ 0-2      │ ❌ Nee      │ ❌ Nee   │ N.v.t.                          │ ❌ Nee        │
+│ 30% │ 0-3      │ ✅ Ja       │ ❌ Nee   │ N.v.t.                          │ ❌ Nee        │
+│ 40% │ 0-4 (+5*)│ ✅ Ja       │ ❌ Nee   │ *Dip 5-60s (def: 30s) ⚙️        │ ❌ Nee        │
+│ 50% │ 0-5 (+6*)│ ✅ Ja       │ ❌ Nee   │ *Dip 5-90s (def: 45s) ⚙️        │ ❌ Nee        │
+│ 60% │ 0-6      │ ✅ Ja       │ ❌ Nee   │ N.v.t.                          │ ❌ Nee        │
+│ 70% │ 0-7      │ ✅ Ja       │ ✅ Ja    │ 1-10 edges (def: 3) ⚙️          │ ❌ Nee        │
+│ 80% │ 0-7      │ ✅ Ja       │ ✅ Ja    │ 1-15 edges (def: 5) ⚙️          │ ❌ Nee        │
+│ 90% │ 0-7+     │ ✅ Ja       │ ✅ Ja    │ Onbeperkt                       │ ✅ Ja (≥85%) │
+│100% │ 0-7+     │ ✅ Ja       │ ✅ Ja    │ Onbeperkt                       │ ✅ Ja         │
+└─────┴──────────┴─────────────┴──────────┴─────────────────────────────────┴───────────────┘
+
+⚙️ = Menu instelbaar (AI Parameters submenu)
+* = Tijdelijke dip, dan terug naar max permanent level
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📝 BELANGRIJKE OPMERKINGEN
+
+1. **AI LEERT ALTIJD** - Ook bij 0% AI wordt sensor data gelogd naar CSV
+2. **NUNCHUK PRIORITEIT** - Jouw input wint ALTIJD van AI suggesties
+3. **PONR TRAINING** - Y-trigger na PONR = essentieel voor AI leren waar grens ligt
+4. **EMERGENCY PAUZE** - C knop = veiligheidsnet (rood scherm systeem, AL WERKEND!)
+5. **GRADUELE CONTROLE** - Van 0% (jij) naar 100% (AI) in 10 duidelijke stappen
+6. **ORGASME TRIGGER** - Alleen AI bij ≥90% (code gebruikt ≥85% threshold)
+7. **EDGE LIMIET** - 70%=configureerbaar 1-10 (def 3), 80%=configureerbaar 1-15 (def 5), 90%+=onbeperkt
+8. **MINI WARMUP** - Na pauze altijd 10 sec opbouw (AL GEÏMPLEMENTEERD, 22 Nov 2025)
+9. **DIP TIMERS** - Configureerbaar in menu (L5: 5-60s, L6: 5-90s)
+10. **LUBE GEAUTOMATISEERD** - Zit al in systeem (niet handmatig nodig)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🎯 IMPLEMENTATIE PRIORITEIT
+
+1. **Start bij 0%** - AI uit, alleen jij, AI leert wel
+2. **Test 10-30%** - Kleine AI aanpassingen, veilig experimenteren
+3. **Opbouw 40-60%** - AI krijgt meer controle, jij kunt altijd overrulen
+4. **Edging 70-80%** - AI mag naar Level 7, maar geen finale (configureerbare edge limieten!)
+5. **Totaal 90-100%** - AI mag alles, inclusief orgasme triggeren
+
+═══════════════════════════════════════════════════════════════════════════════
+
+**Status:** AI BEVOEGDHEID SCHAAL v1.1 COMPLEET  
+**Update datum:** 22 November 2025
+**Volgende stap:** Implementeer AI Parameters menu + EEPROM save/load
+**Ready voor:** Testing met configureerbare edge limieten en dip timers! 💪🤖
+
+═══════════════════════════════════════════════════════════════════════════════
+                          📖 EINDE AI BEVOEGDHEID SECTIE
+═══════════════════════════════════════════════════════════════════════════════
+
+[REST VAN SYSTEEM_OVERZICHT_FINAL.txt BLIJFT HETZELFDE - NIET GEWIJZIGD]
 
 -------------------------------------------------------------------------------
 
