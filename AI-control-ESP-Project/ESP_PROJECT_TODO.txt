@@ -3,7 +3,7 @@
 AI-Controlled ESP32 Edging System - Complete Overzicht
 ═══════════════════════════════════════════════════════════════════════════════
 
-**Datum:** 21 November 2025 - BODY ESP AI UPDATE! 🎉
+**Datum:** 22 November 2025 - EMERGENCY PAUSE & AI EIGENWIL! 🎉
 **Project:** AI-Control-ESP-Project
 **Owner:** Aak
 
@@ -13,14 +13,118 @@ AI-Controlled ESP32 Edging System - Complete Overzicht
 
 ```
 Pomp Unit (ESP8266):       ████████████████████ 100% ✅ KLAAR!
-Body ESP (SC01 Plus):      ███████████████████░  95% ✅ AI OPERATIONEEL! 🆕
-Hooft ESP (CYD 2.8"):      ███████████████████▓  97% ✅ BIJNA COMPLEET!
+Body ESP (SC01 Plus):      ████████████████████  98% ✅ AI + PAUSE SYSTEEM! 🆕
+Hooft ESP (CYD 2.8"):      ████████████████████  99% ✅ EMERGENCY PAUSE WERKEND! 🆕
 M5StickC Plus:             ████████████████████ 100% ✅ KLAAR (hardware twijfel)
 ```
 
-**Totaal Project:** ~98% compleet (Body ESP AI nu actief!)
+**Totaal Project:** ~99% compleet (Emergency pause + AI warmup nu actief!)
 
 ═══════════════════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════════════
+
+# 🎉 VANDAAG GEFIXT (22 Nov 2025) - EMERGENCY PAUSE SYSTEEM!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ✅ EMERGENCY PAUSE + WARMUP SYSTEEM COMPLEET!
+
+**Status:** MAJOR SAFETY FEATURE IMPLEMENTED! 🚀🎊
+
+### ✅ EMERGENCY PAUSE (100%):
+  ✅ C knop kort (tijdens AI override) → Emergency pause
+  ✅ Body ESP detecteert pause via STATUS_UPDATE
+  ✅ Rood scherm met smooth fonts: "Nood Pauze" + "Raak scherm aan"
+  ✅ Touch resume → Warmup sequence start
+  ✅ Hooft ESP blijft animatie/Keon pauzeren
+  ✅ Grafieken blijven werken tijdens pause
+
+**Test resultaat:**
+```
+[PAUSE] ⚠️ Emergency pause detected!
+[PAUSE] Was op Level 5
+[PAUSE] Drawing red screen...
+[PAUSE] Touch detected - resuming session
+[WARMUP] Starting 10000ms warm-up to Level 5
+```
+
+### ✅ WARMUP SYSTEEM (100%):
+  ✅ Start altijd bij Level 0 (safe!)
+  ✅ Bouwt op naar origineel level in 10 seconden
+  ✅ Gebruikt speciale AI_WARMUP command (mag level forceren)
+  ✅ Animatie + Keon bewegen tijdens warmup
+  ✅ Smooth progressie (0→1→2→3→4→5)
+  ✅ Level 5 bereikt (rounding fix met +0.5f)
+  ✅ Na warmup: terug naar normale AI (15% eigenwil)
+
+**Warmup configuratie:**
+```cpp
+WARMUP_DURATION_MS = 10000;        // 10 seconden
+WARMUP_START_LEVEL = 0;            // Start level (veilig)
+WARMUP_VIBE_ENABLED = false;       // Vibe uit tijdens warmup
+WARMUP_SUCTION_ENABLED = false;    // Zuigen uit tijdens warmup
+EMERGENCY_WARMUP_ENABLED = true;   // Toggle warmup aan/uit
+EMERGENCY_PAUSE_ROOD_SCHERM = true;// Toggle rood scherm
+```
+
+**Test resultaat:**
+```
+[WARMUP] Progress: 13% → Level 0/5 (via AI_WARMUP)
+[WARMUP] Progress: 25% → Level 1/5 (via AI_WARMUP)
+[WARMUP] Progress: 48% → Level 2/5 (via AI_WARMUP)
+[WARMUP] Progress: 71% → Level 3/5 (via AI_WARMUP)
+[WARMUP] Progress: 95% → Level 4/5 (via AI_WARMUP)
+[WARMUP] Complete! Returning to normal AI control
+```
+
+### ✅ AI EIGENWIL SYSTEEM (100%):
+  ✅ 0-100% schaal gedefinieerd
+  ✅ 15% eigenwil = subtiele aanpassingen BINNEN level (factors only)
+  ✅ AI forceert NIET je level bij <50% eigenwil
+  ✅ Warmup gebruikt apart AI_WARMUP command (mag forceren)
+  ✅ Normale AI gebruikt AI_OVERRIDE (geen level forceren)
+
+**Eigenwil schaal:**
+```
+0%:       AI uit (pure manual)
+1-25%:    AI kijkt mee (subtiele aanpassingen binnen level)
+26-49%:   AI adviseert (sterker, maar jij hebt meerderheid)
+50-84%:   AI mede-beslisser (mag levels veranderen)
+85-100%:  AI volledige controle (Level 7 + orgasme trigger)
+```
+
+**Test resultaat:**
+```
+[AI Override] Trust: 0.14, Sleeve: 0.14 (factors only)
+[SNELH DEBUG] g_speedStep=5, getUserSleeveSpeed()=1.48, final_sleeve=0.21
+→ Level blijft 5, alleen 15% factor aanpassing! ✅
+```
+
+### ✅ ANIMATIE RESUME FIX (100%):
+  ✅ resetPauseState() functie in ui.cpp
+  ✅ Reset paused, sessionActive, parkToBottom
+  ✅ Reset phase, velEMA voor smooth restart
+  ✅ Animatie + Keon bewegen na warmup
+  ✅ Geen dubbele C druk meer nodig
+
+**Code fix:**
+```cpp
+void resetPauseState() {
+  paused = false;
+  sessionActive = true;
+  parkToBottom = false;
+  phase = -1.5707963f;
+  velEMA = 0.0f;
+  Serial.println("[UI] Pause state reset via Body ESP resume");
+}
+```
+
+### ✅ ESP-NOW COMMANDS (100%):
+  ✅ AI_WARMUP command (mag g_speedStep forceren)
+  ✅ AI_OVERRIDE command (alleen factors, geen level forceren)
+  ✅ RESUME_SESSION command (reset pause state)
+  ✅ Hooft ESP ontvangt beide commands correct
+
 ═══════════════════════════════════════════════════════════════════════════════
 
 # 🎉 VANDAAG GEFIXT (21 Nov 2025) - BODY ESP AI BREAKTHROUGH!

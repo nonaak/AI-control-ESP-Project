@@ -227,25 +227,13 @@ void handleBodyESPMessage(const bodyESP_message_t &msg) {
   
   // AI override functies
   if (strcmp(msg.command, "AI_OVERRIDE") == 0) {
-    // Normale AI - GEEN level forceren (subtiele aanpassingen only)
+    // AI override actief - pas trust/sleeve factors aan
     bodyESP_trustOverride = (msg.newTrust < 0.0f) ? 0.0f : (msg.newTrust > 1.0f) ? 1.0f : msg.newTrust;
     bodyESP_sleeveOverride = (msg.newSleeve < 0.0f) ? 0.0f : (msg.newSleeve > 1.0f) ? 1.0f : msg.newSleeve;
     aiOverruleActive = msg.overruleActive;
     
-    Serial.printf("[AI Override] Trust: %.2f, Sleeve: %.2f (factors only)\n", 
+    Serial.printf("[AI Override] Trust factor: %.2f, Sleeve factor: %.2f\n", 
                   bodyESP_trustOverride, bodyESP_sleeveOverride);
-  }
-  else if (strcmp(msg.command, "AI_WARMUP") == 0) {
-    // Warmup na emergency pause - MAG level forceren!
-    bodyESP_trustOverride = (msg.newTrust < 0.0f) ? 0.0f : (msg.newTrust > 1.0f) ? 1.0f : msg.newTrust;
-    bodyESP_sleeveOverride = (msg.newSleeve < 0.0f) ? 0.0f : (msg.newSleeve > 1.0f) ? 1.0f : msg.newSleeve;
-    aiOverruleActive = msg.overruleActive;
-    
-    extern uint8_t g_speedStep;
-    g_speedStep = msg.stressLevel;  // Forceer speed tijdens warmup
-    
-    Serial.printf("[AI Warmup] Speed: %d, Trust: %.2f, Sleeve: %.2f\n", 
-                  g_speedStep, bodyESP_trustOverride, bodyESP_sleeveOverride);
   }
   else if (strcmp(msg.command, "HEARTBEAT") == 0) {
     // Heartbeat update - connection status al bijgewerkt
@@ -385,7 +373,6 @@ void handleBodyESPMessage(const bodyESP_message_t &msg) {
     // 1. Zet animatie op pauze
     extern bool paused;
     paused = true;
-    Serial.println("[DEBUG] paused set to TRUE here! espnow_comm_cpp");
     
     // 2. Snelheid naar minimum (0)
     extern uint8_t g_speedStep;
@@ -400,21 +387,13 @@ void handleBodyESPMessage(const bodyESP_message_t &msg) {
       sendToggleZuigenCommand();
     }
     
-// 5. AI overrides resetten naar neutraal
+    // 5. AI overrides resetten naar neutraal
     bodyESP_trustOverride = 1.0f;
     bodyESP_sleeveOverride = 1.0f;
     aiOverruleActive = false;
     
     Serial.println("[AI EMERGENCY] Safe mode actief - gebruiker heeft volledige controle");
   }
-  else if (strcmp(msg.command, "RESUME_SESSION") == 0) {
-      Serial.println("[PAUSE] Resume ontvangen van Body ESP - unpause!");
-    
-      extern void resetPauseState();
-      resetPauseState();  // Roep ui.cpp functie aan
-    
-      Serial.println("[PAUSE] Resume complete!");
-    }
   else {
     // Unknown command - log for debugging
     Serial.printf("[WARNING] Unknown command from Body ESP: '%s' (Trust:%.2f, Sleeve:%.2f, StressLevel:%d, Vibe:%d, Zuigen:%d)\n", 
@@ -527,8 +506,8 @@ void sendBodyESPStatusUpdate(const machineStatus_message_t &msg) {
 void sendM5AtomStatusUpdate(const monitoring_message_t &msg) {
   esp_err_t result = esp_now_send(m5atom_MAC, (uint8_t*)&msg, sizeof(msg));
   if (result == ESP_OK) {
-    //Serial.printf("[TX M5Atom Status OK] Trust:%.1f, Sleeve:%.1f, Status:%s\n", 
- //                 msg.trustSpeed, msg.sleeveSpeed, msg.status);
+    Serial.printf("[TX M5Atom Status OK] Trust:%.1f, Sleeve:%.1f, Status:%s\n", 
+                  msg.trustSpeed, msg.sleeveSpeed, msg.status);
   } else {
     Serial.printf("[TX M5Atom Status ERROR] Send failed: %d\n", result);
   }
@@ -537,9 +516,9 @@ void sendM5AtomStatusUpdate(const monitoring_message_t &msg) {
 void sendM5AtomPumpColors(const pumpColors_message_t &msg) {
   esp_err_t result = esp_now_send(m5atom_MAC, (uint8_t*)&msg, sizeof(msg));
   if (result == ESP_OK) {
-    //Serial.printf("[TX M5Atom Colors OK] Sent pump colors: A(%d,%d,%d) B(%d,%d,%d), flags=0x%02X (VacLED:%d DebugLED:%d)\n", 
-   //               msg.a_r, msg.a_g, msg.a_b, msg.b_r, msg.b_g, msg.b_b, msg.flags, 
-   //                (msg.flags & 0x04) ? 1 : 0, (msg.flags & 0x08) ? 1 : 0);
+    Serial.printf("[TX M5Atom Colors OK] Sent pump colors: A(%d,%d,%d) B(%d,%d,%d), flags=0x%02X (VacLED:%d DebugLED:%d)\n", 
+                  msg.a_r, msg.a_g, msg.a_b, msg.b_r, msg.b_g, msg.b_b, msg.flags, 
+                  (msg.flags & 0x04) ? 1 : 0, (msg.flags & 0x08) ? 1 : 0);
   } else {
     Serial.printf("[TX M5Atom Colors ERROR] Send failed: %d (ESP_ERR_ESPNOW_NOT_INIT=%d)\n", 
                   result, ESP_ERR_ESPNOW_NOT_INIT);
@@ -1072,59 +1051,4 @@ void sendImmediateArrowUpdate() {
   } else {
     Serial.printf("[IMMEDIATE] FAILED: %d\n", result);
   }
-}
-// ===============================================================================
-// NUNCHUK COMMAND FUNCTIONS - Send to Body ESP
-// ===============================================================================
-
-void sendOrgasmTrigger() {
-  if (!bodyESP_connected) {
-    Serial.println("[ORGASM] Cannot send - Body ESP offline!");
-    return;
-  }
-  
-  machineStatus_message_t msg;
-  memset(&msg, 0, sizeof(msg));
-  
-  strcpy(msg.command, "ORGASM_TRIGGER");
-  msg.trust = getUserTrustSpeed();
-  msg.sleeve = getUserSleeveSpeed();
-  msg.suction = abs(currentVacuumReading);
-  msg.vibeOn = vibeState;
-  msg.zuigActive = pompUnitZuigActive;
-  msg.vacuumMbar = abs(currentVacuumReading / 0.75f);
-  
-  extern bool paused;
-  extern uint8_t g_speedStep;
-  msg.pauseActive = paused;
-  msg.currentSpeedStep = g_speedStep;
-  
-  sendBodyESPStatusUpdate(msg);
-  Serial.println("[ESP-NOW] ORGASM_TRIGGER sent to Body ESP!");
-}
-
-void sendFunscriptCommand(bool enabled) {
-  if (!bodyESP_connected) {
-    Serial.printf("[FUNSCRIPT] Cannot send - Body ESP offline!\n");
-    return;
-  }
-  
-  machineStatus_message_t msg;
-  memset(&msg, 0, sizeof(msg));
-  
-  strcpy(msg.command, enabled ? "FUNSCRIPT_ON" : "FUNSCRIPT_OFF");
-  msg.trust = getUserTrustSpeed();
-  msg.sleeve = getUserSleeveSpeed();
-  msg.suction = abs(currentVacuumReading);
-  msg.vibeOn = vibeState;
-  msg.zuigActive = pompUnitZuigActive;
-  msg.vacuumMbar = abs(currentVacuumReading / 0.75f);
-  
-  extern bool paused;
-  extern uint8_t g_speedStep;
-  msg.pauseActive = paused;
-  msg.currentSpeedStep = g_speedStep;
-  
-  sendBodyESPStatusUpdate(msg);
-  Serial.printf("[ESP-NOW] Funscript %s sent to Body ESP!\n", enabled ? "ON" : "OFF");
 }

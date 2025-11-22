@@ -1276,6 +1276,25 @@ void loop() {
   // EMERGENCY PAUSE SCREEN - Teken in main loop (niet in callback!)
   // ═══════════════════════════════════════════════════════════
 
+  /*if (emergencyPauseActive && !emergencyPauseScreenDrawn) {
+    Serial.println("[PAUSE] Drawing red screen...");
+  
+    body_gfx->fillScreen(0xF800);  // Rood
+  
+    // "Nood Pauze" - grote letters
+    body_gfx->setTextSize(4);
+    body_gfx->setTextColor(0xFFFF);
+    body_gfx->setCursor(90, 110);
+    body_gfx->println("Nood Pauze");
+  
+    // "Raak scherm aan" - kleinere letters
+    body_gfx->setTextSize(2);
+    body_gfx->setCursor(120, 190);
+    body_gfx->println("Raak scherm aan");
+  
+    emergencyPauseScreenDrawn = true;
+  }*/
+
   if (emergencyPauseActive && !emergencyPauseScreenDrawn) {
     Serial.println("[PAUSE] Drawing red screen...");
   

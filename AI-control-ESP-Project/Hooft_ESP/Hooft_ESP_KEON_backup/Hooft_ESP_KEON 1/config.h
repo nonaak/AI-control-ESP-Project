@@ -60,6 +60,32 @@ struct Config {
   
   // === Z-knop nunchuk instellingen ===
   uint16_t doubleClickTiming = 800;     // Tijd tussen clicks voor Vibe (300-1500ms)
+  
+  // ═══════════════════════════════════════════════════════════
+  // ORGASM & COOLDOWN SYSTEEM
+  // ═══════════════════════════════════════════════════════════
+  
+  // === Cooldown instellingen ===
+  uint32_t cooldownDefaultSeconds = 30;  // Default cooldown tijd in seconden (10-300)
+  uint32_t cooldownDefaultStrokes = 10;  // Default cooldown aantal strokes (10-200)
+  uint8_t  cooldownMode = 1;             // 0=tijd only, 1=strokes only, 2=beide (eerste wint)
+  
+  // === Orgasm fase instellingen ===
+  uint32_t orgasmMaxSpeedDuration = 10000; // Max tijd op speed 7 voor orgasm (ms, 5000-30000)
+  bool     orgasmAutoLevel0 = true;        // Auto naar level 0 na orgasm complete (true/false)
+  
+  // === Body ESP AI cooldown override ===
+  bool     allowAICooldownOverride = true; // Body ESP AI mag cooldown aanpassen (true/false)
+  uint32_t minAICooldownSeconds = 15;      // Minimum AI cooldown tijd (10-60 sec)
+  uint32_t maxAICooldownSeconds = 120;     // Maximum AI cooldown tijd (30-300 sec)
+
+  // ═══════════════════════════════════════════════════════════
+  // STROKE RANGE CONTROL
+  // ═══════════════════════════════════════════════════════════
+  // Percentage van totale range (0-100%)
+  // 0% = helemaal boven (uit), 100% = helemaal onder (in)
+  float strokeTopLimit = 0.0f;      // Top positie (default 5% = bijna helemaal uit)
+  float strokeBottomLimit = 95.0f;  // Bottom positie (default 95% = bijna helemaal in)
 };
 extern Config CFG;
 

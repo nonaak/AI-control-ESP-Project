@@ -1872,39 +1872,6 @@ if (nunchukHelpPopupOpen) {
     }
   }
 
-  /*
-  if (paletteOpen && cev==CE_SHORT){
-    cancelColorEdit_globalIndex(editingGlobalIdx);
-    paletteOpen=false; colorEdit=false; editingGlobalIdx=-1;
-    drawRightMenu();
-  } else if (cev==CE_LONG){
-    uiMode = (uiMode==MODE_MENU)? MODE_ANIM : MODE_MENU;
-    menuEdit = false; colorEdit=false; paletteOpen=false;
-    drawRightMenu();
-  } else if (cev==CE_SHORT && !paletteOpen){
-    if (!paused) {
-      parkToBottom = true;
-      paused = true;
-      // STOP AUTO VACUUM BIJ PAUSE!
-      extern bool arrowFull;
-      arrowFull = false;
-      extern void sendImmediateArrowUpdate();
-      sendImmediateArrowUpdate();
-      Serial.println("[PAUSE] arrowFull=false sent to stop auto vacuum");
-      Serial.println("[DEBUG] parkToBottom set to TRUE here! ui_cpp");
-      keonSyncEnabled = false;
-    }else { 
-      paused = false; parkToBottom = false;
-      phase = -1.5707963f;
-      //phase = 0.0f;
-      //capY_draw = (float)CAP_Y_IN; 
-      velEMA = 0.0f;
-      keonSyncEnabled = true;
-      Serial.println("[UNPAUSE] velEMA reset for crispy auto vacuum response");
-      Serial.printf("[UNPAUSE DEBUG] paused=%d parkToBottom=%d phase=%.2f\n", paused, parkToBottom, phase);
-    }
-  }*/
-
   // Check connection progress
   if (connectionPopupOpen && connectionInProgress) {
     if (connectionDeviceIdx == 0) {
@@ -2381,7 +2348,8 @@ if (!paused && !parkToBottom) {
   }
 
   int capYnow = (int)round(capY_draw);
-  const int DRAW_BASELINE_Y = (int)round(CAP_Y_MID + (BL - CAP_Y_MID) * RANGE_SCALE);
+  //const int DRAW_BASELINE_Y = (int)round(CAP_Y_MID + (BL - CAP_Y_MID) * RANGE_SCALE);
+  const int DRAW_BASELINE_Y = (int)round(CAP_Y_OUT_BASE + (BL - CAP_Y_OUT_BASE) * bottomPercent);  // ✅ GOED!
   
   uint16_t rodCol = lerp_rgb565_u8(CFG.rodSlowR,CFG.rodSlowG,CFG.rodSlowB,
                                    CFG.rodFastR,CFG.rodFastG,CFG.rodFastB, step01);
@@ -2497,5 +2465,23 @@ if (!paused && !parkToBottom) {
   delay(1);
 }
 
+// ═══════════════════════════════════════════════════════════
+// EXTERNE FUNCTIES VOOR BODY ESP COMMUNICATIE
+// ═══════════════════════════════════════════════════════════
 
+// Reset pause state na Body ESP resume command
+void resetPauseState() {
+  extern bool paused;
+  extern bool sessionActive;
+  //extern bool keonSyncEnabled;  // ← Ook extern!
+  
+  paused = false;
+  sessionActive = true;
+  parkToBottom = false;
+  phase = -1.5707963f;
+  velEMA = 0.0f;
+  //keonSyncEnabled = true;
+  
+  Serial.println("[UI] Pause state reset via Body ESP resume");
+}
 

@@ -1,0 +1,7 @@
+Board: "ESP32 Dev Module"
+Flash Mode: "QIO"
+Flash Size: "16MB (128Mb)"
+Partition Scheme: "16M Flash (3MB APP/9.9MB FATFS)"
+PSRAM: "diabled"
+Upload Mode: "UART0 / Hardware CDC"
+Upload Speed: "921600"

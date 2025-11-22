@@ -261,13 +261,13 @@ Level 7: MAXIMUM EDGE ZONE (AI blijft actief bij 85%+ ML Eigenwil!)
   - **Waarom zo heftig?** 1 stap terug = mislukt orgasme (DRAMA!)
   - Afkoelen (10-30 sec), dan geleidelijk opbouwen (Level 3→4→5→6→7)
   - Kan weer verder? AI verhoogt stapsgewijs (niet te snel!)
-  - Repeat: Edge zone bereiken → Afkoelen → Opbouwen → Edge
+  - Repeat: Edge zone bereiken → Afkoelen → Opbouwen → Edge → tot ik Y orgasme mode forceer
   - **⚙️ Alle parameters instelbaar via menu!** (drop level, thresholds, timing)
 - **Orgasme Trigger:**
-  - **JIJ:** Y omhoog 4 sec = ALTIJD mogelijk (dit is WET!)
+  - **JIJ:** Y omhoog 3 sec = ALTIJD mogelijk (dit is WET!)
   - **AI bij ≥ 85% ML Eigenwil:** AI MAG zelf triggeren (hoge vrijheid)
   - **AI bij < 85%:** AI mag NIET triggeren (alleen jij)
-  - **Als getriggerd (door AI of jij):** AI LOCKED OUT → Finale fase
+  - **Als getriggerd (door AI of jij):** AI LOCKED OUT → Finale fase → na orgasme C → cooldown
 - ML Eigenwil slider: 
   - 0% = AI uit (pure manual)
   - < 85% = AI mag NIET orgasme triggeren
@@ -278,39 +278,66 @@ Level 7: MAXIMUM EDGE ZONE (AI blijft actief bij 85%+ ML Eigenwil!)
 
 ❌ Geen AI
 ✅ Alleen jij via nunchuk
+✅ AI Leert
 
-1-25% - "AI KIJKT MEE":
+1-15% - "AI KIJKT MEE":
 
 ✅ Subtiele aanpassingen BINNEN hetzelfde level
-✅ Trust/sleeve factors (max 25% aanpassing)
+✅ Trust/sleeve factors (max 15% aanpassing)
+✅ Vibe/zuig suggesties
+✅ AI Leert
 ❌ Geen level changes
-❌ Geen vibe/zuig forceren
 ❌ Geen Level 7 toegang
 ❌ Geen orgasme trigger
 
-26-49% - "AI ADVISEERT":
+16-30% - "AI KIJKT MEE EN ADVISEERT":
+
+✅ kleine level suggesties/forceren (0→1→2 of 2→1→0)(jij bent meerderheid)
+✅ Trust/sleeve factors (max 30% aanpassing)
+✅ Mag vibe/zuig aan/uit
+✅ AI Leert
+-❌ Geen level changes
+❌ Geen Level 7 toegang
+❌ Geen orgasme trigger
+
+31-49% - "AI ADVISEERT":
 
 ✅ Iets sterkere aanpassingen (max 49%)
-✅ Vibe/zuig suggesties
-❌ Nog geen level forceren (jij bent meerderheid)
+✅ Mag vibe/zuig aan/uit
+✅ Mag levels veranderen (0→1→2→3→4 of 4→3→2→1→0) (jij bent meerderheid)
+✅ AI Leert
 ❌ Geen Level 7 toegang
 ❌ Geen orgasme trigger
 
-50-84% - "AI MEDE-BESLISSER":
+50-65% - "AI MEDE-BESLISSER":
 
-✅ AI heeft meerderheid
-✅ Mag levels veranderen (6→5 of 4→5)
+✅ AI heeft meerderheid (jij mag corrigeren)
+✅ Mag levels veranderen (6→0 of 0→6)
 ✅ Mag vibe/zuig aan/uit
 ✅ Sterke invloed
+✅ AI Leert
 ❌ Nog geen Level 7 toegang
+❌ Nog geen orgasme trigger
+
+66-84% - "AI VOLLEDIGE CONTROLE":
+
+✅ AI mag naar Level 7 brengen
+✅ Bepaalde aantal edge momomenten
+✅ Maximale experimentele vrijheid
+✅ Alle bevoegdheden
+✅ Sterke invloed
+✅ AI Leert
 ❌ Nog geen orgasme trigger
 
 85-100% - "AI VOLLEDIGE CONTROLE":
 
 ✅ AI mag naar Level 7 brengen
 ✅ AI mag orgasme triggeren
+✅ Onbepaalde aantal edge momomenten
 ✅ Maximale experimentele vrijheid
 ✅ Alle bevoegdheden
+✅ AI Leert
+
 -------------------------------------------------------------------------------
 
 **Menu functies:**

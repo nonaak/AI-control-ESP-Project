@@ -27,3 +27,4 @@ extern float g_startLube_s;
 
 // ========== HELPER FUNCTIONS (exposed for ESP-NOW) ==========
 float getSleevePercentage();  // Get current sleeve position as percentage (0-100)
+void resetPauseState();       // Reset pause state after Body ESP resume command
