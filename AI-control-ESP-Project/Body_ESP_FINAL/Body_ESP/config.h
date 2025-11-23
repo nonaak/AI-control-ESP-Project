@@ -216,6 +216,25 @@
                                               // Dit is veilig en voorkomt schrikken
 
 // ================================================================================
+// TOUCH DISABLE OPTIES
+// ================================================================================
+// Drie aparte opties om touch aan/uit te zetten per functie.
+// Handig als je encoder gebruikt en niet per ongeluk wil touchen.
+
+#define TOUCH_MENU_ENABLED      false    // Touch voor menu navigatie knoppen
+                                        // true = menu buttons werken met touch
+                                        // false = alleen encoder werkt
+                                        
+#define TOUCH_PARAMS_ENABLED    false    // Touch voor parameter editing (pijl blokjes)
+                                        // true = rood/blauw pijlen werken met touch
+                                        // false = alleen encoder werkt
+                                        
+#define TOUCH_EMERGENCY_ENABLED true    // Touch voor emergency pause scherm (ALTIJD AAN!)
+                                        // true = rood orgasme scherm werkt met touch
+                                        // false = alleen encoder werkt (gevaarlijk!)
+                                        // WAARSCHUWING: Als false kan je vast komen te zitten!
+
+// ================================================================================
 // KALIBRATIE
 // ================================================================================
 // Kalibratie gebeurt via het menu systeem:

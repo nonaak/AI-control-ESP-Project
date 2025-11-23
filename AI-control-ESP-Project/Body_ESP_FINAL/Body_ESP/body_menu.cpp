@@ -96,6 +96,11 @@ static float gsrSum = 0, tempSum = 0, hrSum = 0;
 static int sampleCount = 0;
 static bool calibrationScreenDrawn = false; // Track of statische delen getekend zijn
 
+// Touch toggle states (extern uit Body_ESP.ino)
+extern bool touchMenuEnabled;
+extern bool touchParamsEnabled;
+extern bool touchEmergencyEnabled;
+
 // RTC tijd instellingen state
 int editYear = 2024;
 int editMonth = 1;
@@ -1632,6 +1637,12 @@ void drawSensorSettingsItems() {
 void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
   if (!pressed) return;
   
+  // Check menu touch enabled (behalve voor emergency pause)
+  if (!touchMenuEnabled && bodyMenuPage != BODY_PAGE_PLAYBACK) {
+    // Menu touch uitgeschakeld (encoder only)
+    return;
+  }
+  
   menuDirty = true;
   
   if (bodyMenuMode == BODY_MODE_SENSORS) {
@@ -2133,8 +2144,8 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
         for (int i = 0; i < 5; i++) {
           int btnBoxY = START_Y + i * LINE_H - 7;
           
-          // - knop
-          if (x >= MINUS_X && x <= MINUS_X + BTN_W && y >= btnBoxY && y <= btnBoxY + BTN_H) {
+          // - knop (check touchParamsEnabled)
+          if (touchParamsEnabled && x >= MINUS_X && x <= MINUS_X + BTN_W && y >= btnBoxY && y <= btnBoxY + BTN_H) {
             switch(i) {
               case 0: if (editYear > 2000) editYear--; break;  // Jaar
               case 1: if (editMonth > 1) editMonth--; else editMonth = 12; break;  // Maand (1-12)
@@ -2146,8 +2157,8 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
             return;
           }
           
-          // + knop
-          if (x >= PLUS_X && x <= PLUS_X + BTN_W && y >= btnBoxY && y <= btnBoxY + BTN_H) {
+          // + knop (check touchParamsEnabled)
+          if (touchParamsEnabled && x >= PLUS_X && x <= PLUS_X + BTN_W && y >= btnBoxY && y <= btnBoxY + BTN_H) {
             switch(i) {
               case 0: if (editYear < 2100) editYear++; break;  // Jaar
               case 1: if (editMonth < 12) editMonth++; else editMonth = 1; break;  // Maand (1-12)
@@ -2213,8 +2224,8 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
         for (int i = 0; i < 6; i++) {
           int btnBoxY = START_Y + i * LINE_H - 5;
           
-          // - knop
-          if (x >= MINUS_X && x <= MINUS_X + BTN_W && y >= btnBoxY && y <= btnBoxY + BTN_H) {
+          // - knop (check touchParamsEnabled)
+          if (touchParamsEnabled && x >= MINUS_X && x <= MINUS_X + BTN_W && y >= btnBoxY && y <= btnBoxY + BTN_H) {
             switch(i) {
               case 0: // AI Eigenwil (0-100%)
                 if (aiSettings.autonomyLevel > 0.0f) aiSettings.autonomyLevel -= 1.0f;
@@ -2240,8 +2251,8 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
             return;
           }
           
-          // + knop
-          if (x >= PLUS_X && x <= PLUS_X + BTN_W && y >= btnBoxY && y <= btnBoxY + BTN_H) {
+          // + knop (check touchParamsEnabled)
+          if (touchParamsEnabled && x >= PLUS_X && x <= PLUS_X + BTN_W && y >= btnBoxY && y <= btnBoxY + BTN_H) {
             switch(i) {
               case 0: // AI Eigenwil (0-100%)
                 if (aiSettings.autonomyLevel < 100.0f) aiSettings.autonomyLevel += 1.0f;
@@ -2311,8 +2322,8 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
         for (int i = 0; i < 6; i++) {
           int btnBoxY = START_Y + i * LINE_H - 5;
           
-          // - knop
-          if (x >= MINUS_X && x <= MINUS_X + BTN_W && y >= btnBoxY && y <= btnBoxY + BTN_H) {
+          // - knop (check touchParamsEnabled)
+          if (touchParamsEnabled && x >= MINUS_X && x <= MINUS_X + BTN_W && y >= btnBoxY && y <= btnBoxY + BTN_H) {
             switch(i) {
               case 0: // Beat Threshold (10000-100000)
                 if (sensorEdit.beatThreshold > 10000.0f) sensorEdit.beatThreshold -= 1000.0f;
@@ -2338,8 +2349,8 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
             return;
           }
           
-          // + knop
-          if (x >= PLUS_X && x <= PLUS_X + BTN_W && y >= btnBoxY && y <= btnBoxY + BTN_H) {
+          // + knop (check touchParamsEnabled)
+          if (touchParamsEnabled && x >= PLUS_X && x <= PLUS_X + BTN_W && y >= btnBoxY && y <= btnBoxY + BTN_H) {
             switch(i) {
               case 0: // Beat Threshold (10000-100000)
                 if (sensorEdit.beatThreshold < 100000.0f) sensorEdit.beatThreshold += 1000.0f;

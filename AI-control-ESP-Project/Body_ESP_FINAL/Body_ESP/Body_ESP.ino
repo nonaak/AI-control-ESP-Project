@@ -41,6 +41,7 @@
 #include <esp_now.h>            // ESP-NOW communicatie
 #include <WiFi.h>               // WiFi voor ESP-NOW
 #include "esp_task_wdt.h"       // 🔥 NIEUW: Watchdog timer
+#include <Preferences.h>        // Voor touch settings opslag
 #include "config.h"             // SC01 Plus configuratie (eenvoudig)
 #include "body_config.h"        // Body ESP configuratie (geavanceerd)
 #include "body_gfx4.h"          // Grafisch systeem
@@ -49,6 +50,15 @@
 #include "body_menu.h"          // Menu systeem
 #include "sensor_settings.h"    // Sensor kalibratie (EEPROM)
 #include "multifunplayer_client.h"  // MultiFunPlayer WebSocket client
+
+// ========= TOUCH TOGGLE STATES (GLOBAAL) =========
+bool touchEnabled = true;         // Global touch enable/disable
+bool touchMenuEnabled = true;     // Touch voor menu navigatie
+bool touchParamsEnabled = true;   // Touch voor parameters
+bool touchEmergencyEnabled = true; // Touch voor emergency pause
+
+// ========= PREFERENCES OBJECT =========
+Preferences prefs;
 
 // 🔥 NIEUW: Extern reference naar rendering pause flag
 extern volatile bool g4_pauseRendering;
@@ -775,6 +785,12 @@ void touchCallback(TPoint point, TEvent e) {
   // ═══════════════════════════════════════════════════════════
   
   if (emergencyPauseActive) {
+    // Check emergency touch enabled
+    if (!touchEmergencyEnabled) {
+      Serial.println("[PAUSE] Touch disabled for emergency - use encoder!");
+      return;  // Touch disabled, moet encoder gebruiken
+    }
+    
     Serial.println("[PAUSE] Touch detected - resuming session");
     
     // Start warm-up sequence (als enabled)
@@ -1871,6 +1887,15 @@ void setup() {
   Serial.println("\n[MFP] Initializing MultiFunPlayer client...");
   setupMultiFunPlayer();  // Zie body_config.h voor configuratie
   Serial.println("[MFP] Client ready! Toggle Funscript in System Settings.");
+  
+  // ===== Touch Toggle States Laden =====
+  prefs.begin("touch_cfg", false);
+  touchMenuEnabled = prefs.getBool("touch_menu", TOUCH_MENU_ENABLED);
+  touchParamsEnabled = prefs.getBool("touch_params", TOUCH_PARAMS_ENABLED);
+  touchEmergencyEnabled = prefs.getBool("touch_emerg", TOUCH_EMERGENCY_ENABLED);
+  prefs.end();
+  Serial.printf("[SETUP] Touch states loaded: Menu=%d Params=%d Emergency=%d\n", 
+                touchMenuEnabled, touchParamsEnabled, touchEmergencyEnabled);
   
   Serial.println("\n[BODY] System ready!");
   Serial.println("[BODY] Touch knoppen: REC, PLAY, MENU, AI");
