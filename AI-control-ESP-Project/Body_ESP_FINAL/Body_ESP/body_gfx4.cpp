@@ -208,7 +208,8 @@ void drawChannel(uint8_t ch) {
   }
 }
 
-void body_gfx4_drawButtons(bool recording, bool playing, bool menuActive, bool overruleActive, bool recDisabled) {
+void body_gfx4_drawButtons(bool recording, bool playing, bool menuActive, bool overruleActive, bool recDisabled, int8_t highlightIdx) {
+//void body_gfx4_drawButtons(bool recording, bool playing, bool menuActive, bool overruleActive, bool recDisabled) {
   static uint32_t lastDebug = 0;
   if (millis() - lastDebug > 5000) {  // Debug elke 5 seconden
     Serial.printf("[BODY] Drawing buttons at Y=%d, W=%d, H=%d\n", BUTTON_Y, BUTTON_W, BUTTON_H);
@@ -227,12 +228,31 @@ void body_gfx4_drawButtons(bool recording, bool playing, bool menuActive, bool o
   
   for (int i = 0; i < 4; i++) {
     int x = BUTTON_START_X + i * BUTTON_SPACING;
+
+    // Clear button area (inclusief ruimte voor oranje rand)
+    body_gfx->fillRect(x-3, BUTTON_Y-3, BUTTON_W+6, BUTTON_H+6, BODY_CFG.COL_BG);
+    
+    // Draw button with HoofdESP styling - groter en duidelijker
+    body_gfx->fillRoundRect(x, BUTTON_Y, BUTTON_W, BUTTON_H, 8, BODY_CFG.COL_BG);
+    
+    // Highlight geselecteerde button met oranje rand
+    if (i == highlightIdx) {
+      body_gfx->drawRoundRect(x-2, BUTTON_Y-2, BUTTON_W+4, BUTTON_H+4, 10, 0xFD20);  // Oranje buitenrand
+      body_gfx->drawRoundRect(x-1, BUTTON_Y-1, BUTTON_W+2, BUTTON_H+2, 9, 0xFD20);   // Oranje
+      body_gfx->drawRoundRect(x, BUTTON_Y, BUTTON_W, BUTTON_H, 8, 0xFD20);           // Oranje binnenrand
+    } else {
+      body_gfx->drawRoundRect(x, BUTTON_Y, BUTTON_W, BUTTON_H, 8, BODY_CFG.COL_FRAME2);
+      body_gfx->drawRoundRect(x+2, BUTTON_Y+2, BUTTON_W-4, BUTTON_H-4, 6, BODY_CFG.COL_FRAME);
+    }
+  /*
+  for (int i = 0; i < 4; i++) {
+    int x = BUTTON_START_X + i * BUTTON_SPACING;
     
     // Draw button with HoofdESP styling - groter en duidelijker
     body_gfx->fillRoundRect(x, BUTTON_Y, BUTTON_W, BUTTON_H, 8, BODY_CFG.COL_BG);
     body_gfx->drawRoundRect(x, BUTTON_Y, BUTTON_W, BUTTON_H, 8, BODY_CFG.COL_FRAME2);
     body_gfx->drawRoundRect(x+2, BUTTON_Y+2, BUTTON_W-4, BUTTON_H-4, 6, BODY_CFG.COL_FRAME);
-    
+    */
     // Fill button if active
     if (states[i]) {
       body_gfx->fillRoundRect(x+4, BUTTON_Y+4, BUTTON_W-8, BUTTON_H-8, 4, colors[i]);

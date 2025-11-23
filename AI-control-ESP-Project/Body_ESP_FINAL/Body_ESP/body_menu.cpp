@@ -59,6 +59,8 @@ float* g_sleeveSpeed = nullptr;
 uint32_t* g_lastCommTime = nullptr;
 uint32_t* g_samplesRecorded = nullptr;
 
+
+
 // Simple getter functions to safely access values
 float getBPM() { return g_BPM ? (float)*g_BPM : 0.0f; }
 float getTempValue() { return g_tempValue ? *g_tempValue : 36.5f; }
@@ -111,7 +113,7 @@ struct AISettingsData {
   float responseRate = 0.5f;       // Response Rate (0-1.0)
   bool aiEnabled = false;          // AI AAN/UIT
 };
-static AISettingsData aiSettings;
+AISettingsData aiSettings;
 static Preferences aiPrefs;  // ESP32 Preferences voor AI settings
 
 // Sensor Settings state (wordt uit sensorConfig gehaald)
@@ -123,7 +125,7 @@ struct SensorSettingsEdit {
   float gsrSensitivity = 1.0f;
   float gsrSmoothing = 0.1f;
 };
-static SensorSettingsEdit sensorEdit;
+SensorSettingsEdit sensorEdit;
 
 // Playback state variabelen
 static bool isPlaybackActive = false;
@@ -658,10 +660,20 @@ void drawMainMenuItems() {
     int y = START_Y + row * (BTN_H + BTN_MARGIN_Y);
     
     // Teken gekleurde knop
+
+    // Teken gekleurde knop
     body_gfx->fillRoundRect(x, y, BTN_W, BTN_H, 8, colors[i]);
-    body_gfx->drawRoundRect(x, y, BTN_W, BTN_H, 8, 0xFFFF);  // Witte rand
-    body_gfx->drawRoundRect(x+1, y+1, BTN_W-2, BTN_H-2, 7, 0xFFFF);  // Dubbele rand
     
+    // Highlight geselecteerde knop met gele rand
+    if (i == bodyMenuIdx) {
+      body_gfx->drawRoundRect(x-2, y-2, BTN_W+4, BTN_H+4, 10, 0xFD20);  // Oranje buitenrand
+      body_gfx->drawRoundRect(x-1, y-1, BTN_W+2, BTN_H+2, 9, 0xFD20);   // Oranje
+      body_gfx->drawRoundRect(x, y, BTN_W, BTN_H, 8, 0xFD20);            // Oranje binnenrand
+    } else {
+      body_gfx->drawRoundRect(x, y, BTN_W, BTN_H, 8, 0xFFFF);            // Witte rand
+      body_gfx->drawRoundRect(x+1, y+1, BTN_W-2, BTN_H-2, 7, 0xFFFF);    // Dubbele rand
+    }
+
     // Centreer tekst in knop
     body_gfx->setTextColor(0x0000, colors[i]);  // Zwarte tekst
     int16_t x1, y1; uint16_t tw, th;
@@ -679,8 +691,16 @@ void drawMainMenuItems() {
   int btnW = 300;
   int btnX = MENU_X + (MENU_W - btnW) / 2;
   body_gfx->fillRoundRect(btnX, btnY, btnW, 45, 8, 0x001F);  // Blauw
-  body_gfx->drawRoundRect(btnX, btnY, btnW, 45, 8, 0xFFFF);
-  body_gfx->drawRoundRect(btnX+1, btnY+1, btnW-2, 43, 7, 0xFFFF);
+  
+  // Highlight TERUG als geselecteerd (index 6)
+  if (bodyMenuIdx == 6) {
+    body_gfx->drawRoundRect(btnX-2, btnY-2, btnW+4, 49, 10, 0xFD20);  // Oranje
+    body_gfx->drawRoundRect(btnX-1, btnY-1, btnW+2, 47, 9, 0xFD20);
+    body_gfx->drawRoundRect(btnX, btnY, btnW, 45, 8, 0xFD20);
+  } else {
+    body_gfx->drawRoundRect(btnX, btnY, btnW, 45, 8, 0xFFFF);
+    body_gfx->drawRoundRect(btnX+1, btnY+1, btnW-2, 43, 7, 0xFFFF);
+  }
   
   // TERUG tekst met kleinere font
   #if USE_ADAFRUIT_FONTS
@@ -702,6 +722,11 @@ void drawMainMenuItems() {
 }
 
 void drawAISettingsItems() {
+  //extern bool aiSettingsInButtonMode;
+  extern bool aiSettingsEditMode;
+  extern int aiSettingsEditingParam;
+  extern bool aiParamModified[6];
+  
   const int MENU_X = 20;
   const int MENU_Y = 20;
   const int MENU_W = 480 - 40;
@@ -769,8 +794,21 @@ void drawAISettingsItems() {
     int valBoxY = y - 5;  // Was y - 8, nu nog 3px naar beneden
     int valBoxH = 20;
     body_gfx->fillRoundRect(VAL_X, valBoxY, 100, valBoxH, 3, 0x2104);  // Donkergrijs
-    body_gfx->drawRoundRect(VAL_X, valBoxY, 100, valBoxH, 3, 0x8410);  // Lichtgrijze rand
-    body_gfx->setTextColor(0xFFFF, 0x2104);  // Witte tekst
+    body_gfx->drawRoundRect(VAL_X, valBoxY, 100, valBoxH, 3, 0x8410);
+    
+    // Kleur bepalen: ROOD=gewijzigd, GROEN=cursor, WIT=normaal
+    uint16_t valueColor;
+    // Kleur bepalen
+    if (aiParamModified[i]) {
+      valueColor = 0xF800;  // ROOD = gewijzigd (na edit)
+    } else if (aiSettingsEditMode && i == aiSettingsEditingParam) {
+      valueColor = 0xF800;  // ROOD = edit mode (tijdens edit)
+    } else if (!aiSettingsEditMode && i == bodyMenuIdx) {
+      valueColor = 0x07E0;  // GROEN = cursor (browsing)
+    } else {
+      valueColor = 0xFFFF;  // WIT = normaal
+    }
+    body_gfx->setTextColor(valueColor, 0x2104);
     
     // Centreer waarde in box (horizontaal + verticaal)
     char valStr[10];
@@ -814,7 +852,7 @@ void drawAISettingsItems() {
     y += LINE_H;
   }
   
-  // 3 knoppen onderaan met kleinere font - gecentreerd
+// 3 knoppen onderaan met kleinere font - gecentreerd
   int btnY = MENU_Y + 225;
   int btnW = 120;
   int btnH = 40;
@@ -831,9 +869,16 @@ void drawAISettingsItems() {
     body_gfx->setTextSize(2);
   #endif
   
-  // AI AAN (paars)
+  // AI AAN (paars) - Index 6
   body_gfx->fillRoundRect(btn1X, btnY, btnW, btnH, 8, 0x841F);
-  body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFFFF);
+  
+  if (!aiSettingsEditMode && bodyMenuIdx == 6) {
+    body_gfx->drawRoundRect(btn1X-2, btnY-2, btnW+4, btnH+4, 10, 0xFFE0);  // Geel
+    body_gfx->drawRoundRect(btn1X-1, btnY-1, btnW+2, btnH+2, 9, 0xFFE0);
+    body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFFE0);
+  } else {
+    body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFFFF);
+  }
   body_gfx->setTextColor(0xFFFF, 0x841F);
   int16_t xa1, ya1; uint16_t twa, tha;
   body_gfx->getTextBounds("AI AAN", 0, 0, &xa1, &ya1, &twa, &tha);
@@ -844,9 +889,16 @@ void drawAISettingsItems() {
   #endif
   body_gfx->print("AI AAN");
   
-  // Opslaan (groen)
-  body_gfx->fillRoundRect(btn2X, btnY, btnW, btnH, 8, BODY_CFG.DOT_GREEN);  // Groen
-  body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFFFF);
+  // Opslaan (groen) - Index 7
+  body_gfx->fillRoundRect(btn2X, btnY, btnW, btnH, 8, BODY_CFG.DOT_GREEN);
+  
+  if (!aiSettingsEditMode && bodyMenuIdx == 7) {
+    body_gfx->drawRoundRect(btn2X-2, btnY-2, btnW+4, btnH+4, 10, 0xFFE0);  // Geel
+    body_gfx->drawRoundRect(btn2X-1, btnY-1, btnW+2, btnH+2, 9, 0xFFE0);
+    body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFFE0);
+  } else {
+    body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFFFF);
+  }
   body_gfx->setTextColor(0xFFFF, BODY_CFG.DOT_GREEN);
   int16_t xb1, yb1; uint16_t twb, thb;
   body_gfx->getTextBounds("Opslaan", 0, 0, &xb1, &yb1, &twb, &thb);
@@ -857,9 +909,16 @@ void drawAISettingsItems() {
   #endif
   body_gfx->print("Opslaan");
   
-  // TERUG (blauw)
-  body_gfx->fillRoundRect(btn3X, btnY, btnW, btnH, 8, 0x001F);  // Blauw
-  body_gfx->drawRoundRect(btn3X, btnY, btnW, btnH, 8, 0xFFFF);
+  // TERUG (blauw) - Index 8
+  body_gfx->fillRoundRect(btn3X, btnY, btnW, btnH, 8, 0x001F);
+  
+  if (!aiSettingsEditMode && bodyMenuIdx == 8) {
+    body_gfx->drawRoundRect(btn3X-2, btnY-2, btnW+4, btnH+4, 10, 0xFFE0);  // Geel
+    body_gfx->drawRoundRect(btn3X-1, btnY-1, btnW+2, btnH+2, 9, 0xFFE0);
+    body_gfx->drawRoundRect(btn3X, btnY, btnW, btnH, 8, 0xFFE0);
+  } else {
+    body_gfx->drawRoundRect(btn3X, btnY, btnW, btnH, 8, 0xFFFF);
+  }
   body_gfx->setTextColor(0xFFFF, 0x001F);
   int16_t xc1, yc1; uint16_t twc, thc;
   body_gfx->getTextBounds("TERUG", 0, 0, &xc1, &yc1, &twc, &thc);
@@ -1207,9 +1266,17 @@ void drawSensorCalItems() {
     int y = START_Y + i * (BTN_H + BTN_SPACING);
     
     // Gekleurde knop met witte rand (zoals hoofdmenu)
-    body_gfx->fillRoundRect(START_X, y, BTN_W, BTN_H, 8, colors[i]);
-    body_gfx->drawRoundRect(START_X, y, BTN_W, BTN_H, 8, 0xFFFF);
-    body_gfx->drawRoundRect(START_X+1, y+1, BTN_W-2, BTN_H-2, 7, 0xFFFF);  // Dubbele rand
+      body_gfx->fillRoundRect(START_X, y, BTN_W, BTN_H, 8, colors[i]);
+    
+      // Highlight geselecteerde item
+      if (i == bodyMenuIdx) {
+        body_gfx->drawRoundRect(START_X-2, y-2, BTN_W+4, BTN_H+4, 10, 0xFFE0);  // Geel
+        body_gfx->drawRoundRect(START_X-1, y-1, BTN_W+2, BTN_H+2, 9, 0xFFE0);
+        body_gfx->drawRoundRect(START_X, y, BTN_W, BTN_H, 8, 0xFFE0);
+      } else {
+        body_gfx->drawRoundRect(START_X, y, BTN_W, BTN_H, 8, 0xFFFF);
+        body_gfx->drawRoundRect(START_X+1, y+1, BTN_W-2, BTN_H-2, 7, 0xFFFF);
+      }
     
     // Centreer tekst in knop (zwarte tekst)
     body_gfx->setTextColor(0x0000, colors[i]);
@@ -1228,7 +1295,15 @@ void drawSensorCalItems() {
   int btnW = MENU_W - 40;
   int btnX = MENU_X + 20;
   body_gfx->fillRoundRect(btnX, btnY, btnW, 40, 8, 0x001F);  // Blauw
-  body_gfx->drawRoundRect(btnX, btnY, btnW, 40, 8, 0xFFFF);
+  
+  // Highlight TERUG als geselecteerd (index 4)
+  if (bodyMenuIdx == 4) {
+    body_gfx->drawRoundRect(btnX-2, btnY-2, btnW+4, 44, 10, 0xFFE0);  // Geel
+    body_gfx->drawRoundRect(btnX-1, btnY-1, btnW+2, 42, 9, 0xFFE0);
+    body_gfx->drawRoundRect(btnX, btnY, btnW, 40, 8, 0xFFE0);
+  } else {
+    body_gfx->drawRoundRect(btnX, btnY, btnW, 40, 8, 0xFFFF);
+  }
   
   // Centreer tekst in knop (verticaal)
   #if USE_ADAFRUIT_FONTS
@@ -1249,12 +1324,14 @@ void drawSensorCalItems() {
 }
 
 // Geselecteerd bestand voor Recording menu
-static int selectedRecordingFile = -1;
-static String csvFiles[10];  // CSV bestanden lijst (globaal voor touch handler)
-static int csvCount = -1;     // Aantal gevonden bestanden (-1 = nog niet gescand)
-static uint32_t lastRecordingScan = 0;  // Laatste scan tijd
+int selectedRecordingFile = -1;
+String csvFiles[10];  // CSV bestanden lijst (globaal voor touch handler)
+int csvCount = -1;     // Aantal gevonden bestanden (-1 = nog niet gescand)
+uint32_t lastRecordingScan = 0;  // Laatste scan tijd
 
 void drawRecordingItems() {
+  extern bool recordingInButtonMode;  // <-- HIER, bovenaan de functie
+  
   const int MENU_X = 20;
   const int MENU_Y = 20;
   const int MENU_W = 480 - 40;
@@ -1313,14 +1390,19 @@ void drawRecordingItems() {
     body_gfx->setCursor(LIST_X, LIST_Y);
     body_gfx->print("Geen opnames gevonden");
   } else {
-    for (int i = 0; i < csvCount && i < 8; i++) {  // Max 8 regels
+    for (int i = 0; i < csvCount && i < 8; i++) {
       int y = LIST_Y + i * 20;
       
-      // Highlight geselecteerd bestand
+      // ROOD = geselecteerd bestand (rode letters, geen balk)
       if (i == selectedRecordingFile) {
-        body_gfx->fillRoundRect(LIST_X - 2, y - 2, LIST_W, 18, 3, 0x07E0);  // Groen highlight
-        body_gfx->setTextColor(0x0000, 0x07E0);  // Zwart op groen
-      } else {
+        body_gfx->setTextColor(0xF800, BODY_CFG.COL_BG);  // Rode letters
+      }
+      // GROEN = encoder positie (alleen in file mode)
+      else if (!recordingInButtonMode && i == bodyMenuIdx) {
+        body_gfx->setTextColor(0x07E0, BODY_CFG.COL_BG);  // Groene letters
+      }
+      // Normaal
+      else {
         body_gfx->setTextColor(0xFFFF, BODY_CFG.COL_BG);  // Wit
       }
       
@@ -1338,13 +1420,24 @@ void drawRecordingItems() {
   const char* btnLabels[] = {"PLAY", "DELETE", "AI analyze", "TERUG"};
   uint16_t btnColors[] = {0x07E0, 0xFD20, 0xF81F, 0x001F};  // Groen, Oranje, Magenta, Blauw
   
+  // Check of we in button mode zijn (extern variabele)
+  extern bool recordingInButtonMode;
+  
   for (int i = 0; i < 4; i++) {
     int y = BTN_Y + i * (BTN_H + BTN_SPACING);
     
-    // Knop met dubbele witte rand
+    // Knop
     body_gfx->fillRoundRect(BTN_X, y, BTN_W, BTN_H, 8, btnColors[i]);
-    body_gfx->drawRoundRect(BTN_X, y, BTN_W, BTN_H, 8, 0xFFFF);
-    body_gfx->drawRoundRect(BTN_X+1, y+1, BTN_W-2, BTN_H-2, 7, 0xFFFF);
+    
+    // Highlight alleen als we in button mode zijn EN deze knop is geselecteerd
+    if (recordingInButtonMode && i == bodyMenuIdx) {
+      body_gfx->drawRoundRect(BTN_X-2, y-2, BTN_W+4, BTN_H+4, 10, 0xFD20);  // Oranje
+      body_gfx->drawRoundRect(BTN_X-1, y-1, BTN_W+2, BTN_H+2, 9, 0xFD20);
+      body_gfx->drawRoundRect(BTN_X, y, BTN_W, BTN_H, 8, 0xFD20);
+    } else {
+      body_gfx->drawRoundRect(BTN_X, y, BTN_W, BTN_H, 8, 0xFFFF);
+      body_gfx->drawRoundRect(BTN_X+1, y+1, BTN_W-2, BTN_H-2, 7, 0xFFFF);
+    }
     
     // Tekst gecentreerd (zwart op PLAY/AI, wit op DELETE/TERUG)
     uint16_t txtColor = (i == 1 || i == 3) ? 0xFFFF : 0x0000;  // Wit voor DELETE en TERUG
@@ -1368,59 +1461,11 @@ void drawRecordingItems() {
   }
 }
 
-// void drawESPStatusItems() {
-//   const int MENU_X = 20;
-//   const int MENU_Y = 20;
-//   const int MENU_W = 480 - 40;
-//   
-//   setMenuFontItem();
-//   int y = MENU_Y + 60;
-//   
-//   body_gfx->setTextColor(BODY_CFG.COL_BRAND, BODY_CFG.COL_BG);
-//   body_gfx->setCursor(MENU_X + 30, y);
-//   body_gfx->print("ESP-NOW:");
-//   y += 35;
-//   
-//   // ESP status met kleur
-//   bool espOK = getEspNowInitialized();
-//   uint16_t statusColor = espOK ? BODY_CFG.DOT_GREEN : BODY_CFG.DOT_RED;
-//   body_gfx->setTextColor(statusColor, BODY_CFG.COL_BG);
-//   body_gfx->setCursor(MENU_X + 30, y);
-//   body_gfx->printf("%s", espOK ? "OK" : "FOUT");
-//   y += 30;
-//   
-//   // Timing info
-//   body_gfx->setTextColor(BODY_CFG.DOT_GREY, BODY_CFG.COL_BG);
-//   uint32_t timeSince = millis() - getLastCommTime();
-//   body_gfx->setCursor(MENU_X + 30, y);
-//   body_gfx->printf("Last RX:");
-//   y += 25;
-//   body_gfx->setCursor(MENU_X + 40, y);
-//   body_gfx->printf("%u sec", timeSince / 1000);
-//   y += 30;
-//   
-//   // Data values
-//   body_gfx->setCursor(MENU_X + 30, y);
-//   body_gfx->printf("Trust: %.1f", getTrustSpeed());
-//   y += 25;
-//   body_gfx->setCursor(MENU_X + 30, y);
-//   body_gfx->printf("Sleeve: %.1f", getSleeveSpeed());
-//   
-//   // TERUG knop onderaan (blauw)
-//   int btnY = MENU_Y + 230;
-//   int btnW = MENU_W - 40;
-//   int btnX = MENU_X + 20;
-//   body_gfx->fillRoundRect(btnX, btnY, btnW, 40, 8, 0x001F);  // Blauw
-//   body_gfx->drawRoundRect(btnX, btnY, btnW, 40, 8, 0xFFFF);
-//   
-//   body_gfx->setTextColor(0xFFFF, 0x001F);
-//   int16_t x1, y1; uint16_t tw, th;
-//   body_gfx->getTextBounds("TERUG", 0, 0, &x1, &y1, &tw, &th);
-//   body_gfx->setCursor(btnX + (btnW - tw) / 2, btnY + 10);
-//   body_gfx->print("TERUG");
-// }
-
 void drawSensorSettingsItems() {
+  extern bool sensorSettingsEditMode;
+  extern int sensorSettingsEditingParam;
+  extern bool sensorParamModified[6];
+  
   const int MENU_X = 20;
   const int MENU_Y = 20;
   const int MENU_W = 480 - 40;
@@ -1468,9 +1513,21 @@ void drawSensorSettingsItems() {
     int valBoxY = y - 5;  // 3px naar beneden (was y - 8)
     int valBoxH = 20;
     body_gfx->fillRoundRect(VAL_X, valBoxY, 100, valBoxH, 3, 0x2104);  // Donkergrijs
-    body_gfx->drawRoundRect(VAL_X, valBoxY, 100, valBoxH, 3, 0x8410);  // Lichtgrijze rand
-    body_gfx->setTextColor(0xFFFF, 0x2104);  // Witte tekst
+    body_gfx->drawRoundRect(VAL_X, valBoxY, 100, valBoxH, 3, 0x8410);
     
+    // Kleur bepalen
+    uint16_t valueColor;
+    if (sensorParamModified[i]) {
+      valueColor = 0xF800;  // ROOD = gewijzigd (na edit)
+    } else if (sensorSettingsEditMode && i == sensorSettingsEditingParam) {
+      valueColor = 0xF800;  // ROOD = edit mode (tijdens edit)
+    } else if (!sensorSettingsEditMode && i == bodyMenuIdx) {
+      valueColor = 0x07E0;  // GROEN = cursor (browsing)
+    } else {
+      valueColor = 0xFFFF;  // WIT = normaal
+    }
+    body_gfx->setTextColor(valueColor, 0x2104);
+   
     // Centreer waarde in box (horizontaal + verticaal)
     char valStr[12];
     sprintf(valStr, "%.2f", values[i]);
@@ -1530,8 +1587,16 @@ void drawSensorSettingsItems() {
   #endif
   
   // Opslaan (groen, links)
-  body_gfx->fillRoundRect(btn1X, btnY, btnW, btnH, 8, BODY_CFG.DOT_GREEN);  // Groen
-  body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFFFF);
+  body_gfx->fillRoundRect(btn1X, btnY, btnW, btnH, 8, BODY_CFG.DOT_GREEN);
+  
+  // Highlight als geselecteerd (index 0)
+  if (!sensorSettingsEditMode && bodyMenuIdx == 6) {
+    body_gfx->drawRoundRect(btn1X-2, btnY-2, btnW+4, btnH+4, 10, 0xFD20);  // Oranje
+    body_gfx->drawRoundRect(btn1X-1, btnY-1, btnW+2, btnH+2, 9, 0xFD20);
+    body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFD20);
+  } else {
+    body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFFFF);
+  }
   body_gfx->setTextColor(0xFFFF, BODY_CFG.DOT_GREEN);
   int16_t xa1, ya1; uint16_t twa, tha;
   body_gfx->getTextBounds("Opslaan", 0, 0, &xa1, &ya1, &twa, &tha);
@@ -1543,8 +1608,16 @@ void drawSensorSettingsItems() {
   body_gfx->print("Opslaan");
   
   // TERUG (blauw, rechts)
-  body_gfx->fillRoundRect(btn2X, btnY, btnW, btnH, 8, 0x001F);  // Blauw
-  body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFFFF);
+  body_gfx->fillRoundRect(btn2X, btnY, btnW, btnH, 8, 0x001F);
+  
+  // Highlight als geselecteerd (index 1)
+  if (!sensorSettingsEditMode && bodyMenuIdx == 7) {
+    body_gfx->drawRoundRect(btn2X-2, btnY-2, btnW+4, btnH+4, 10, 0xFD20);  // Oranje
+    body_gfx->drawRoundRect(btn2X-1, btnY-1, btnW+2, btnH+2, 9, 0xFD20);
+    body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFD20);
+  } else {
+    body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFFFF);
+  }
   body_gfx->setTextColor(0xFFFF, 0x001F);
   int16_t xb1, yb1; uint16_t twb, thb;
   body_gfx->getTextBounds("TERUG", 0, 0, &xb1, &yb1, &twb, &thb);
@@ -2428,11 +2501,18 @@ void drawSystemSettingsItems() {
   for (int i = 0; i < 4; i++) {
     int y = START_Y + i * (BTN_H + BTN_SPACING);
     
-    // Gekleurde knop met witte rand
+    // Gekleurde knop
     body_gfx->fillRoundRect(START_X, y, BTN_W, BTN_H, 8, colors[i]);
-    body_gfx->drawRoundRect(START_X, y, BTN_W, BTN_H, 8, 0xFFFF);
-    body_gfx->drawRoundRect(START_X+1, y+1, BTN_W-2, BTN_H-2, 7, 0xFFFF);  // Dubbele rand
     
+    // Highlight als geselecteerd
+    if (i == bodyMenuIdx) {
+      body_gfx->drawRoundRect(START_X-2, y-2, BTN_W+4, BTN_H+4, 10, 0x07E0);  // Groen
+      body_gfx->drawRoundRect(START_X-1, y-1, BTN_W+2, BTN_H+2, 9, 0x07E0);
+      body_gfx->drawRoundRect(START_X, y, BTN_W, BTN_H, 8, 0x07E0);
+    } else {
+      body_gfx->drawRoundRect(START_X, y, BTN_W, BTN_H, 8, 0xFFFF);
+      body_gfx->drawRoundRect(START_X+1, y+1, BTN_W-2, BTN_H-2, 7, 0xFFFF);
+    }
     // Centreer tekst in knop (kleur per knop)
     body_gfx->setTextColor(textColors[i], colors[i]);
     int16_t x1, y1; uint16_t tw, th;
@@ -2450,7 +2530,15 @@ void drawSystemSettingsItems() {
   int btnW = MENU_W - 40;
   int btnX = MENU_X + 20;
   body_gfx->fillRoundRect(btnX, btnY, btnW, 40, 8, 0x001F);  // Blauw
-  body_gfx->drawRoundRect(btnX, btnY, btnW, 40, 8, 0xFFFF);
+  
+  // Highlight TERUG als geselecteerd (index 4)
+  if (bodyMenuIdx == 4) {
+    body_gfx->drawRoundRect(btnX-2, btnY-2, btnW+4, 44, 10, 0x07E0);  // Groen
+    body_gfx->drawRoundRect(btnX-1, btnY-1, btnW+2, 42, 9, 0x07E0);
+    body_gfx->drawRoundRect(btnX, btnY, btnW, 40, 8, 0x07E0);
+  } else {
+    body_gfx->drawRoundRect(btnX, btnY, btnW, 40, 8, 0xFFFF);
+  }
   
   // Centreer tekst
   #if USE_ADAFRUIT_FONTS
@@ -2566,8 +2654,16 @@ void drawTimeSettingsItems() {
   
   // OPSLAAN (groen)
   body_gfx->fillRoundRect(btn1X, btnY, btnW, btnH, 8, 0x07E0);  // Groen
-  body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFFFF);
-  body_gfx->drawRoundRect(btn1X+1, btnY+1, btnW-2, btnH-2, 7, 0xFFFF);
+  
+  // Highlight als geselecteerd (index 0)
+  if (bodyMenuIdx == 0) {
+    body_gfx->drawRoundRect(btn1X-2, btnY-2, btnW+4, btnH+4, 10, 0xFD20);  // Oranje
+    body_gfx->drawRoundRect(btn1X-1, btnY-1, btnW+2, btnH+2, 9, 0xFD20);
+    body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFD20);
+  } else {
+    body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFFFF);
+    body_gfx->drawRoundRect(btn1X+1, btnY+1, btnW-2, btnH-2, 7, 0xFFFF);
+  }
   body_gfx->setTextColor(0x0000, 0x07E0);  // Zwarte tekst
   int16_t xa1, ya1; uint16_t twa, tha;
   body_gfx->getTextBounds("OPSLAAN", 0, 0, &xa1, &ya1, &twa, &tha);
@@ -2580,8 +2676,16 @@ void drawTimeSettingsItems() {
   
   // TERUG (blauw)
   body_gfx->fillRoundRect(btn2X, btnY, btnW, btnH, 8, 0x001F);  // Blauw
-  body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFFFF);
-  body_gfx->drawRoundRect(btn2X+1, btnY+1, btnW-2, btnH-2, 7, 0xFFFF);
+  
+  // Highlight als geselecteerd (index 1)
+  if (bodyMenuIdx == 1) {
+    body_gfx->drawRoundRect(btn2X-2, btnY-2, btnW+4, btnH+4, 10, 0xFD20);  // Oranje
+    body_gfx->drawRoundRect(btn2X-1, btnY-1, btnW+2, btnH+2, 9, 0xFD20);
+    body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFD20);
+  } else {
+    body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFFFF);
+    body_gfx->drawRoundRect(btn2X+1, btnY+1, btnW-2, btnH-2, 7, 0xFFFF);
+  }
   body_gfx->setTextColor(0xFFFF, 0x001F);  // Witte tekst
   int16_t xb1, yb1; uint16_t twb, thb;
   body_gfx->getTextBounds("TERUG", 0, 0, &xb1, &yb1, &twb, &thb);
@@ -2676,8 +2780,16 @@ void drawFormatConfirmItems() {
   
   // ANNULEREN (blauw, links)
   body_gfx->fillRoundRect(btn1X, btnY, btnW, btnH, 8, 0x001F);  // Blauw
-  body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFFFF);
-  body_gfx->drawRoundRect(btn1X+1, btnY+1, btnW-2, btnH-2, 7, 0xFFFF);
+  
+  // Highlight als geselecteerd (index 0)
+  if (bodyMenuIdx == 0) {
+    body_gfx->drawRoundRect(btn1X-2, btnY-2, btnW+4, btnH+4, 10, 0x07E0);  // Groen
+    body_gfx->drawRoundRect(btn1X-1, btnY-1, btnW+2, btnH+2, 9, 0x07E0);
+    body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0x07E0);
+  } else {
+    body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFFFF);
+    body_gfx->drawRoundRect(btn1X+1, btnY+1, btnW-2, btnH-2, 7, 0xFFFF);
+  }
   body_gfx->setTextColor(0xFFFF, 0x001F);
   int16_t xa1, ya1; uint16_t twa, tha;
   body_gfx->getTextBounds("ANNULEREN", 0, 0, &xa1, &ya1, &twa, &tha);
@@ -2690,8 +2802,16 @@ void drawFormatConfirmItems() {
   
   // FORMATTEER (rood, rechts)
   body_gfx->fillRoundRect(btn2X, btnY, btnW, btnH, 8, 0xF800);  // Rood
-  body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFFFF);
-  body_gfx->drawRoundRect(btn2X+1, btnY+1, btnW-2, btnH-2, 7, 0xFFFF);
+  
+  // Highlight als geselecteerd (index 1)
+  if (bodyMenuIdx == 1) {
+    body_gfx->drawRoundRect(btn2X-2, btnY-2, btnW+4, btnH+4, 10, 0x07E0);  // Groen
+    body_gfx->drawRoundRect(btn2X-1, btnY-1, btnW+2, btnH+2, 9, 0x07E0);
+    body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0x07E0);
+  } else {
+    body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFFFF);
+    body_gfx->drawRoundRect(btn2X+1, btnY+1, btnW-2, btnH-2, 7, 0xFFFF);
+  }
   body_gfx->setTextColor(0xFFFF, 0xF800);
   int16_t xb1, yb1; uint16_t twb, thb;
   body_gfx->getTextBounds("FORMATTEER", 0, 0, &xb1, &yb1, &twb, &thb);
@@ -2732,8 +2852,16 @@ void drawFunscriptSettingsItems() {
   uint16_t aanColor = funscriptEnabled ? 0x07E0 : 0x4208;
   uint16_t aanTextColor = funscriptEnabled ? 0x0000 : 0xC618;
   body_gfx->fillRoundRect(btn1X, btnY, btnW, btnH, 8, aanColor);
-  body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFFFF);
-  body_gfx->drawRoundRect(btn1X+1, btnY+1, btnW-2, btnH-2, 7, 0xFFFF);
+  
+  // Highlight als geselecteerd (index 0)
+  if (bodyMenuIdx == 0) {
+    body_gfx->drawRoundRect(btn1X-2, btnY-2, btnW+4, btnH+4, 10, 0xFD20);
+    body_gfx->drawRoundRect(btn1X-1, btnY-1, btnW+2, btnH+2, 9, 0xFD20);
+    body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFD20);
+  } else {
+    body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFFFF);
+    body_gfx->drawRoundRect(btn1X+1, btnY+1, btnW-2, btnH-2, 7, 0xFFFF);
+  }
   body_gfx->setTextColor(aanTextColor, aanColor);
   int16_t xa1, ya1; uint16_t twa, tha;
   body_gfx->getTextBounds("AAN", 0, 0, &xa1, &ya1, &twa, &tha);
@@ -2748,8 +2876,16 @@ void drawFunscriptSettingsItems() {
   uint16_t uitColor = !funscriptEnabled ? 0xF800 : 0x4208;
   uint16_t uitTextColor = !funscriptEnabled ? 0xFFFF : 0xC618;
   body_gfx->fillRoundRect(btn2X, btnY, btnW, btnH, 8, uitColor);
-  body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFFFF);
-  body_gfx->drawRoundRect(btn2X+1, btnY+1, btnW-2, btnH-2, 7, 0xFFFF);
+  
+  // Highlight als geselecteerd (index 1)
+  if (bodyMenuIdx == 1) {
+    body_gfx->drawRoundRect(btn2X-2, btnY-2, btnW+4, btnH+4, 10, 0xFD20);
+    body_gfx->drawRoundRect(btn2X-1, btnY-1, btnW+2, btnH+2, 9, 0xFD20);
+    body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFD20);
+  } else {
+    body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFFFF);
+    body_gfx->drawRoundRect(btn2X+1, btnY+1, btnW-2, btnH-2, 7, 0xFFFF);
+  }
   body_gfx->setTextColor(uitTextColor, uitColor);
   int16_t xb1, yb1; uint16_t twb, thb;
   body_gfx->getTextBounds("UIT", 0, 0, &xb1, &yb1, &twb, &thb);
@@ -2805,7 +2941,15 @@ void drawFunscriptSettingsItems() {
   #endif
   
   body_gfx->fillRoundRect(terugX, terugY, terugW, 40, 8, 0x001F);  // Blauw
-  body_gfx->drawRoundRect(terugX, terugY, terugW, 40, 8, 0xFFFF);
+  
+  // Highlight als geselecteerd (index 2)
+  if (bodyMenuIdx == 2) {
+    body_gfx->drawRoundRect(terugX-2, terugY-2, terugW+4, 44, 10, 0xFD20);
+    body_gfx->drawRoundRect(terugX-1, terugY-1, terugW+2, 42, 9, 0xFD20);
+    body_gfx->drawRoundRect(terugX, terugY, terugW, 40, 8, 0xFD20);
+  } else {
+    body_gfx->drawRoundRect(terugX, terugY, terugW, 40, 8, 0xFFFF);
+  }
   body_gfx->setTextColor(0xFFFF, 0x001F);
   int16_t xt1, yt1; uint16_t twt, tht;
   body_gfx->getTextBounds("TERUG", 0, 0, &xt1, &yt1, &twt, &tht);

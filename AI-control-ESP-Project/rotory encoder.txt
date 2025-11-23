@@ -1,0 +1,131 @@
+📝 ENCODER PROJECT SAMENVATTING
+✅ WAT WE HEBBEN GEDAAN
+Hardware & Basis
+
+Rotary Encoder toegevoegd: Adafruit I2C QT Rotary Encoder (0x36)
+I2C configuratie: Wire1, SDA=18, SCL=8
+Debouncing: 50ms polling, active LOW button
+
+Encoder Navigatie - Hoofdscherm
+
+Activatie: 1500ms hold (was 2000ms)
+Dubbele klik: 800ms window voor direct AI toggle
+4 knoppen: REC, PLAY, MENU, AI
+Deactivatie: Bij AI selectie of menu TERUG
+
+Encoder Navigatie - Alle Menu's
+✅ Hoofdmenu (oranje kaders)
+
+6 items + TERUG
+
+✅ Sensor Calibration (geel kaders)
+
+4 items + TERUG
+
+✅ AI Settings (geel kaders)
+
+3 buttons: AI AAN, Opslaan, TERUG
+Parameters nog touch-only
+
+✅ ML Training (oranje kaders)
+
+4 items + TERUG
+
+✅ Sensor Settings (oranje kaders)
+
+2 buttons: Opslaan, TERUG
+Parameters nog touch-only
+
+✅ Recording (oranje kaders, groene/rode letters)
+
+FASE 1: Bestanden scrollen (groene letters)
+FASE 2: Knoppen (PLAY, DELETE, AI, TERUG)
+Geselecteerd bestand = rode letters
+
+✅ System Settings (groene kaders)
+
+4 items + TERUG
+
+✅ Funscript Settings (oranje kaders)
+
+AAN, UIT, TERUG
+
+✅ Format Confirm (groene kaders)
+
+ANNULEREN, FORMATTEER
+
+✅ Time Settings (oranje kaders)
+
+OPSLAAN, TERUG
+Parameters nog touch-only
+
+
+🔧 NOG TE DOEN
+1. Parameter Editing met Encoder
+Doel: +/- waarden aanpassen met encoder ipv touch
+Locaties:
+
+AI Settings: 6 parameters (HR Laag/Hoog, Temp Max, GSR Max, Response, Autonomy)
+Sensor Settings: 6 parameters (Beat Threshold, Temp Offset/Smoothing, GSR Baseline/Sensitivity/Smoothing)
+Time Settings: 5 parameters (Jaar, Maand, Dag, Uur, Minuut)
+
+Implementatie idee:
+
+Index 0-5 = Parameters (highlight parameter)
+SELECT op parameter → Edit mode (waarde knippert)
+Draaien in edit mode → +/- waarde
+SELECT weer → Save + exit edit mode
+Index 6+ = Buttons (Opslaan, TERUG, etc.)
+
+2. RGB LED Integratie
+Hardware: WS2812B RGB LED (te bepalen welke pin)
+Functionaliteit te bepalen:
+
+Encoder status indicator?
+Menu mode indicator?
+Recording status?
+AI overrule status?
+Custom kleuren per mode?
+
+Vragen:
+
+Welke pin?
+Welke library? (FastLED, Adafruit NeoPixel?)
+Welke kleuren voor welke states?
+
+3. Touch Disable via Config
+Doel: Touch uitschakelen als encoder actief is
+Implementatie:
+cpp// In body_config.h
+#define ENCODER_DISABLE_TOUCH true  // Touch uit als encoder actief
+
+// In bodyMenuHandleTouch()
+#if ENCODER_DISABLE_TOUCH
+  if (encoderActiveMainScreen) return;  // Blokkeer touch in hoofdscherm
+  if (currentMode == MODE_MENU) return; // Blokkeer touch in menu's
+#endif
+Configuratie opties:
+
+ENCODER_DISABLE_TOUCH_MAIN - Hoofdscherm
+ENCODER_DISABLE_TOUCH_MENU - Menu's
+ENCODER_DISABLE_TOUCH_PARAMS - Parameter editing
+
+
+📊 TECHNISCHE DETAILS
+Variabelen (Body_ESP.ino)
+cppbool encoderActiveMainScreen = false;
+int mainScreenButtonIdx = 0;
+bool recordingInButtonMode = false;
+extern int selectedRecordingFile;
+extern int csvCount;
+Key Functions
+
+handleEncoderInput() - Hoofdlogica
+bodyMenuForceRedraw() - Menu refresh
+bodyMenuHandleTouch() - Touch simulatie voor backward compatibility
+
+Timing
+
+Encoder polling: 50ms
+Hold activatie: 1500ms
+Dubbele klik: 800ms

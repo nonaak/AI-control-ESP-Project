@@ -15,7 +15,8 @@ void body_gfx4_begin();
 void body_gfx4_clear();
 void body_gfx4_setLabel(uint8_t ch, const char* name);
 void body_gfx4_pushSample(uint8_t ch, float value, bool mark=false);
-void body_gfx4_drawButtons(bool recording, bool playing, bool menuActive, bool overruleActive, bool recDisabled=false);
+void body_gfx4_drawButtons(bool recording, bool playing, bool menuActive, bool overruleActive, bool recDisabled=false, int8_t highlightIdx=-1);
+//void body_gfx4_drawButtons(bool recording, bool playing, bool menuActive, bool overruleActive, bool recDisabled=false);
 void body_gfx4_drawStatus(const char* text);
 
 // Touch cooldown management

@@ -1404,11 +1404,20 @@ void drawMLTrainingView() {
   for (int i = 0; i < 4; i++) {
     int y = START_Y + i * (BTN_H + BTN_SPACING);
     
-    // Gekleurde knop met dubbele witte rand
+    // Gekleurde knop
     body_gfx->fillRoundRect(START_X, y, BTN_W, BTN_H, 8, colors[i]);
-    body_gfx->drawRoundRect(START_X, y, BTN_W, BTN_H, 8, 0xFFFF);      // Witte rand
-    body_gfx->drawRoundRect(START_X+1, y+1, BTN_W-2, BTN_H-2, 7, 0xFFFF);  // Dubbele rand
     
+    // Highlight als geselecteerd
+    extern int bodyMenuIdx;
+    if (i == bodyMenuIdx) {
+      body_gfx->drawRoundRect(START_X-2, y-2, BTN_W+4, BTN_H+4, 10, 0xFD20);  // Oranje
+      body_gfx->drawRoundRect(START_X-1, y-1, BTN_W+2, BTN_H+2, 9, 0xFD20);
+      body_gfx->drawRoundRect(START_X, y, BTN_W, BTN_H, 8, 0xFD20);
+    } else {
+      body_gfx->drawRoundRect(START_X, y, BTN_W, BTN_H, 8, 0xFFFF);
+      body_gfx->drawRoundRect(START_X+1, y+1, BTN_W-2, BTN_H-2, 7, 0xFFFF);
+    }
+
     // Zwarte tekst gecentreerd
     body_gfx->setTextColor(0x0000, colors[i]);  // Zwart op kleur
     int16_t x1, y1; uint16_t tw, th;
@@ -1445,8 +1454,17 @@ void drawMLTrainingView() {
   int btnX = MENU_X + 20;
   
   body_gfx->fillRoundRect(btnX, btnY, btnW, 40, 8, 0x001F);  // Blauw
-  body_gfx->drawRoundRect(btnX, btnY, btnW, 40, 8, 0xFFFF);  // Witte rand
-  body_gfx->drawRoundRect(btnX+1, btnY+1, btnW-2, 38, 7, 0xFFFF);  // Dubbele rand
+  
+  // Highlight TERUG als geselecteerd (index 4)
+  extern int bodyMenuIdx;
+  if (bodyMenuIdx == 4) {
+    body_gfx->drawRoundRect(btnX-2, btnY-2, btnW+4, 44, 10, 0xFD20);  // Oranje
+    body_gfx->drawRoundRect(btnX-1, btnY-1, btnW+2, 42, 9, 0xFD20);
+    body_gfx->drawRoundRect(btnX, btnY, btnW, 40, 8, 0xFD20);
+  } else {
+    body_gfx->drawRoundRect(btnX, btnY, btnW, 40, 8, 0xFFFF);
+    body_gfx->drawRoundRect(btnX+1, btnY+1, btnW-2, 38, 7, 0xFFFF);
+  }
   
   #if USE_ADAFRUIT_FONTS
     body_gfx->setFont(&FONT_ITEM);

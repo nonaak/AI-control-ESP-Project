@@ -60,30 +60,6 @@ const int SCR_H = 320;
 // ===== SC01 Plus Display Pins =====
 // Display wordt nu gedefinieerd in body_display.cpp
 #define GFX_BL 45  // Backlight pin
-// 
-// // 8-bit parallel bus
-// Arduino_DataBus *bus = new Arduino_ESP32LCD8(
-//     0,   // DC
-//     GFX_NOT_DEFINED,  // CS
-//     47,  // WR
-//     GFX_NOT_DEFINED,  // RD
-//     9,   // D0
-//     46,  // D1
-//     3,   // D2
-//     8,   // D3
-//     18,  // D4
-//     17,  // D5
-//     16,  // D6
-//     15   // D7
-// );
-// 
-// // ST7796 display driver (480x320)
-// Arduino_GFX *gfx = new Arduino_ST7796(
-//     bus, 
-//     4,    // RST
-//     1,    // rotation (landscape)
-//     true  // IPS
-// );
 
 // Gebruik extern display van body_display.cpp
 extern Arduino_GFX *body_gfx;
@@ -119,6 +95,52 @@ Adafruit_seesaw encoder(&Wire1);
 bool encoderAvailable = false;
 int32_t encoderPosition = 0;
 
+// Encoder state voor hoofdscherm
+bool encoderActiveMainScreen = false;
+int mainScreenButtonIdx = 0;  // 0=REC, 1=PLAY, 2=MENU, 3=AI
+
+// Recording menu state
+bool recordingInButtonMode = false;  // false = bestanden, true = knoppen
+
+// Extern variabelen uit body_menu.cpp
+extern int selectedRecordingFile;
+extern int csvCount;
+
+// AI Settings menu state
+bool aiSettingsEditMode = false;
+int aiSettingsEditingParam = -1;
+bool aiParamModified[6] = {false};
+float aiParamBackup[6];
+
+// Sensor Settings menu state (NIEUW!)
+bool sensorSettingsEditMode = false;
+int sensorSettingsEditingParam = -1;
+bool sensorParamModified[6] = {false};
+float sensorParamBackup[6];
+
+// Forward declaration voor AI Settings struct uit body_menu.cpp
+struct AISettingsData {
+  float autonomyLevel;
+  float hrLow;
+  float hrHigh;
+  float tempMax;
+  float gsrMax;
+  float responseRate;
+  bool aiEnabled;
+};
+extern AISettingsData aiSettings;
+
+// Forward declaration voor Sensor Settings struct uit body_menu.cpp
+struct SensorSettingsEdit {
+  float beatThreshold;
+  float tempOffset;
+  float tempSmoothing;
+  float gsrBaseline;
+  float gsrSensitivity;
+  float gsrSmoothing;
+};
+extern SensorSettingsEdit sensorEdit;
+
 // ===== ESP-NOW Communicatie =====
 // MAC adressen van het netwerk
 static uint8_t hoofdESP_MAC[] = {0xE4, 0x65, 0xB8, 0x7A, 0x85, 0xE4};  // HoofdESP
@@ -137,23 +159,6 @@ static uint32_t lastLubeTriggerTime = 0;  // Tijd van laatste lube trigger
 static float sleevePercentage = 0.0f;  // Echte sleeve positie percentage (0-100)
 static uint8_t hoofdESPSpeedStep = 3;  // Laatst ontvangen speed step van HoofdESP
 static bool espNowInitialized = false;
-
-// 🔥 NIEUW: ESP-NOW Retry Queue
-//#define ESPNOW_QUEUE_SIZE 5
-//#define MAX_RETRIES 3
-//#define RETRY_DELAY_MS 100
-
-//struct ESPNowQueueItem {
-  //esp_now_send_message_t message;
-  //uint32_t timestamp;
-  //uint8_t retryCount;
-  //bool inUse;
-//};
-
-//static ESPNowQueueItem espNowQueue[ESPNOW_QUEUE_SIZE];
-//static int queueHead = 0;  // Volgende te verzenden
-//static int queueTail = 0;  // Volgende vrije slot
-//static int queueCount = 0; // Aantal berichten in queue
 
 // ESP-NOW ontvangst bericht structuur (van HoofdESP)
 typedef struct __attribute__((packed)) {
@@ -205,59 +210,6 @@ static int queueCount = 0;
 volatile bool touchDetected = false;
 volatile uint16_t touchX = 0;
 volatile uint16_t touchY = 0;
-
-// ===== Kleur test knoppen - UITGESCHAKELD (vervangen door body_gfx4) =====
-// struct ColorButton {
-//   int x, y, w, h;
-//   uint16_t targetColor;
-//   uint16_t currentColor;
-//   const char* label;
-// };
-// 
-// ColorButton buttons[4] = {
-//   {20, 30, 100, 70, 0xF800, 0xFFFF, "ROOD"},     // Links boven
-//   {360, 50, 100, 70, 0x07E0, 0xFFFF, "GROEN"},   // Rechts boven
-//   {50, 230, 100, 70, 0x001F, 0xFFFF, "BLAUW"},   // Links onder
-//   {340, 220, 120, 80, 0xFFE0, 0xFFFF, "GEEL"}    // Rechts onder (groter)
-// };
-// 
-// // Functie om knoppen te tekenen
-// void drawButtons() {
-//   for (int i = 0; i < 4; i++) {
-//     // Knop rechthoek
-//     gfx->fillRoundRect(buttons[i].x, buttons[i].y, buttons[i].w, buttons[i].h, 8, buttons[i].currentColor);
-//     gfx->drawRoundRect(buttons[i].x, buttons[i].y, buttons[i].w, buttons[i].h, 8, 0x0000);  // Zwarte rand
-//     
-//     // Label tekst (in target kleur)
-//     gfx->setTextSize(2);
-//     gfx->setTextColor(buttons[i].targetColor, buttons[i].currentColor);
-//     
-//     // Center text - horizontaal en verticaal
-//     int16_t x1, y1; uint16_t tw, th;
-//     gfx->getTextBounds((char*)buttons[i].label, 0, 0, &x1, &y1, &tw, &th);
-//     int textX = buttons[i].x + (buttons[i].w - tw) / 2;
-//     int textY = buttons[i].y + (buttons[i].h) / 2 - 6;  // text omhoog is -, text omlaag is + 12px omhoog totaal
-//     gfx->setCursor(textX, textY);
-//     gfx->print(buttons[i].label);
-//   }
-// }
-// 
-// // Check of touch binnen knop valt
-// bool checkButtonTouch(int x, int y) {
-//   for (int i = 0; i < 4; i++) {
-//     if (x >= buttons[i].x && x < buttons[i].x + buttons[i].w &&
-//         y >= buttons[i].y && y < buttons[i].y + buttons[i].h) {
-//       // Knop ingedrukt - verander naar target kleur
-//       if (buttons[i].currentColor != buttons[i].targetColor) {
-//         buttons[i].currentColor = buttons[i].targetColor;
-//         drawButtons();  // Herteken alle knoppen
-//         Serial.printf("[BUTTON] %s pressed - changed to target color!\n", buttons[i].label);
-//       }
-//       return true;
-//     }
-//   }
-//   return false;
-// }
 
 // ===== Body GFX4 Touch Handler =====
 // UI states voor knoppen
@@ -319,9 +271,6 @@ void startCSVRecording() {
   // Maak bestandsnaam met timestamp
   DateTime now = rtc.now();
   char filename[64];
-  //sprintf(filename, "/recordings/session_%04d%02d%02d_%02d%02d%02d.csv",
-          //now.year(), now.month(), now.day(),
-          //now.hour(), now.minute(), now.second());
   sprintf(filename, "/recordings/%02d-%02d - %02d-%02d-%02d.csv",
         now.hour(), now.minute(),        // Tijd: HH-MM
         now.day(), now.month(), now.year() % 100);  // Datum: DD-MM-YY        
@@ -474,9 +423,6 @@ static void onESPNowReceive(const esp_now_recv_info *info, const uint8_t *incomi
       Serial.println("[PAUSE] ⚠️ Emergency pause detected!");
 
       levelBeforePause = message.currentSpeedStep;
-      //extern AdvancedStressManager stressManager;
-      //StressDecision decision = stressManager.getStressDecision();
-      //levelBeforePause = decision.currentLevel;
       
       Serial.printf("[PAUSE] Was op Level %d\n", levelBeforePause);
       
@@ -677,8 +623,6 @@ bool sendESPNowMessage(float newTrust, float newSleeve, bool overruleActive, con
     Serial.printf("[ESP-NOW] TX FAILED: %d - adding to retry queue\n", result);
     addToESPNowQueue(message);
     return false;  // Direct send failed, maar wordt ge-retry'd
-    //Serial.printf("[ESP-NOW] TX FAILED: %d\n", result);
-    //return false;
   }
 }
 
@@ -840,7 +784,8 @@ void touchCallback(TPoint point, TEvent e) {
     
     // Herstel normaal scherm
     body_gfx4_clear();
-    body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
+    body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
+    //body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
     
     return;  // Stop hier, verwerk geen andere touches
   }
@@ -877,10 +822,6 @@ void touchCallback(TPoint point, TEvent e) {
       x = 480 - 1 - x;
       y = 320 - 1 - y;
     }
-    
-    // Serial output UITGESCHAKELD (zie sensor debug in loop)
-    // Serial.printf("RAW: x=%d, y=%d -> MANUAL(S%d,FX%d,FY%d): x=%d, y=%d (event=%d)\n", 
-    //               rawX, rawY, MANUAL_SWAP_XY, MANUAL_FLIP_X, MANUAL_FLIP_Y, x, y, (int)e);
   
   #else
     // ===== AUTO MODE: Gebruik rotatie =====
@@ -957,7 +898,8 @@ void touchCallback(TPoint point, TEvent e) {
 
       // Volledige hertekening van body_gfx4 scherm
       body_gfx4_clear();  // Clear menu EN teken frame
-      body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
+      body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
+      //body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
       
       // Force onmiddellijke sensor update zodat grafieken zichtbaar worden
       lastSensorPush = 0;  // Reset timer (wordt gedeclareerd in loop)
@@ -974,14 +916,6 @@ void touchCallback(TPoint point, TEvent e) {
     return;  // Menu verwerkt de touch, stop hier
   }
   
-  // ===== MAIN MODE TOUCH HANDLING =====
-  // Check of touch op body_gfx4 knoppen is (onderaan scherm)
-  // Button layout (volgens body_gfx4.cpp):
-  // BUTTON_Y = SCR_H - 40 = 280
-  // BUTTON_W = (SCR_W - 30) / 4 = 112
-  // BUTTON_SPACING = (SCR_W - 10) / 4 = 117
-  // BUTTON_START_X = 5
-  
   if (y >= 280 && y < 315) {  // Binnen knop hoogte
     lastButtonTouch = millis();
     
@@ -995,7 +929,8 @@ void touchCallback(TPoint point, TEvent e) {
         stopCSVRecording();   // Stop huidige recording
       }
       
-      body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
+      body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
+      //body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
       Serial.printf("[BUTTON] REC %s\n", isRecording ? "ON" : "OFF");
     }
     else if (x >= 122 && x < 234) {
@@ -1011,10 +946,565 @@ void touchCallback(TPoint point, TEvent e) {
     else if (x >= 356 && x < 475) {
       // AI knop
       aiOverruleActive = !aiOverruleActive;
-      body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
+      body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
+      //body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
       Serial.printf("[BUTTON] AI %s\n", aiOverruleActive ? "ON" : "OFF");
     }
   }
+}
+
+
+// ===== ENCODER HANDLER =====
+void handleEncoderInput() {
+  if (!encoderAvailable) return;
+  
+  static uint32_t lastEncoderRead = 0;
+  static bool lastButtonState = false;
+  static int32_t lastPosition = 0;
+  static uint32_t buttonPressStart = 0;
+  static uint32_t lastClickTime = 0;
+  static bool waitingForDoubleClick = false;
+  
+  if (millis() - lastEncoderRead < 50) return;  // 50ms polling
+  lastEncoderRead = millis();
+  
+  // Lees encoder
+  int32_t newPosition = encoder.getEncoderPosition();
+  int32_t delta = newPosition - lastPosition;
+  bool buttonPressed = !encoder.digitalRead(24);  // Active LOW
+  
+  // ===== HOOFDSCHERM MODE =====
+  if (currentMode == MODE_MAIN) {
+    // Button press detectie
+    if (buttonPressed && !lastButtonState) {
+      buttonPressStart = millis();
+    }
+    
+    // Button release detectie
+    if (!buttonPressed && lastButtonState) {
+      uint32_t pressDuration = millis() - buttonPressStart;
+      
+      // ENCODER INACTIEF: Check voor activatie of double-click
+      if (!encoderActiveMainScreen) {
+        if (pressDuration >= 1500) {
+          // 2 sec hold = Activeer encoder
+          encoderActiveMainScreen = true;
+          mainScreenButtonIdx = 0;
+          body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
+          //body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
+          Serial.println("[ENCODER] Main screen activated");
+        } else {
+          // Kort drukken = Check voor double-click (AI toggle)
+          if (waitingForDoubleClick && (millis() - lastClickTime < 800)) {
+            // DOUBLE CLICK = Direct AI toggle
+            aiOverruleActive = !aiOverruleActive;
+            body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
+            //body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
+            Serial.printf("[ENCODER] AI toggled: %s\n", aiOverruleActive ? "ON" : "OFF");
+            waitingForDoubleClick = false;
+          } else {
+            // Eerste klik - wacht op tweede
+            waitingForDoubleClick = true;
+            lastClickTime = millis();
+          }
+        }
+      }
+       // ENCODER ACTIEF: Selecteer button
+       else {
+        if (mainScreenButtonIdx == 0) {
+          // REC toggle
+          isRecording = !isRecording;
+          if (isRecording) startCSVRecording();
+          else stopCSVRecording();
+          body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
+          Serial.printf("[ENCODER] REC: %s\n", isRecording ? "ON" : "OFF");
+        } else if (mainScreenButtonIdx == 1) {
+          // PLAY - open menu
+          currentMode = MODE_MENU;
+          menuActive = true;
+          bodyMenuMode = BODY_MODE_MENU;
+          bodyMenuPage = BODY_PAGE_RECORDING;
+          bodyMenuIdx = 0;
+          recordingInButtonMode = false;  // Reset naar bestand mode
+          bodyMenuForceRedraw();
+          Serial.println("[ENCODER] -> Recording menu");
+        } else if (mainScreenButtonIdx == 2) {
+          // MENU - open menu
+          currentMode = MODE_MENU;
+          menuActive = true;
+          bodyMenuMode = BODY_MODE_MENU;
+          bodyMenuPage = BODY_PAGE_MAIN;
+          bodyMenuIdx = 0;
+          bodyMenuForceRedraw();
+          Serial.println("[ENCODER] -> Main menu");
+        } else if (mainScreenButtonIdx == 3) {
+          // AI toggle + DEACTIVEER encoder
+          aiOverruleActive = !aiOverruleActive;
+          encoderActiveMainScreen = false;
+          body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
+          Serial.printf("[ENCODER] AI: %s (deactivated)\n", aiOverruleActive ? "ON" : "OFF");
+        }
+      }
+    }
+    
+    // Reset double-click timer
+    if (waitingForDoubleClick && (millis() - lastClickTime > 800)) {
+      waitingForDoubleClick = false;
+    }
+    
+    // DRAAIEN (alleen als encoder actief)
+    if (encoderActiveMainScreen && delta != 0) {
+      if (delta > 0) {
+        mainScreenButtonIdx--;  // Rechts = links
+      } else {
+        mainScreenButtonIdx++;  // Links = rechts
+      }
+      
+      // Wrap around (4 buttons: 0-3)
+      if (mainScreenButtonIdx < 0) mainScreenButtonIdx = 3;
+      if (mainScreenButtonIdx > 3) mainScreenButtonIdx = 0;
+      
+      body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
+      Serial.printf("[ENCODER] Button: %d\n", mainScreenButtonIdx);
+      lastPosition = newPosition;
+    }
+  }
+  // ===== MENU MODE ===== (bestaande code blijft)
+  else if (currentMode == MODE_MENU) {
+    // DRAAIEN
+    if (delta != 0) {
+      int maxItems = 6;
+      if (bodyMenuPage == BODY_PAGE_MAIN) maxItems = 6;
+      else if (bodyMenuPage == BODY_PAGE_SENSOR_CAL) maxItems = 4;  // 4 items + TERUG
+      else if (bodyMenuPage == BODY_PAGE_AI_SETTINGS) {
+        if (aiSettingsEditMode) {
+          maxItems = 0;  // Geen scrollen tijdens edit mode
+        } else {
+          maxItems = 8;  // 6 params + 3 knoppen (0-8)
+        }
+      }
+      else if (bodyMenuPage == BODY_PAGE_ML_TRAINING) maxItems = 4;  // 4 items + TERUG
+      else if (bodyMenuPage == BODY_PAGE_SENSOR_SETTINGS) {
+        if (sensorSettingsEditMode) {
+          maxItems = 0;  // Geen scrollen tijdens edit mode
+        } else {
+          maxItems = 7;  // 6 params + 2 knoppen (0-7)
+        }
+      }
+      else if (bodyMenuPage == BODY_PAGE_RECORDING) maxItems = 3;  // 4 buttons: 0,1,2,3
+      else if (bodyMenuPage == BODY_PAGE_SYSTEM_SETTINGS) maxItems = 4;  // 4 items + TERUG
+      else if (bodyMenuPage == BODY_PAGE_FUNSCRIPT_SETTINGS) maxItems = 2;  // AAN, UIT, TERUG
+      else if (bodyMenuPage == BODY_PAGE_FORMAT_CONFIRM) maxItems = 1;  // ANNULEREN, FORMATTEER
+      else if (bodyMenuPage == BODY_PAGE_TIME_SETTINGS) maxItems = 1;  // OPSLAAN, TERUG
+      // SPECIAL: Sensor Settings edit mode - waarde +/-
+      if (bodyMenuPage == BODY_PAGE_SENSOR_SETTINGS && sensorSettingsEditMode && delta != 0) {
+        float stepSize = 1.0f;  // Default step
+        
+        // Bepaal step size per parameter
+        if (sensorSettingsEditingParam == 1 || sensorSettingsEditingParam == 2 || sensorSettingsEditingParam == 5) {
+          stepSize = 0.01f;  // Offset/Smoothing: 0.01 stappen
+        } else if (sensorSettingsEditingParam == 0) {
+          stepSize = 1000.0f;  // Beat threshold: 1000 stappen
+        } else if (sensorSettingsEditingParam == 3) {
+          stepSize = 10.0f;  // GSR baseline: 10 stappen
+        } else if (sensorSettingsEditingParam == 4) {
+          stepSize = 0.1f;  // GSR sensitivity: 0.1 stappen
+        }
+        
+        // +/- waarde
+        if (delta > 0) {  // Rechts = omlaag
+          switch(sensorSettingsEditingParam) {
+            case 0: sensorEdit.beatThreshold = max(10000.0f, sensorEdit.beatThreshold - stepSize); break;
+            case 1: sensorEdit.tempOffset = max(-10.0f, sensorEdit.tempOffset - stepSize); break;
+            case 2: sensorEdit.tempSmoothing = max(0.0f, sensorEdit.tempSmoothing - stepSize); break;
+            case 3: sensorEdit.gsrBaseline = max(0.0f, sensorEdit.gsrBaseline - stepSize); break;
+            case 4: sensorEdit.gsrSensitivity = max(0.0f, sensorEdit.gsrSensitivity - stepSize); break;
+            case 5: sensorEdit.gsrSmoothing = max(0.0f, sensorEdit.gsrSmoothing - stepSize); break;
+          }
+        } else {  // Links = omhoog
+          switch(sensorSettingsEditingParam) {
+            case 0: sensorEdit.beatThreshold = min(100000.0f, sensorEdit.beatThreshold + stepSize); break;
+            case 1: sensorEdit.tempOffset = min(10.0f, sensorEdit.tempOffset + stepSize); break;
+            case 2: sensorEdit.tempSmoothing = min(1.0f, sensorEdit.tempSmoothing + stepSize); break;
+            case 3: sensorEdit.gsrBaseline = min(2000.0f, sensorEdit.gsrBaseline + stepSize); break;
+            case 4: sensorEdit.gsrSensitivity = min(5.0f, sensorEdit.gsrSensitivity + stepSize); break;
+            case 5: sensorEdit.gsrSmoothing = min(1.0f, sensorEdit.gsrSmoothing + stepSize); break;
+          }
+        }
+        
+        Serial.printf("[ENCODER] Sensor param %d: %.2f\n", sensorSettingsEditingParam,
+                      sensorSettingsEditingParam == 0 ? sensorEdit.beatThreshold :
+                      sensorSettingsEditingParam == 1 ? sensorEdit.tempOffset :
+                      sensorSettingsEditingParam == 2 ? sensorEdit.tempSmoothing :
+                      sensorSettingsEditingParam == 3 ? sensorEdit.gsrBaseline :
+                      sensorSettingsEditingParam == 4 ? sensorEdit.gsrSensitivity : sensorEdit.gsrSmoothing);
+        
+        bodyMenuForceRedraw();
+        lastPosition = newPosition;
+        return;  // Skip normale scroll logica
+      }
+      // SPECIAL: AI Settings edit mode - waarde +/-
+      if (bodyMenuPage == BODY_PAGE_AI_SETTINGS && aiSettingsEditMode && delta != 0) {
+        //extern AISettingsData aiSettings;
+        float stepSize = 1.0f;  // Default step
+        
+        // Bepaal step size per parameter
+        if (aiSettingsEditingParam == 4 || aiSettingsEditingParam == 5) {
+          stepSize = 0.1f;  // Response/Autonomy: 0.1 stappen
+        }
+        
+        // +/- waarde
+        if (delta > 0) {  // Rechts = omlaag
+          switch(aiSettingsEditingParam) {
+            case 0: aiSettings.autonomyLevel = max(0.0f, aiSettings.autonomyLevel - stepSize); break;
+            case 1: aiSettings.hrLow = max(40.0f, aiSettings.hrLow - stepSize); break;
+            case 2: aiSettings.hrHigh = max(60.0f, aiSettings.hrHigh - stepSize); break;
+            case 3: aiSettings.tempMax = max(30.0f, aiSettings.tempMax - stepSize); break;
+            case 4: aiSettings.gsrMax = max(100.0f, aiSettings.gsrMax - stepSize); break;
+            case 5: aiSettings.responseRate = max(0.0f, aiSettings.responseRate - stepSize); break;
+          }
+        } else {  // Links = omhoog
+          switch(aiSettingsEditingParam) {
+            case 0: aiSettings.autonomyLevel = min(100.0f, aiSettings.autonomyLevel + stepSize); break;
+            case 1: aiSettings.hrLow = min(100.0f, aiSettings.hrLow + stepSize); break;
+            case 2: aiSettings.hrHigh = min(200.0f, aiSettings.hrHigh + stepSize); break;
+            case 3: aiSettings.tempMax = min(50.0f, aiSettings.tempMax + stepSize); break;
+            case 4: aiSettings.gsrMax = min(5000.0f, aiSettings.gsrMax + stepSize); break;
+            case 5: aiSettings.responseRate = min(10.0f, aiSettings.responseRate + stepSize); break;
+          }
+        }
+        
+        Serial.printf("[ENCODER] AI param %d: %.1f\n", aiSettingsEditingParam, 
+                      aiSettingsEditingParam == 0 ? aiSettings.autonomyLevel :
+                      aiSettingsEditingParam == 1 ? aiSettings.hrLow :
+                      aiSettingsEditingParam == 2 ? aiSettings.hrHigh :
+                      aiSettingsEditingParam == 3 ? aiSettings.tempMax :
+                      aiSettingsEditingParam == 4 ? aiSettings.gsrMax : aiSettings.responseRate);
+        
+        bodyMenuForceRedraw();
+        lastPosition = newPosition;
+        return;  // Skip normale scroll logica
+      }
+
+      // straks nieuwe
+      if (delta > 0) {
+        bodyMenuIdx--;
+      } else {
+        bodyMenuIdx++;
+      }
+      
+      if (bodyMenuIdx < 0) bodyMenuIdx = maxItems;
+      if (bodyMenuIdx > maxItems) bodyMenuIdx = 0;
+      
+      bodyMenuForceRedraw();
+      Serial.printf("[ENCODER MENU] Index: %d\n", bodyMenuIdx);
+      lastPosition = newPosition;
+    }
+    
+    // BUTTON RELEASED
+    if (!buttonPressed && lastButtonState) {
+      if (bodyMenuPage == BODY_PAGE_MAIN) {
+        if (bodyMenuIdx == 0) {
+          bodyMenuPage = BODY_PAGE_ML_TRAINING;
+          bodyMenuIdx = 0;
+        } else if (bodyMenuIdx == 1) {
+          bodyMenuPage = BODY_PAGE_RECORDING;
+          bodyMenuIdx = 0;  // Start bij eerste bestand
+          recordingInButtonMode = false;  // Reset naar bestand mode
+          Serial.println("[ENCODER] -> Recording");
+        } else if (bodyMenuIdx == 2) {
+          bodyMenuPage = BODY_PAGE_AI_SETTINGS;
+          bodyMenuIdx = 0;
+          //aiSettingsInButtonMode = false;
+          aiSettingsEditMode = false;
+  
+          // Backup originele waarden
+          //extern AISettingsData aiSettings;
+          aiParamBackup[0] = aiSettings.autonomyLevel;
+          aiParamBackup[1] = aiSettings.hrLow;
+          aiParamBackup[2] = aiSettings.hrHigh;
+          aiParamBackup[3] = aiSettings.tempMax;
+          aiParamBackup[4] = aiSettings.gsrMax;
+          aiParamBackup[5] = aiSettings.responseRate;
+  
+          // Reset modified flags
+          for (int i = 0; i < 6; i++) aiParamModified[i] = false;
+  
+          Serial.println("[ENCODER] -> AI Settings");
+
+        } else if (bodyMenuIdx == 3) {
+          bodyMenuPage = BODY_PAGE_SENSOR_CAL;
+          bodyMenuIdx = 0;
+        } else if (bodyMenuIdx == 4) {
+          bodyMenuPage = BODY_PAGE_SENSOR_SETTINGS;
+          bodyMenuIdx = 0;
+          sensorSettingsEditMode = false;
+  
+          // Backup originele waarden
+          sensorParamBackup[0] = sensorEdit.beatThreshold;
+          sensorParamBackup[1] = sensorEdit.tempOffset;
+          sensorParamBackup[2] = sensorEdit.tempSmoothing;
+          sensorParamBackup[3] = sensorEdit.gsrBaseline;
+          sensorParamBackup[4] = sensorEdit.gsrSensitivity;
+          sensorParamBackup[5] = sensorEdit.gsrSmoothing;
+  
+          // Reset modified flags
+          for (int i = 0; i < 6; i++) sensorParamModified[i] = false;
+          
+          Serial.println("[ENCODER] -> Sensor Settings");
+        } else if (bodyMenuIdx == 5) {
+          bodyMenuPage = BODY_PAGE_SYSTEM_SETTINGS;
+          bodyMenuIdx = 0;
+        } else if (bodyMenuIdx == 6) {
+          currentMode = MODE_MAIN;
+           menuActive = false;
+           bodyMenuMode = BODY_MODE_SENSORS;
+           encoderActiveMainScreen = false;
+  
+           g4_pauseRendering = false;
+           body_gfx4_clear();
+           body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
+           lastSensorPush = 0;
+  
+           Serial.println("[ENCODER] -> Back to main (deactivated)");
+        }
+      }
+      //W3}
+      else if (bodyMenuPage == BODY_PAGE_SENSOR_CAL) {
+        // Sensor Calibration: 4 items + TERUG (index 4)
+        if (bodyMenuIdx >= 0 && bodyMenuIdx <= 3) {
+          // Start calibratie: 0=Alle, 1=GSR, 2=Temp, 3=Hart
+          extern void startCalibration(uint8_t type);
+          startCalibration(bodyMenuIdx);
+          Serial.printf("[ENCODER] Start calibration: %d\n", bodyMenuIdx);
+        } else if (bodyMenuIdx == 4) {
+          // TERUG
+          bodyMenuPage = BODY_PAGE_MAIN;
+          bodyMenuIdx = 0;
+          Serial.println("[ENCODER] -> Back to main menu");
+        }
+      }
+      else if (bodyMenuPage == BODY_PAGE_AI_SETTINGS) {
+        if (bodyMenuIdx < 6) {
+          // PARAMETERS (0-5)
+          if (!aiSettingsEditMode) {
+            // Start editing
+            aiSettingsEditMode = true;
+            aiSettingsEditingParam = bodyMenuIdx;
+            Serial.printf("[ENCODER] Editing param: %d\n", bodyMenuIdx);
+          } else {
+            // Exit edit → markeer rood
+            aiSettingsEditMode = false;
+            aiParamModified[aiSettingsEditingParam] = true;
+            aiSettingsEditingParam = -1;
+            Serial.println("[ENCODER] Param saved (marked RED)");
+          }
+        } else {
+          // KNOPPEN (6-8)
+          int btnIdx = bodyMenuIdx - 6;
+          if (btnIdx == 0) {
+            // AI AAN toggle
+            bodyMenuHandleTouch(90, 250, true);
+            Serial.println("[ENCODER] AI toggled");
+          } else if (btnIdx == 1) {
+            // Opslaan
+            bodyMenuHandleTouch(210, 250, true);
+            for (int i = 0; i < 6; i++) aiParamModified[i] = false;  // Reset rood
+            Serial.println("[ENCODER] Saved to EEPROM");
+          } else if (btnIdx == 2) {
+            // TERUG - restore
+            aiSettings.autonomyLevel = aiParamBackup[0];
+            aiSettings.hrLow = aiParamBackup[1];
+            aiSettings.hrHigh = aiParamBackup[2];
+            aiSettings.tempMax = aiParamBackup[3];
+            aiSettings.gsrMax = aiParamBackup[4];
+            aiSettings.responseRate = aiParamBackup[5];
+            
+            bodyMenuPage = BODY_PAGE_MAIN;
+            bodyMenuIdx = 0;
+            aiSettingsEditMode = false;
+            Serial.println("[ENCODER] Back (changes discarded)");
+          }
+        }
+      }
+      else if (bodyMenuPage == BODY_PAGE_ML_TRAINING) {     
+        // ML Training: 4 items + TERUG
+        if (bodyMenuIdx == 0) {
+          // Toggle recording
+          isRecording = !isRecording;
+          if (isRecording) startCSVRecording();
+          else stopCSVRecording();
+          Serial.printf("[ENCODER] Recording: %s\n", isRecording ? "ON" : "OFF");
+        } else if (bodyMenuIdx == 1) {
+          // Model Trainen
+          Serial.println("[ENCODER] Model Trainen - TODO");
+        } else if (bodyMenuIdx == 2) {
+          // AI Annotatie
+          Serial.println("[ENCODER] AI Annotatie - TODO");
+        } else if (bodyMenuIdx == 3) {
+          // Model Manager
+          Serial.println("[ENCODER] Model Manager - TODO");
+        } else if (bodyMenuIdx == 4) {
+          // TERUG
+          bodyMenuPage = BODY_PAGE_MAIN;
+          bodyMenuIdx = 0;
+          Serial.println("[ENCODER] -> Back to main menu");
+        }
+      }
+      else if (bodyMenuPage == BODY_PAGE_SENSOR_SETTINGS) {
+        if (bodyMenuIdx < 6) {
+          // PARAMETERS (0-5)
+          if (!sensorSettingsEditMode) {
+            // Start editing
+            sensorSettingsEditMode = true;
+            sensorSettingsEditingParam = bodyMenuIdx;
+            Serial.printf("[ENCODER] Editing sensor param: %d\n", bodyMenuIdx);
+          } else {
+            // Exit edit → markeer rood
+            sensorSettingsEditMode = false;
+            sensorParamModified[sensorSettingsEditingParam] = true;
+            sensorSettingsEditingParam = -1;
+            Serial.println("[ENCODER] Sensor param saved (marked RED)");
+          }
+        } else {
+          // KNOPPEN (6-7)
+          int btnIdx = bodyMenuIdx - 6;
+          if (btnIdx == 0) {
+            // Opslaan - blijf in menu
+            bodyMenuHandleTouch(330, 250, true);
+            for (int i = 0; i < 6; i++) sensorParamModified[i] = false;  // Reset rood
+            bodyMenuPage = BODY_PAGE_SENSOR_SETTINGS;  // Force terug naar menu
+            bodyMenuIdx = 0;  // Reset cursor
+            Serial.println("[ENCODER] Sensor settings saved, staying in menu");
+          } else if (btnIdx == 1) {
+            // TERUG - restore
+            sensorEdit.beatThreshold = sensorParamBackup[0];
+            sensorEdit.tempOffset = sensorParamBackup[1];
+            sensorEdit.tempSmoothing = sensorParamBackup[2];
+            sensorEdit.gsrBaseline = sensorParamBackup[3];
+            sensorEdit.gsrSensitivity = sensorParamBackup[4];
+            sensorEdit.gsrSmoothing = sensorParamBackup[5];
+            
+            bodyMenuPage = BODY_PAGE_MAIN;
+            bodyMenuIdx = 0;
+            sensorSettingsEditMode = false;
+            Serial.println("[ENCODER] Back (sensor changes discarded)");
+          }
+      }
+      }
+      else if (bodyMenuPage == BODY_PAGE_SYSTEM_SETTINGS) {
+        // System Settings: 4 items + TERUG
+        if (bodyMenuIdx == 0) {
+          // Scherm Rotatie toggle
+          extern void toggleScreenRotation();
+          toggleScreenRotation();
+          Serial.println("[ENCODER] Screen rotation toggled");
+        } else if (bodyMenuIdx == 1) {
+          // Funscript Settings
+          bodyMenuPage = BODY_PAGE_FUNSCRIPT_SETTINGS;
+          bodyMenuIdx = 0;
+          Serial.println("[ENCODER] -> Funscript Settings");
+        } else if (bodyMenuIdx == 2) {
+          // Format SD bevestiging
+          bodyMenuPage = BODY_PAGE_FORMAT_CONFIRM;
+          bodyMenuIdx = 0;
+          Serial.println("[ENCODER] -> Format SD confirmation");
+        } else if (bodyMenuIdx == 3) {
+          // Tijd Instellen
+          bodyMenuPage = BODY_PAGE_TIME_SETTINGS;
+          bodyMenuIdx = 0;
+          Serial.println("[ENCODER] -> Time Settings");
+        } else if (bodyMenuIdx == 4) {
+          // TERUG
+          bodyMenuPage = BODY_PAGE_MAIN;
+          bodyMenuIdx = 0;
+          Serial.println("[ENCODER] -> Back to main menu");
+        }
+      }
+      else if (bodyMenuPage == BODY_PAGE_FUNSCRIPT_SETTINGS) {
+        // Funscript Settings: AAN, UIT, TERUG
+        extern bool funscriptEnabled;
+        if (bodyMenuIdx == 0) {
+          // AAN
+          funscriptEnabled = true;
+          Serial.println("[ENCODER] Funscript enabled");
+        } else if (bodyMenuIdx == 1) {
+          // UIT
+          funscriptEnabled = false;
+          Serial.println("[ENCODER] Funscript disabled");
+        } else if (bodyMenuIdx == 2) {
+          // TERUG naar System Settings
+          bodyMenuPage = BODY_PAGE_SYSTEM_SETTINGS;
+          bodyMenuIdx = 0;
+          Serial.println("[ENCODER] -> Back to System Settings");
+        }
+      }
+      else if (bodyMenuPage == BODY_PAGE_FORMAT_CONFIRM) {
+        // Format SD bevestiging: ANNULEREN, FORMATTEER
+        if (bodyMenuIdx == 0) {
+          // ANNULEREN - terug naar System Settings
+          bodyMenuPage = BODY_PAGE_SYSTEM_SETTINGS;
+          bodyMenuIdx = 0;
+          Serial.println("[ENCODER] Format cancelled");
+        } else if (bodyMenuIdx == 1) {
+          // FORMATTEER
+          bodyMenuHandleTouch(310, 250, true);  // Klik op FORMATTEER knop
+          Serial.println("[ENCODER] Formatting SD card...");
+        }
+      }
+      else if (bodyMenuPage == BODY_PAGE_TIME_SETTINGS) {
+        // Time Settings: OPSLAAN, TERUG
+        if (bodyMenuIdx == 0) {
+          // OPSLAAN
+          bodyMenuHandleTouch(110, 250, true);  // Klik op OPSLAAN knop
+          Serial.println("[ENCODER] Time saved");
+        } else if (bodyMenuIdx == 1) {
+          // TERUG naar System Settings
+          bodyMenuPage = BODY_PAGE_SYSTEM_SETTINGS;
+          bodyMenuIdx = 0;
+          Serial.println("[ENCODER] -> Back to System Settings");
+        }
+      }
+      else if (bodyMenuPage == BODY_PAGE_RECORDING) {
+        extern int csvCount;
+        extern int selectedRecordingFile;
+        
+        if (!recordingInButtonMode) {
+          // FASE 1: Bestand selecteren
+          selectedRecordingFile = bodyMenuIdx;
+          recordingInButtonMode = true;
+          bodyMenuIdx = 0;  // Start bij PLAY
+          bodyMenuForceRedraw();
+          Serial.printf("[ENCODER] File selected: %d, switched to buttons\n", selectedRecordingFile);
+        } else {
+          // FASE 2: Knop actie
+          if (bodyMenuIdx == 0) {
+            // PLAY
+            bodyMenuHandleTouch(345, 60, true);
+            Serial.println("[ENCODER] PLAY");
+          } else if (bodyMenuIdx == 1) {
+            // DELETE
+            bodyMenuHandleTouch(345, 113, true);
+            Serial.println("[ENCODER] DELETE");
+          } else if (bodyMenuIdx == 2) {
+            // AI analyze
+            Serial.println("[ENCODER] AI analyze - TODO");
+          } else if (bodyMenuIdx == 3) {
+            // TERUG - reset naar bestand mode
+            selectedRecordingFile = -1;
+            recordingInButtonMode = false;
+            bodyMenuPage = BODY_PAGE_MAIN;
+            bodyMenuIdx = 0;
+            Serial.println("[ENCODER] -> Back (reset to file mode)");
+          }
+        }
+      }
+      // nieuwe straks
+      bodyMenuForceRedraw();
+    }
+  }
+  
+  lastButtonState = buttonPressed;
 }
 
 void setup() {
@@ -1632,27 +2122,10 @@ Serial.printf("[MFP] Status: %s | Actions: %d | ML Overrides: %d (%.1f%%)\n",
     }
   }
   
-  // ===== ENCODER TEST (elke 100ms) =====
-  static uint32_t lastEncoderRead = 0;
-  static bool lastButtonState = false;
-  if (encoderAvailable && millis() - lastEncoderRead > 100) {
-    int32_t newPosition = encoder.getEncoderPosition();
-    bool buttonPressed = !encoder.digitalRead(24);  // Button is active LOW
-    
-    // Position changed?
-    if (newPosition != encoderPosition) {
-      Serial.printf("[ENCODER] Position: %d (delta: %d)\n", newPosition, newPosition - encoderPosition);
-      encoderPosition = newPosition;
-    }
-    
-    // Button state changed?
-    if (buttonPressed != lastButtonState) {
-      Serial.printf("[ENCODER] Button: %s\n", buttonPressed ? "PRESSED" : "RELEASED");
-      lastButtonState = buttonPressed;
-    }
-    
-    lastEncoderRead = millis();
-  }
+  // ===== ENCODER INPUT (alleen in MENU mode) =====
+  //if (currentMode == MODE_MENU) {
+    handleEncoderInput();
+  //}
   
   delay(10);  // Kleine delay voor stabiele polling
 }
