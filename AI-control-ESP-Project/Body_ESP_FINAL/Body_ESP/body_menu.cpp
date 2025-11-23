@@ -97,11 +97,11 @@ static int sampleCount = 0;
 static bool calibrationScreenDrawn = false; // Track of statische delen getekend zijn
 
 // RTC tijd instellingen state
-static int editYear = 2024;
-static int editMonth = 1;
-static int editDay = 1;
-static int editHour = 0;
-static int editMinute = 0;
+int editYear = 2024;
+int editMonth = 1;
+int editDay = 1;
+int editHour = 0;
+int editMinute = 0;
 
 // AI Settings state (dynamisch, wordt geladen uit EEPROM)
 struct AISettingsData {
@@ -2559,6 +2559,10 @@ void drawSystemSettingsItems() {
 }
 
 void drawTimeSettingsItems() {
+  extern bool timeSettingsEditMode;
+  extern int timeSettingsEditingParam;
+  extern bool timeParamModified[5];
+  
   const int MENU_X = 20;
   const int MENU_Y = 20;
   const int MENU_W = 480 - 40;
@@ -2595,7 +2599,19 @@ void drawTimeSettingsItems() {
     int valBoxH = 28;
     body_gfx->fillRoundRect(VAL_X, valBoxY, 110, valBoxH, 5, 0x2104);  // Donkergrijs
     body_gfx->drawRoundRect(VAL_X, valBoxY, 110, valBoxH, 5, 0x8410);  // Lichtgrijze rand
-    body_gfx->setTextColor(0xFFFF, 0x2104);  // Witte tekst
+    
+    // Kleur bepalen
+    uint16_t valueColor;
+    if (timeParamModified[i]) {
+      valueColor = 0xF800;  // ROOD = gewijzigd (na edit)
+    } else if (timeSettingsEditMode && i == timeSettingsEditingParam) {
+      valueColor = 0xF800;  // ROOD = edit mode (tijdens edit)
+    } else if (!timeSettingsEditMode && i == bodyMenuIdx) {
+      valueColor = 0x07E0;  // GROEN = cursor (browsing)
+    } else {
+      valueColor = 0xFFFF;  // WIT = normaal
+    }
+    body_gfx->setTextColor(valueColor, 0x2104);
     
     // Centreer waarde in box
     char valStr[10];
@@ -2654,9 +2670,8 @@ void drawTimeSettingsItems() {
   
   // OPSLAAN (groen)
   body_gfx->fillRoundRect(btn1X, btnY, btnW, btnH, 8, 0x07E0);  // Groen
-  
-  // Highlight als geselecteerd (index 0)
-  if (bodyMenuIdx == 0) {
+  // Highlight als geselecteerd (index 5)
+  if (!timeSettingsEditMode && bodyMenuIdx == 5) {
     body_gfx->drawRoundRect(btn1X-2, btnY-2, btnW+4, btnH+4, 10, 0xFD20);  // Oranje
     body_gfx->drawRoundRect(btn1X-1, btnY-1, btnW+2, btnH+2, 9, 0xFD20);
     body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFD20);
@@ -2677,8 +2692,8 @@ void drawTimeSettingsItems() {
   // TERUG (blauw)
   body_gfx->fillRoundRect(btn2X, btnY, btnW, btnH, 8, 0x001F);  // Blauw
   
-  // Highlight als geselecteerd (index 1)
-  if (bodyMenuIdx == 1) {
+  // Highlight als geselecteerd (index 6)
+  if (!timeSettingsEditMode && bodyMenuIdx == 6) {
     body_gfx->drawRoundRect(btn2X-2, btnY-2, btnW+4, btnH+4, 10, 0xFD20);  // Oranje
     body_gfx->drawRoundRect(btn2X-1, btnY-1, btnW+2, btnH+2, 9, 0xFD20);
     body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFD20);

@@ -118,6 +118,12 @@ int sensorSettingsEditingParam = -1;
 bool sensorParamModified[6] = {false};
 float sensorParamBackup[6];
 
+// Time Settings menu state (NIEUW!)
+bool timeSettingsEditMode = false;
+int timeSettingsEditingParam = -1;
+bool timeParamModified[5] = {false};
+int timeParamBackup[5];  // Jaar, Maand, Dag, Uur, Minuut
+
 // Forward declaration voor AI Settings struct uit body_menu.cpp
 struct AISettingsData {
   float autonomyLevel;
@@ -140,6 +146,9 @@ struct SensorSettingsEdit {
   float gsrSmoothing;
 };
 extern SensorSettingsEdit sensorEdit;
+
+// Forward declaration voor Time Settings variabelen uit body_menu.cpp
+extern int editYear, editMonth, editDay, editHour, editMinute;
 
 // ===== ESP-NOW Communicatie =====
 // MAC adressen van het netwerk
@@ -1095,7 +1104,46 @@ void handleEncoderInput() {
       else if (bodyMenuPage == BODY_PAGE_SYSTEM_SETTINGS) maxItems = 4;  // 4 items + TERUG
       else if (bodyMenuPage == BODY_PAGE_FUNSCRIPT_SETTINGS) maxItems = 2;  // AAN, UIT, TERUG
       else if (bodyMenuPage == BODY_PAGE_FORMAT_CONFIRM) maxItems = 1;  // ANNULEREN, FORMATTEER
-      else if (bodyMenuPage == BODY_PAGE_TIME_SETTINGS) maxItems = 1;  // OPSLAAN, TERUG
+      else if (bodyMenuPage == BODY_PAGE_TIME_SETTINGS) {
+      if (timeSettingsEditMode) {
+        maxItems = 0;  // Geen scrollen tijdens edit mode
+        } else {
+          maxItems = 6;  // 5 params + 2 knoppen (0-6)
+       }
+      }
+      // SPECIAL: Time Settings edit mode - waarde +/-
+      if (bodyMenuPage == BODY_PAGE_TIME_SETTINGS && timeSettingsEditMode && delta != 0) {
+        int stepSize = 1;
+        
+        // +/- waarde
+        if (delta > 0) {  // Rechts = omlaag
+          switch(timeSettingsEditingParam) {
+            case 0: editYear = max(2024, editYear - stepSize); break;
+            case 1: editMonth = max(1, editMonth - stepSize); break;
+            case 2: editDay = max(1, editDay - stepSize); break;
+            case 3: editHour = max(0, editHour - stepSize); break;
+            case 4: editMinute = max(0, editMinute - stepSize); break;
+          }
+        } else {  // Links = omhoog
+          switch(timeSettingsEditingParam) {
+            case 0: editYear = min(2099, editYear + stepSize); break;
+            case 1: editMonth = min(12, editMonth + stepSize); break;
+            case 2: editDay = min(31, editDay + stepSize); break;
+            case 3: editHour = min(23, editHour + stepSize); break;
+            case 4: editMinute = min(59, editMinute + stepSize); break;
+          }
+        }
+        
+        Serial.printf("[ENCODER] Time param %d: %d\n", timeSettingsEditingParam,
+                      timeSettingsEditingParam == 0 ? editYear :
+                      timeSettingsEditingParam == 1 ? editMonth :
+                      timeSettingsEditingParam == 2 ? editDay :
+                      timeSettingsEditingParam == 3 ? editHour : editMinute);
+        
+        bodyMenuForceRedraw();
+        lastPosition = newPosition;
+        return;  // Skip normale scroll logica
+      }
       // SPECIAL: Sensor Settings edit mode - waarde +/-
       if (bodyMenuPage == BODY_PAGE_SENSOR_SETTINGS && sensorSettingsEditMode && delta != 0) {
         float stepSize = 1.0f;  // Default step
@@ -1413,6 +1461,18 @@ void handleEncoderInput() {
           // Tijd Instellen
           bodyMenuPage = BODY_PAGE_TIME_SETTINGS;
           bodyMenuIdx = 0;
+          timeSettingsEditMode = false;
+          
+          // Backup originele waarden
+          timeParamBackup[0] = editYear;
+          timeParamBackup[1] = editMonth;
+          timeParamBackup[2] = editDay;
+          timeParamBackup[3] = editHour;
+          timeParamBackup[4] = editMinute;
+          
+          // Reset modified flags
+          for (int i = 0; i < 5; i++) timeParamModified[i] = false;
+          
           Serial.println("[ENCODER] -> Time Settings");
         } else if (bodyMenuIdx == 4) {
           // TERUG
@@ -1453,16 +1513,43 @@ void handleEncoderInput() {
         }
       }
       else if (bodyMenuPage == BODY_PAGE_TIME_SETTINGS) {
-        // Time Settings: OPSLAAN, TERUG
-        if (bodyMenuIdx == 0) {
-          // OPSLAAN
-          bodyMenuHandleTouch(110, 250, true);  // Klik op OPSLAAN knop
-          Serial.println("[ENCODER] Time saved");
-        } else if (bodyMenuIdx == 1) {
-          // TERUG naar System Settings
-          bodyMenuPage = BODY_PAGE_SYSTEM_SETTINGS;
-          bodyMenuIdx = 0;
-          Serial.println("[ENCODER] -> Back to System Settings");
+        if (bodyMenuIdx < 5) {
+          // PARAMETERS (0-4)
+          if (!timeSettingsEditMode) {
+            // Start editing
+            timeSettingsEditMode = true;
+            timeSettingsEditingParam = bodyMenuIdx;
+            Serial.printf("[ENCODER] Editing time param: %d\n", bodyMenuIdx);
+          } else {
+            // Exit edit → markeer rood
+            timeSettingsEditMode = false;
+            timeParamModified[timeSettingsEditingParam] = true;
+            timeSettingsEditingParam = -1;
+            Serial.println("[ENCODER] Time param saved (marked RED)");
+          }
+        } else {
+          // KNOPPEN (5-6)
+          int btnIdx = bodyMenuIdx - 5;
+          if (btnIdx == 0) {
+            // Opslaan - blijf in menu
+            bodyMenuHandleTouch(110, 250, true);
+            for (int i = 0; i < 5; i++) timeParamModified[i] = false;  // Reset rood
+            bodyMenuPage = BODY_PAGE_TIME_SETTINGS;  // Force terug naar menu
+            bodyMenuIdx = 0;  // Reset cursor
+            Serial.println("[ENCODER] Time saved, staying in menu");
+          } else if (btnIdx == 1) {
+            // TERUG - restore
+            editYear = timeParamBackup[0];
+            editMonth = timeParamBackup[1];
+            editDay = timeParamBackup[2];
+            editHour = timeParamBackup[3];
+            editMinute = timeParamBackup[4];
+            
+            bodyMenuPage = BODY_PAGE_SYSTEM_SETTINGS;
+            bodyMenuIdx = 0;
+            timeSettingsEditMode = false;
+            Serial.println("[ENCODER] Back (time changes discarded)");
+          }
         }
       }
       else if (bodyMenuPage == BODY_PAGE_RECORDING) {
