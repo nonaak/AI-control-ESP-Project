@@ -24,10 +24,10 @@ M5StickC Plus:             █████████████████�
 --------AI Traingen menu is nog niks klaar!!!-----------
 --------in Funscript menu, terug gaat naar hoofd scherm, moet terug naar vorig scherm----------------
 ✅ --------de waardes invullen met encoder (FASE 1 KLAAR: navigatie!)
-☐ --------Parameter editing: +/- waarden met encoder (TODO!)
-☐ --------encoder led gedimt in de kleur van de knop, kiezen niet gedimt
+✅--------Parameter editing: +/- waarden met encoder (TODO!)
+✅ --------encoder led gedimt in de kleur van de knop, kiezen niet gedimt
 ☐ --------touch uit configureerbaar via config.h
-☐ --------toch uit alleen voor rood scherm niet
+☐ --------touch uit alleen voor rood scherm niet
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -303,21 +303,6 @@ EMERGENCY_PAUSE_ROOD_SCHERM = true;// Toggle rood scherm
   ✅ Warmup gebruikt apart AI_WARMUP command (mag forceren)
   ✅ Normale AI gebruikt AI_OVERRIDE (geen level forceren)
 
-**Eigenwil schaal:**
-```
-0%:       AI uit (pure manual)
-1-25%:    AI kijkt mee (subtiele aanpassingen binnen level)
-26-49%:   AI adviseert (sterker, maar jij hebt meerderheid)
-50-84%:   AI mede-beslisser (mag levels veranderen)
-85-100%:  AI volledige controle (Level 7 + orgasme trigger)
-```
-
-**Test resultaat:**
-```
-[AI Override] Trust: 0.14, Sleeve: 0.14 (factors only)
-[SNELH DEBUG] g_speedStep=5, getUserSleeveSpeed()=1.48, final_sleeve=0.21
-→ Level blijft 5, alleen 15% factor aanpassing! ✅
-```
 
 ### ✅ ANIMATIE RESUME FIX (100%):
   ✅ resetPauseState() functie in ui.cpp
@@ -584,8 +569,8 @@ strokeBottomLimit = 75.0f;
   ☐ Tijdelijke dip timer logica (40%/50% AI)
 
 ☐ **Optionele Features:**
-  ☐ Rotary encoder toevoegen (hardware upgrade)
-  ☐ AI cooldown berekening (advanced)
+  ✅ Rotary encoder toevoegen (hardware upgrade)
+  ✅ AI cooldown berekening (advanced)
   ☐ ML training event logging (nice to have)
   ☐ Post-session AI rapporten genereren
 

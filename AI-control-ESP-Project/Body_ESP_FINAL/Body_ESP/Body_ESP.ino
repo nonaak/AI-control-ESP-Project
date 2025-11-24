@@ -1978,29 +1978,35 @@ void handleEncoderInput() {
           } else {
             // Voer knop actie uit
             if (stressPopupButtonIdx == 0) {
-              // ANNULEREN - terug naar playback zonder opslaan
+              // ANNULEREN - terug naar playback, pauze blijft aan
               stressPopupActive = false;
               stressLevelConfirmed = false;
-              isPlaybackPaused = false;  // Zet pauze uit, verder afspelen
-              playbackScreenDrawn = false;  // Force redraw playback scherm
+              isPlaybackPaused = true;  // Zorg dat pauze aan blijft
+              g4_pauseRendering = false;  // Hervat grafiek rendering
               body_gfx4_clear();  // Wis popup scherm
+              playbackScreenDrawn = false;  // Force redraw playback scherm
+              bodyMenuIdx = 1;  // Encoder op PAUZE knop
+              bodyMenuForceRedraw();  // Herteken playback scherm
+              updateEncoderLEDForMenu();
               
-              Serial.println("[ENCODER] Stress popup geannuleerd, terug naar playback");
+              Serial.println("[ENCODER] Stress popup geannuleerd, encoder op PAUZE");
             } else {
-              // OPSLAAN - marker opslaan en verder afspelen
+              // OPSLAAN - marker opslaan, pauze blijft aan
               Serial.printf("[ENCODER] Stress level opgeslagen: %d\n", selectedStressLevel);
               
               // TODO: Marker toevoegen aan stressMarkers array
-              // extern StressMarker stressMarkers[];
-              // extern int stressMarkerCount;
               
               stressPopupActive = false;
               stressLevelConfirmed = false;
-              isPlaybackPaused = false;  // Zet pauze uit, verder afspelen
-              playbackScreenDrawn = false;  // Force redraw playback scherm
+              isPlaybackPaused = true;  // Zorg dat pauze aan blijft
+              g4_pauseRendering = false;  // Hervat grafiek rendering
               body_gfx4_clear();  // Wis popup scherm
+              playbackScreenDrawn = false;  // Force redraw playback scherm
+              bodyMenuIdx = 1;  // Encoder op PAUZE knop
+              bodyMenuForceRedraw();  // Herteken playback scherm
+              updateEncoderLEDForMenu();
               
-              Serial.println("[ENCODER] Terug naar playback, pauze uit");
+              Serial.println("[ENCODER] Marker opgeslagen, encoder op PAUZE");
             }
             updateEncoderLEDForMenu();
           }
@@ -2024,13 +2030,15 @@ void handleEncoderInput() {
             playbackScreenDrawn = false;  // Force redraw voor knop update
             Serial.printf("[ENCODER] PLAYBACK %s\n", isPlaybackPaused ? "PAUSED" : "PLAYING");
           } else if (bodyMenuIdx == 2) {
-            // AI-ACTIE - open stress popup
+            // AI-ACTIE - open stress popup, zet pauze aan
             stressPopupActive = true;
             stressLevelConfirmed = false;
             selectedStressLevel = 2;  // Default: normaal
             stressPopupButtonIdx = 0;
+            isPlaybackPaused = true;  // Zet pauze aan
+            g4_pauseRendering = true;  // Pauzeer grafiek rendering
             setEncoderLED(0, 255, 0, true);  // Groen voor level selectie
-            Serial.println("[ENCODER] AI-ACTIE - stress popup geopend");
+            Serial.println("[ENCODER] AI-ACTIE - stress popup geopend, pauze aan");
           } else if (bodyMenuIdx == 3) {
             // Speed -
             playbackSpeed = max(10.0f, playbackSpeed - 10.0f);
