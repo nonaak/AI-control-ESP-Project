@@ -1116,7 +1116,15 @@ void handleEncoderInput() {
           maxItems = 7;  // 6 params + 2 knoppen (0-7)
         }
       }
-      else if (bodyMenuPage == BODY_PAGE_RECORDING) maxItems = 3;  // 4 buttons: 0,1,2,3
+      //else if (bodyMenuPage == BODY_PAGE_RECORDING) maxItems = 3;  // 4 buttons: 0,1,2,3
+      else if (bodyMenuPage == BODY_PAGE_RECORDING) {
+        extern int csvCount;
+        if (!recordingInButtonMode) {
+          maxItems = max(0, csvCount - 1);  // FASE 1: Alle bestanden
+        } else {
+          maxItems = 3;  // FASE 2: 4 knoppen (PLAY, DELETE, AI, TERUG)
+        }
+      }
       else if (bodyMenuPage == BODY_PAGE_SYSTEM_SETTINGS) maxItems = 4;  // 4 items + TERUG
       else if (bodyMenuPage == BODY_PAGE_FUNSCRIPT_SETTINGS) maxItems = 2;  // AAN, UIT, TERUG
       else if (bodyMenuPage == BODY_PAGE_FORMAT_CONFIRM) maxItems = 1;  // ANNULEREN, FORMATTEER
@@ -1582,13 +1590,32 @@ void handleEncoderInput() {
         } else {
           // FASE 2: Knop actie
           if (bodyMenuIdx == 0) {
-            // PLAY
-            bodyMenuHandleTouch(345, 60, true);
-            Serial.println("[ENCODER] PLAY");
+            // PLAY - direct uitvoeren
+            extern int csvCount;
+            extern String csvFiles[];
+            extern char selectedPlaybackFile[];
+            extern void startPlayback(const char* filename);
+            if (selectedRecordingFile >= 0 && selectedRecordingFile < csvCount) {
+              strncpy(selectedPlaybackFile, csvFiles[selectedRecordingFile].c_str(), 63);
+              selectedPlaybackFile[63] = '\0';
+              startPlayback(selectedPlaybackFile);
+              Serial.printf("[ENCODER] PLAY: %s\n", selectedPlaybackFile);
+            } else {
+              Serial.println("[ENCODER] PLAY: Geen bestand geselecteerd!");
           } else if (bodyMenuIdx == 1) {
-            // DELETE
-            bodyMenuHandleTouch(345, 113, true);
-            Serial.println("[ENCODER] DELETE");
+            // DELETE - direct uitvoeren
+            extern int csvCount;
+            extern String csvFiles[];
+            if (selectedRecordingFile >= 0 && selectedRecordingFile < csvCount) {
+              String filepath = "/recordings/" + csvFiles[selectedRecordingFile];
+              if (SD_MMC.remove(filepath.c_str())) {
+                Serial.printf("[ENCODER] Deleted: %s\n", filepath.c_str());
+                csvCount = -1;  // Trigger rescan
+                selectedRecordingFile = -1;
+                recordingInButtonMode = false;
+                bodyMenuForceRedraw();
+              }
+            }
           } else if (bodyMenuIdx == 2) {
             // AI analyze
             Serial.println("[ENCODER] AI analyze - TODO");
