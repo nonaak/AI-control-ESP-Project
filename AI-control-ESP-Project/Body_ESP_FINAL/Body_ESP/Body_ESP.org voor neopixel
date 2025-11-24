@@ -37,7 +37,6 @@
 #include <Adafruit_ADS1X15.h>   // ADS1115 sensor library
 #include <RTClib.h>             // RTC DS3231 library
 #include <Adafruit_seesaw.h>    // I2C Rotory Encoder
-#include <seesaw_neopixel.h>    // NeoPixel op encoder board
 #include <SD_MMC.h>             // SD card voor CSV recording (SD_MMC mode)
 #include <esp_now.h>            // ESP-NOW communicatie
 #include <WiFi.h>               // WiFi voor ESP-NOW
@@ -102,10 +101,8 @@ bool eepromAvailable = false;
 
 // ===== Rotary Encoder (Wire1 - I2C address 0x36) =====
 Adafruit_seesaw encoder(&Wire1);
-seesaw_NeoPixel encoderPixel = seesaw_NeoPixel(1, 6, NEO_GRB + NEO_KHZ800, &Wire1);
 #define ENCODER_ADDR 0x36
 bool encoderAvailable = false;
-bool encoderPixelAvailable = false;  // NeoPixel apart checken
 int32_t encoderPosition = 0;
 
 // Encoder state voor hoofdscherm
@@ -130,6 +127,48 @@ bool sensorSettingsEditMode = false;
 int sensorSettingsEditingParam = -1;
 bool sensorParamModified[6] = {false};
 float sensorParamBackup[6];
+
+// ========= ENCODER NEOPIXEL FUNCTIES =========
+// Zet encoder LED kleur (dim = 25% brightness, helder = 100%)
+void setEncoderLED(uint8_t r, uint8_t g, uint8_t b, bool bright = false) {
+  if (!encoderAvailable) return;
+  if (!bright) {
+    // Dim naar 25%
+    r = r / 4;
+    g = g / 4;
+    b = b / 4;
+  }
+  encoder.setPixelColor(0, encoder.Color(r, g, b));
+  encoder.show();
+}
+
+// Zet encoder LED uit
+void setEncoderLEDOff() {
+  if (!encoderAvailable) return;
+  encoder.setPixelColor(0, 0);
+  encoder.show();
+}
+
+// Parameter edit gradient: paars (midden) → rood (+) / blauw (-)
+// value: -100 tot +100 relatief t.o.v. startwaarde
+void setEncoderLEDGradient(int value) {
+  if (!encoderAvailable) return;
+  // Clamp value tussen -100 en +100
+  value = constrain(value, -100, 100);
+  // -100 = vol blauw (0,0,255), 0 = paars (128,0,128), +100 = vol rood (255,0,0)
+  int r = map(value, -100, 100, 0, 255);
+  int b = map(value, -100, 100, 255, 0);
+  encoder.setPixelColor(0, encoder.Color(r, 0, b));
+  encoder.show();
+}
+
+// Flash LED helder (voor selectie bevestiging)
+void flashEncoderLED(uint8_t r, uint8_t g, uint8_t b) {
+  if (!encoderAvailable) return;
+  encoder.setPixelColor(0, encoder.Color(r, g, b));
+  encoder.show();
+  // Na 200ms wordt LED weer gedimd door volgende update
+}ja
 
 // Time Settings menu state (NIEUW!)
 bool timeSettingsEditMode = false;
@@ -244,8 +283,6 @@ bool aiOverruleActive = false;
 static bool emergencyPauseActive = false;
 static bool emergencyPauseScreenDrawn = false;
 static uint8_t levelBeforePause = 0;
-static bool emergencyBlinkState = false;
-static unsigned long lastEmergencyBlink = 0;
 static uint32_t warmupStartTime = 0;
 static bool warmupActive = false;
 
@@ -262,171 +299,6 @@ uint32_t csvSampleCount = 0;
 static String csvBuffer[SD_BUFFER_SIZE];
 static int bufferIndex = 0;
 static unsigned long lastBufferFlush = 0;
-
-// ========= ENCODER NEOPIXEL FUNCTIES =========
-// Zet encoder LED kleur (dim = 10% brightness, helder = 100%)
-void setEncoderLED(uint8_t r, uint8_t g, uint8_t b, bool bright = false) {
-  if (!encoderPixelAvailable) return;
-  if (!bright) {
-    r = r / 10;
-    g = g / 10;
-    b = b / 10;
-  }
-  encoderPixel.setPixelColor(0, encoderPixel.Color(r, g, b));
-  encoderPixel.show();
-}
-
-// Zet encoder LED uit
-void setEncoderLEDOff() {
-  if (!encoderPixelAvailable) return;
-  encoderPixel.setPixelColor(0, 0);
-  encoderPixel.show();
-}
-
-// Parameter edit gradient: paars (0) -> rood (+) / blauw (-)
-void setEncoderLEDGradient(int delta) {
-  if (!encoderPixelAvailable) return;
-  delta = constrain(delta, -100, 100);
-  
-  int r, b;
-  if (delta >= 0) {
-    // 0 tot +100: paars naar rood
-    r = 255;  // Altijd vol rood
-    b = map(delta, 0, 100, 255, 0);  // 255 bij 0, 0 bij +100
-  } else {
-    // -100 tot 0: blauw naar paars
-    r = map(delta, -100, 0, 0, 255);  // 0 bij -100, 255 bij 0
-    b = 255;  // Altijd vol blauw
-  }
-  encoderPixel.setPixelColor(0, encoderPixel.Color(r, 0, b));
-  encoderPixel.show();
-}
-
-// Haal RGB kleur voor menu knop
-void getButtonColor(BodyMenuPage page, int idx, uint8_t &r, uint8_t &g, uint8_t &b) {
-  r = 255; g = 255; b = 255;  // Default wit
-  
-  switch(page) {
-    case BODY_PAGE_MAIN:
-      switch(idx) {
-        case 0: r=0; g=255; b=255; break;    // Cyaan
-        case 1: r=0; g=255; b=0; break;      // Groen
-        case 2: r=255; g=0; b=255; break;    // Magenta
-        case 3: r=255; g=0; b=0; break;      // Rood
-        case 4: r=255; g=255; b=0; break;    // Geel
-        case 5: r=128; g=0; b=255; break;    // Paars
-        case 6: r=0; g=0; b=255; break;      // Blauw
-      }
-      break;
-    case BODY_PAGE_SENSOR_CAL:
-      switch(idx) {
-        case 0: r=0; g=255; b=0; break;
-        case 1: r=0; g=255; b=255; break;
-        case 2: r=255; g=165; b=0; break;
-        case 3: r=255; g=0; b=0; break;
-        case 4: r=0; g=0; b=255; break;
-      }
-      break;
-    case BODY_PAGE_AI_SETTINGS:
-      if (idx <= 5) { r=128; g=0; b=128; }
-      else if (idx == 6) { r=128; g=0; b=255; }
-      else if (idx == 7) { r=0; g=255; b=0; }
-      else { r=0; g=0; b=255; }
-      break;
-    case BODY_PAGE_SENSOR_SETTINGS:
-      if (idx <= 5) { r=255; g=255; b=0; }
-      else if (idx == 6) { r=0; g=255; b=0; }
-      else { r=0; g=0; b=255; }
-      break;
-    case BODY_PAGE_ML_TRAINING:
-      switch(idx) {
-        case 0: r=0; g=255; b=0; break;
-        case 1: r=0; g=255; b=255; break;
-        case 2: r=255; g=0; b=255; break;
-        case 3: r=255; g=165; b=0; break;
-        case 4: r=0; g=0; b=255; break;
-      }
-      break;
-    case BODY_PAGE_RECORDING:
-      if (recordingInButtonMode) {
-        switch(idx) {
-          case 0: r=0; g=255; b=0; break;
-          case 1: r=255; g=165; b=0; break;
-          case 2: r=255; g=0; b=255; break;
-          case 3: r=0; g=0; b=255; break;
-        }
-      } else { r=0; g=255; b=0; }
-      break;
-    case BODY_PAGE_SYSTEM_SETTINGS:
-      switch(idx) {
-        case 0: r=0; g=255; b=255; break;
-        case 1: r=0; g=255; b=0; break;
-        case 2: r=255; g=0; b=255; break;
-        case 3: r=255; g=0; b=0; break;
-        case 4: r=0; g=0; b=255; break;
-      }
-      break;
-    case BODY_PAGE_TIME_SETTINGS:
-      if (idx <= 4) { r=0; g=255; b=255; }
-      else if (idx == 5) { r=0; g=255; b=0; }
-      else { r=0; g=0; b=255; }
-      break;
-    case BODY_PAGE_FUNSCRIPT_SETTINGS:
-      switch(idx) {
-        case 0: r=0; g=255; b=0; break;
-        case 1: r=255; g=0; b=0; break;
-        case 2: r=0; g=0; b=255; break;
-      }
-      break;
-    case BODY_PAGE_FORMAT_CONFIRM:
-      switch(idx) {
-        case 0: r=0; g=0; b=255; break;
-        case 1: r=255; g=0; b=0; break;
-      }
-      break;
-    default: break;
-  }
-}
-
-// Update encoder LED voor huidige menu state
-void updateEncoderLEDForMenu() {
-  if (!encoderPixelAvailable) return;
-  
-  if (bodyMenuMode == BODY_MODE_SENSORS && encoderActiveMainScreen) {
-    switch(mainScreenButtonIdx) {
-      case 0: setEncoderLED(255, 0, 0); break;
-      case 1: setEncoderLED(0, 255, 0); break;
-      case 2: setEncoderLED(0, 0, 255); break;
-      case 3: setEncoderLED(255, 0, 255); break;
-    }
-    return;
-  }
-  
-  if (bodyMenuMode == BODY_MODE_MENU) {
-    uint8_t r, g, b;
-    getButtonColor(bodyMenuPage, bodyMenuIdx, r, g, b);
-    setEncoderLED(r, g, b);
-  }
-}
-
-// Flash encoder LED helder voor selectie
-void flashEncoderLEDForButton() {
-  if (!encoderPixelAvailable) return;
-  uint8_t r, g, b;
-  
-  if (bodyMenuMode == BODY_MODE_SENSORS && encoderActiveMainScreen) {
-    switch(mainScreenButtonIdx) {
-      case 0: r=255; g=0; b=0; break;
-      case 1: r=0; g=255; b=0; break;
-      case 2: r=0; g=0; b=255; break;
-      case 3: r=255; g=0; b=255; break;
-      default: r=255; g=255; b=255; break;
-    }
-  } else {
-    getButtonColor(bodyMenuPage, bodyMenuIdx, r, g, b);
-  }
-  setEncoderLED(r, g, b, true);
-}
 
 // 🔥 NIEUW: Flush buffer naar SD kaart
 void flushCSVBuffer() {
@@ -973,7 +845,6 @@ void touchCallback(TPoint point, TEvent e) {
     
     emergencyPauseActive = false;
     emergencyPauseScreenDrawn = false;
-    setEncoderLEDOff();  // Stop knipperen
     
     // Stuur RESUME naar Hooft ESP
     sendESPNowMessage(0, 0, false, "RESUME_SESSION", 0, false, false);
@@ -1174,9 +1045,6 @@ void handleEncoderInput() {
     // Button press detectie
     if (buttonPressed && !lastButtonState) {
       buttonPressStart = millis();
-      if (encoderActiveMainScreen) {
-        flashEncoderLEDForButton();  // LED 100% bij indrukken
-      }
     }
     
     // Button release detectie
@@ -1190,19 +1058,15 @@ void handleEncoderInput() {
           encoderActiveMainScreen = true;
           mainScreenButtonIdx = 0;
           body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
-          updateEncoderLEDForMenu();  // LED aan met knop kleur
+          //body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
           Serial.println("[ENCODER] Main screen activated");
         } else {
           // Kort drukken = Check voor double-click (AI toggle)
           if (waitingForDoubleClick && (millis() - lastClickTime < 800)) {
             // DOUBLE CLICK = Direct AI toggle
             aiOverruleActive = !aiOverruleActive;
-            if (aiOverruleActive) {
-              setEncoderLED(255, 0, 255, true);  // Fel paars als AI AAN
-            } else {
-              setEncoderLEDOff();  // LED uit als AI UIT
-            }
             body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
+            //body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive);
             Serial.printf("[ENCODER] AI toggled: %s\n", aiOverruleActive ? "ON" : "OFF");
             waitingForDoubleClick = false;
           } else {
@@ -1239,13 +1103,11 @@ void handleEncoderInput() {
           bodyMenuPage = BODY_PAGE_MAIN;
           bodyMenuIdx = 0;
           bodyMenuForceRedraw();
-          updateEncoderLEDForMenu();  // LED aan met menu kleur
           Serial.println("[ENCODER] -> Main menu");
         } else if (mainScreenButtonIdx == 3) {
           // AI toggle + DEACTIVEER encoder
           aiOverruleActive = !aiOverruleActive;
           encoderActiveMainScreen = false;
-          setEncoderLEDOff();  // LED uit
           body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
           Serial.printf("[ENCODER] AI: %s (deactivated)\n", aiOverruleActive ? "ON" : "OFF");
         }
@@ -1270,20 +1132,12 @@ void handleEncoderInput() {
       if (mainScreenButtonIdx > 3) mainScreenButtonIdx = 0;
       
       body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
-      updateEncoderLEDForMenu();  // LED update met nieuwe kleur
       Serial.printf("[ENCODER] Button: %d\n", mainScreenButtonIdx);
       lastPosition = newPosition;
     }
   }
   // ===== MENU MODE ===== (bestaande code blijft)
   else if (currentMode == MODE_MENU) {
-    // Button press detectie - LED fel
-    if (buttonPressed && !lastButtonState) {
-      if (!aiSettingsEditMode && !sensorSettingsEditMode && !timeSettingsEditMode) {
-        flashEncoderLEDForButton();  // LED 100% bij indrukken
-      }
-    }
-    
     // DRAAIEN
     if (delta != 0) {
       int maxItems = 6;
@@ -1352,14 +1206,6 @@ void handleEncoderInput() {
                       timeSettingsEditingParam == 2 ? editDay :
                       timeSettingsEditingParam == 3 ? editHour : editMinute);
         
-        // LED gradient: paars(0) -> rood(+) / blauw(-)
-        int currentVal = timeSettingsEditingParam == 0 ? editYear :
-                         timeSettingsEditingParam == 1 ? editMonth :
-                         timeSettingsEditingParam == 2 ? editDay :
-                         timeSettingsEditingParam == 3 ? editHour : editMinute;
-        int gradientDelta = (currentVal - timeParamBackup[timeSettingsEditingParam]) * 10;
-        setEncoderLEDGradient(gradientDelta);
-        
         bodyMenuForceRedraw();
         lastPosition = newPosition;
         return;  // Skip normale scroll logica
@@ -1407,26 +1253,6 @@ void handleEncoderInput() {
                       sensorSettingsEditingParam == 3 ? sensorEdit.gsrBaseline :
                       sensorSettingsEditingParam == 4 ? sensorEdit.gsrSensitivity : sensorEdit.gsrSmoothing);
         
-        // LED gradient: paars(0) -> rood(+) / blauw(-)
-        float currentVal = sensorSettingsEditingParam == 0 ? sensorEdit.beatThreshold :
-                           sensorSettingsEditingParam == 1 ? sensorEdit.tempOffset :
-                           sensorSettingsEditingParam == 2 ? sensorEdit.tempSmoothing :
-                           sensorSettingsEditingParam == 3 ? sensorEdit.gsrBaseline :
-                           sensorSettingsEditingParam == 4 ? sensorEdit.gsrSensitivity : sensorEdit.gsrSmoothing;
-        float diff = currentVal - sensorParamBackup[sensorSettingsEditingParam];
-        // Scale per parameter: 10 stappen = volle gradient
-        int gradientDelta;
-        switch(sensorSettingsEditingParam) {
-          case 0: gradientDelta = (int)(diff / 100); break;   // Beat: stap 1000
-          case 1: gradientDelta = (int)(diff * 1000); break;  // TempOffset: stap 0.01
-          case 2: gradientDelta = (int)(diff * 1000); break;  // TempSmooth: stap 0.01
-          case 3: gradientDelta = (int)(diff); break;         // GSR Base: stap 10
-          case 4: gradientDelta = (int)(diff * 100); break;   // GSR Sens: stap 0.1
-          case 5: gradientDelta = (int)(diff * 1000); break;  // GSR Smooth: stap 0.01
-          default: gradientDelta = (int)(diff * 10); break;
-        }
-        setEncoderLEDGradient(gradientDelta);
-        
         bodyMenuForceRedraw();
         lastPosition = newPosition;
         return;  // Skip normale scroll logica
@@ -1469,26 +1295,6 @@ void handleEncoderInput() {
                       aiSettingsEditingParam == 3 ? aiSettings.tempMax :
                       aiSettingsEditingParam == 4 ? aiSettings.gsrMax : aiSettings.responseRate);
         
-        // LED gradient: paars(0) -> rood(+) / blauw(-)
-        float currentVal = aiSettingsEditingParam == 0 ? aiSettings.autonomyLevel :
-                           aiSettingsEditingParam == 1 ? aiSettings.hrLow :
-                           aiSettingsEditingParam == 2 ? aiSettings.hrHigh :
-                           aiSettingsEditingParam == 3 ? aiSettings.tempMax :
-                           aiSettingsEditingParam == 4 ? aiSettings.gsrMax : aiSettings.responseRate;
-        float diff = currentVal - aiParamBackup[aiSettingsEditingParam];
-        // Scale per parameter: 10 stappen = volle gradient
-        int gradientDelta;
-        switch(aiSettingsEditingParam) {
-          case 0: gradientDelta = (int)(diff * 10); break;  // Autonomy: 0-100, stap 1
-          case 1: gradientDelta = (int)(diff * 10); break;  // HR Low: stap 1
-          case 2: gradientDelta = (int)(diff * 10); break;  // HR High: stap 1
-          case 3: gradientDelta = (int)(diff * 10); break;  // Temp Max: stap 1
-          case 4: gradientDelta = (int)(diff / 10); break;  // GSR Max: stap 100
-          case 5: gradientDelta = (int)(diff * 100); break; // Response: stap 0.1
-          default: gradientDelta = (int)(diff * 10); break;
-        }
-        setEncoderLEDGradient(gradientDelta);
-        
         bodyMenuForceRedraw();
         lastPosition = newPosition;
         return;  // Skip normale scroll logica
@@ -1505,7 +1311,6 @@ void handleEncoderInput() {
       if (bodyMenuIdx > maxItems) bodyMenuIdx = 0;
       
       bodyMenuForceRedraw();
-      updateEncoderLEDForMenu();  // LED update met nieuwe kleur
       Serial.printf("[ENCODER MENU] Index: %d\n", bodyMenuIdx);
       lastPosition = newPosition;
     }
@@ -1569,7 +1374,6 @@ void handleEncoderInput() {
            menuActive = false;
            bodyMenuMode = BODY_MODE_SENSORS;
            encoderActiveMainScreen = false;
-           setEncoderLEDOff();  // LED uit bij terug naar main
   
            g4_pauseRendering = false;
            body_gfx4_clear();
@@ -1601,14 +1405,12 @@ void handleEncoderInput() {
             // Start editing
             aiSettingsEditMode = true;
             aiSettingsEditingParam = bodyMenuIdx;
-            setEncoderLED(255, 0, 255, true);  // Fel paars bij start edit
             Serial.printf("[ENCODER] Editing param: %d\n", bodyMenuIdx);
           } else {
             // Exit edit → markeer rood
             aiSettingsEditMode = false;
             aiParamModified[aiSettingsEditingParam] = true;
             aiSettingsEditingParam = -1;
-            updateEncoderLEDForMenu();  // Terug naar menu kleur
             Serial.println("[ENCODER] Param saved (marked RED)");
           }
         } else {
@@ -1670,14 +1472,12 @@ void handleEncoderInput() {
             // Start editing
             sensorSettingsEditMode = true;
             sensorSettingsEditingParam = bodyMenuIdx;
-            setEncoderLED(255, 0, 255, true);  // Fel paars bij start edit
             Serial.printf("[ENCODER] Editing sensor param: %d\n", bodyMenuIdx);
           } else {
             // Exit edit → markeer rood
             sensorSettingsEditMode = false;
             sensorParamModified[sensorSettingsEditingParam] = true;
             sensorSettingsEditingParam = -1;
-            updateEncoderLEDForMenu();  // Terug naar menu kleur
             Serial.println("[ENCODER] Sensor param saved (marked RED)");
           }
         } else {
@@ -1785,14 +1585,12 @@ void handleEncoderInput() {
             // Start editing
             timeSettingsEditMode = true;
             timeSettingsEditingParam = bodyMenuIdx;
-            setEncoderLED(255, 0, 255, true);  // Fel paars bij start edit
             Serial.printf("[ENCODER] Editing time param: %d\n", bodyMenuIdx);
           } else {
             // Exit edit → markeer rood
             timeSettingsEditMode = false;
             timeParamModified[timeSettingsEditingParam] = true;
             timeSettingsEditingParam = -1;
-            updateEncoderLEDForMenu();  // Terug naar menu kleur
             Serial.println("[ENCODER] Time param saved (marked RED)");
           }
         } else {
@@ -1890,10 +1688,6 @@ void handleEncoderInput() {
       }
       // nieuwe straks
       bodyMenuForceRedraw();
-      // LED update na menu actie (maar niet als we in edit mode zitten)
-      if (!aiSettingsEditMode && !sensorSettingsEditMode && !timeSettingsEditMode) {
-        updateEncoderLEDForMenu();
-      }
     }
   }
   
@@ -2124,17 +1918,12 @@ void setup() {
     encoderPosition = 0;
   
     Serial.println("[ENCODER] Configured and ready!");
-    
+
     // NeoPixel op encoder board initialiseren
-    if (encoderPixel.begin(ENCODER_ADDR)) {
-      encoderPixelAvailable = true;
-      encoderPixel.setBrightness(255);
-      encoderPixel.setPixelColor(0, 0);  // Uit bij start
-      encoderPixel.show();
-      Serial.println("[ENCODER] NeoPixel ready!");
-    } else {
-      Serial.println("[ENCODER] NeoPixel FAILED!");
-    }
+    encoder.setPixelColor(0, 0, 0, 0);  // Uit bij start
+    encoder.setPixelType(NEO_GRB + NEO_KHZ800);
+    encoder.setPixelBrightness(255);
+    Serial.println("[ENCODER] NeoPixel ready!");
   } else {
     Serial.println("[I2C] Rotary Encoder NOT found");
     encoderAvailable = false;
@@ -2232,19 +2021,6 @@ void loop() {
     body_gfx->setFont();
   
     emergencyPauseScreenDrawn = true;
-  }
-
-  // Emergency pause LED knipperen (fel rood, 200ms interval)
-  if (emergencyPauseActive && encoderPixelAvailable) {
-    if (millis() - lastEmergencyBlink > 200) {
-      lastEmergencyBlink = millis();
-      emergencyBlinkState = !emergencyBlinkState;
-      if (emergencyBlinkState) {
-        setEncoderLED(255, 0, 0, true);  // Fel rood
-      } else {
-        setEncoderLEDOff();
-      }
-    }
   }
 
   /*

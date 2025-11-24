@@ -1,0 +1,431 @@
+═══════════════════════════════════════════════════════════════════════════════
+📋 TODO LIJST - ALLE ESP MODULES
+AI-Controlled ESP32 Edging System - Complete Overzicht
+═══════════════════════════════════════════════════════════════════════════════
+
+**Datum:** 24 November 2025 - 🆕 TOUCH DISABLE + RECORDING FIXES!
+**Project:** AI-Control-ESP-Project
+**Owner:** Aak
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📊 STATUS OVERZICHT
+
+```
+Pomp Unit (ESP8266):       ████████████████████ 100% ✅ KLAAR!
+Body ESP (SC01 Plus):      ████████████████████  96% ✅ ENCODER + TOUCH DISABLE! 🆕
+Hooft ESP (CYD 2.8"):      ████████████████████  97% ✅ EMERGENCY PAUSE + v1.1 support!
+M5StickC Plus:             ████████████████████ 100% ✅ KLAAR (hardware twijfel)
+```
+
+**Totaal Project:** ~97% compleet (Touch Disable + Recording Fixes!)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🔴 OPENSTAANDE BUGS/ISSUES (NU FIXEN!)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+### ❌ AI Training menu - NIKS KLAAR!!!
+   ☐ Hele menu moet nog geïmplementeerd worden
+   ☐ Data opnemen functionaliteit
+   ☐ Model trainen functionaliteit
+   ☐ AI Annotatie functionaliteit
+   ☐ Model Manager functionaliteit
+
+### ❌ Funscript menu - TERUG gaat naar verkeerde scherm
+   ☐ TERUG gaat naar hoofdscherm, moet naar vorig scherm (System Settings)
+
+### 🔧 Playback scherm - HALF WERKEND
+   ☐ Encoder controls nog niet geïmplementeerd (speed +/-, pauze, stop)
+   ☐ Display/beeld nog niet volledig klaar
+   ☐ Stress popup encoder navigatie
+   ☐ Progress bar encoder interactie
+   ☐ Andere onbekende issues (testen nodig)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ✅ VANDAAG GEFIXT (24 Nov 2025) - TOUCH DISABLE + RECORDING FIXES! 🆕
+
+═══════════════════════════════════════════════════════════════════════════════
+
+### ✅ TOUCH DISABLE SYSTEEM (95%):
+  ✅ 3 defines in config.h:
+     ```cpp
+     #define TOUCH_MENU_ENABLED      true/false  // Menu navigatie knoppen
+     #define TOUCH_PARAMS_ENABLED    true/false  // Parameter +/- pijltjes
+     #define TOUCH_EMERGENCY_ENABLED true        // Emergency pause scherm
+     ```
+  ✅ Preferences opslag in Body_ESP.ino setup()
+  ✅ Touch check in bodyMenuHandleTouch() (body_menu.cpp)
+  ✅ Touch check voor emergency pause resume (Body_ESP.ino regel 787)
+  ✅ Touch checks voor parameter editing:
+     - TIME_SETTINGS (+/- knoppen)
+     - AI_SETTINGS (+/- knoppen)
+     - SENSOR_SETTINGS (+/- knoppen)
+  ✅ Encoder blijft ALTIJD werken (fallback)
+  ☐ Emergency pause encoder resume nog niet getest
+
+**Serial output bij boot:**
+```
+[SETUP] Touch states loaded: Menu=0 Params=0 Emergency=1
+```
+
+### ✅ RECORDING MENU FIXES (100%):
+  ✅ **Scrollen door ALLE bestanden** - was hardcoded op 4, nu dynamisch csvCount
+     ```cpp
+     // OUD: maxItems = 3;  // Altijd 4 items
+     // NIEUW: maxItems = max(0, csvCount - 1);  // Alle bestanden!
+     ```
+  ✅ **DELETE via encoder** - werkt nu direct (geen touch call meer)
+     - Directe SD_MMC.remove() call
+     - csvCount = -1 trigger rescan
+     - selectedRecordingFile reset
+  ✅ **PLAY via encoder** - werkt (roept startPlayback aan)
+
+**Recording encoder flow:**
+```
+FASE 1: Scroll door alle bestanden (groen)
+SELECT: Bestand wordt rood, spring naar knoppen
+FASE 2: Navigate knoppen (PLAY/DELETE/AI/TERUG)
+DELETE: Direct verwijderen + rescan
+PLAY:   Start playback (half werkend)
+TERUG:  Reset naar bestand mode
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+# 🎉 EERDER GEFIXT (23 Nov 2025) - ENCODER NAVIGATIE SYSTEEM v1.0!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ✅ ROTARY ENCODER NAVIGATIE COMPLEET!
+
+**Status:** MAJOR UX FEATURE IMPLEMENTED! 🚀🎊
+
+### ✅ HARDWARE INTEGRATIE (100%):
+  ✅ Adafruit I2C QT Rotary Encoder (0x36)
+  ✅ I2C configuratie: Wire1, SDA=18, SCL=8
+  ✅ Debouncing: 50ms polling, active LOW button
+  ✅ NeoPixel RGB LED integratie voorbereid
+
+**Hardware test:**
+```
+[I2C] Scanning bus 1 (GPIO 18/8)...
+[I2C] Device found at 0x36 - Rotary Encoder!
+[ENCODER] Initialized successfully!
+```
+
+### ✅ HOOFDSCHERM NAVIGATIE (100%):
+  ✅ 1500ms hold activatie (was 2000ms - optimaal voor UX!)
+  ✅ Dubbele klik: 800ms window voor direct AI toggle
+  ✅ 4 knoppen navigatie: REC, PLAY, MENU, AI
+  ✅ Oranje visual feedback op geselecteerde knop
+  ✅ Deactivatie bij AI selectie of menu TERUG
+  ✅ Touch blijft werken (backward compatible!)
+
+**Hoofdscherm features:**
+```
+Hold 1.5s → Encoder actief → Oranje kader
+Draaien   → Navigate buttons (REC/PLAY/MENU/AI)
+Drukken   → Execute functie
+2x Klik   → Direct AI toggle (bypass hold)
+```
+
+### ✅ ALLE MENU'S ENCODER-ENABLED (100%):
+  ✅ **Hoofdmenu** (7 items + oranje kaders)
+  ✅ **Sensor Calibration** (4 items + TERUG, gele kaders)
+  ✅ **AI Settings** (3 buttons, gele kaders)
+  ✅ **ML Training** (5 items + TERUG, oranje kaders)
+  ✅ **Sensor Settings** (2 buttons, oranje kaders)
+  ✅ **Recording** (2-fase systeem, oranje/groen/rood) 🆕 FIXED!
+  ✅ **System Settings** (5 items + TERUG, groene kaders)
+  ✅ **Funscript Settings** (3 buttons, oranje kaders)
+  ✅ **Format Confirm** (2 buttons, groene kaders)
+  ✅ **Time Settings** (2 buttons, oranje kaders)
+
+### ✅ RECORDING MENU 2-FASE SYSTEEM (100%):
+  ✅ **FASE 1**: Door ALLE bestanden scrollen (was beperkt tot 4!)
+     - Groene letters = huidige positie
+     - Touch blijft werken voor snelle selectie
+  ✅ **FASE 2**: Bestand selecteren → Rood + spring naar knoppen
+     - Rode letters = geselecteerd bestand
+     - 4 knoppen: PLAY, DELETE, AI, TERUG
+  ✅ DELETE direct via encoder (werkt!)
+  ✅ PLAY via encoder (werkt, playback half klaar)
+  ✅ TERUG deselecteert bestand
+
+### ✅ KLEUR CODING SYSTEEM (100%):
+  ✅ **Oranje (0xFD20)**: Hoofdmenu, ML Training, Recording buttons, Sensor Settings, Funscript, Time Settings
+  ✅ **Geel (0xFFE0)**: Sensor Calibration, AI Settings
+  ✅ **Groen (0x07E0)**: System Settings, Format Confirm, Recording files (huidige)
+  ✅ **Rood (0xF800)**: Recording (geselecteerd bestand)
+
+### ✅ CODE ARCHITECTUUR (100%):
+  ✅ Encoder state variabelen:
+     ```cpp
+     bool encoderActiveMainScreen = false;
+     int mainScreenButtonIdx = 0;
+     bool recordingInButtonMode = false;
+     extern int selectedRecordingFile;
+     extern int csvCount;
+     ```
+  ✅ `handleEncoderInput()` functie - centraal systeem
+  ✅ Touch backward compatible (blijft werken!)
+  ✅ Menu-specifieke maxItems dynamisch
+  ✅ Aparte draw logica per menu type
+
+**Timing configuratie:**
+```cpp
+ENCODER_POLL_INTERVAL = 50;        // 50ms polling
+ENCODER_HOLD_TIME = 1500;          // 1.5s hold activatie
+DOUBLE_CLICK_WINDOW = 800;         // 800ms dubbele klik
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+# 🎉 OOK EERDER GEFIXT (22 Nov 2025) - AI BEVOEGDHEID SCHAAL v1.1!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ✅ AI BEVOEGDHEID SCHAAL v1.1 - DEFINITIEVE VERSIE!
+
+**Status:** MAJOR UPDATE - 10 NIVEAUS + CONFIGUREERBAAR! 🚀🎊
+
+### ✅ 10-NIVEAU SCHAAL (100%):
+  ✅ 0% → AI uit (alleen observeren)
+  ✅ 10% → AI leert (geen controle)
+  ✅ 20% → Levels 0-2
+  ✅ 30% → Levels 0-3 + vibe/zuig
+  ✅ 40% → Levels 0-4 + tijdelijk L5 (configureerbaar!)
+  ✅ 50% → Levels 0-5 + tijdelijk L6 (configureerbaar!)
+  ✅ 60% → Levels 0-6 (volledige controle tot L6)
+  ✅ 70% → Levels 0-7 (max edges configureerbaar 1-10, default 3)
+  ✅ 80% → Levels 0-7 (max edges configureerbaar 1-15, default 5)
+  ✅ 90% → Levels 0-7+ (AI mag orgasme triggeren ≥85%)
+  ✅ 100% → Absolute controle (maximale vrijheid)
+
+### ✅ CONFIGUREERBARE PARAMETERS (100%):
+  ✅ Level 5 Dip Timer (40% AI): 5-60 sec (default 30 sec)
+  ✅ Level 6 Dip Timer (50% AI): 5-90 sec (default 45 sec)
+  ✅ Edge Limiet bij 70% AI: 1-10 edges (default 3)
+  ✅ Edge Limiet bij 80% AI: 1-15 edges (default 5)
+  ✅ Edge Limiet bij 90%+: Onbeperkt (niet instelbaar)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📝 NOG TE DOEN - ENCODER GERELATEERD
+
+═══════════════════════════════════════════════════════════════════════════════
+
+### ☐ Parameter Editing met Encoder (VOLGENDE PRIORITEIT):
+   ☐ AI Settings: +/- waarden met encoder (6 params)
+   ☐ Sensor Settings: +/- waarden met encoder (6 params)
+   ☐ Time Settings: +/- waarden met encoder (5 params)
+   ☐ Edit mode: Waarde knippert/rood tijdens editing
+
+### ☐ Encoder RGB LED Status (Adafruit I2C seesaw):
+   ☐ Simpele implementatie: encoder.setPixelColor(0, R, G, B)
+   ☐ Kleur = kleur van huidige geselecteerde knop
+   ☐ Gedimde kleur tijdens browsing
+   ☐ Volle kleur tijdens selectie
+   ☐ Uit tijdens rood scherm (emergency pause)
+
+### ☐ Playback Scherm Encoder Controls:
+   ☐ Speed +/- met encoder draaien
+   ☐ Pauze/Play met encoder klik
+   ☐ Stop met encoder hold
+   ☐ Stress popup: level selectie met encoder
+   ☐ Progress bar interactie
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📝 NOG TE DOEN - ANDERE ITEMS
+
+═══════════════════════════════════════════════════════════════════════════════
+
+### ☐ AI Training Menu (HELE MENU ONTBREEKT!):
+   ☐ Data Opnemen implementatie
+   ☐ Model Trainen implementatie
+   ☐ AI Annotatie implementatie
+   ☐ Model Manager implementatie
+   ☐ Encoder navigatie voor alle onderdelen
+
+### ☐ Bug Fixes:
+   ☐ Funscript menu TERUG → moet naar System Settings, niet hoofdscherm
+
+### ☐ AI Parameters Menu (Body ESP):
+   ☐ Dip timers UI (Level 5/6)
+   ☐ Edge limieten UI (70%/80%)
+   ☐ EEPROM save/load
+
+### ☐ Hooft ESP AI v1.1 Support:
+   ☐ Edge counter implementatie
+   ☐ Tijdelijke dip enforcement
+   ☐ Edge limiet check
+
+### ☐ Hardware:
+   ☐ Pipboy arm setup ontwerpen + 3D printen
+   ☐ Sensor calibratie workflow (GSR, HR, Temp)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🎯 NEXT STEPS (Prioriteit volgorde)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+**DEZE WEEK (High Priority):**
+1. ✅ Touch disable systeem - COMPLEET! 🎉🆕
+2. ✅ Recording menu fixes - COMPLEET! 🎉🆕
+3. ☐ **Playback scherm encoder controls** (speed, pause, stop)
+4. ☐ **Parameter editing met encoder** (AI/Sensor/Time settings)
+5. ☐ **Encoder RGB LED status** (simpel via seesaw)
+6. ☐ **Funscript TERUG bug** (quick fix)
+
+**VOLGENDE WEEK:**
+7. ☐ AI Training menu implementeren
+8. ☐ AI Parameters menu (dip timers, edge limieten)
+9. ☐ Hooft ESP AI v1.1 support
+10. ☐ Full system test
+
+**LATER:**
+11. ☐ Pipboy arm setup
+12. ☐ Stability test (2+ uur)
+13. ☐ Documentation updates
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🏆 PROJECT MILESTONES
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ **Milestone 1:** Basis Keon control (COMPLEET - 10 Nov)
+✅ **Milestone 2:** Vacuum + Vibe systeem (COMPLEET - 15 Nov)
+✅ **Milestone 3:** ESP-NOW 4-module netwerk (COMPLEET - 18 Nov)
+✅ **Milestone 4:** Nunchuk controls + hold detection (COMPLEET - 19 Nov)
+✅ **Milestone 5:** Orgasm trigger + cooldown (COMPLEET - 20 Nov)
+✅ **Milestone 6:** Body ESP AI operationeel (COMPLEET - 21 Nov) 🎉
+✅ **Milestone 7:** Emergency pause + warmup (COMPLEET - 22 Nov) 🎉
+✅ **Milestone 8:** AI bevoegdheid schaal v1.1 (COMPLEET - 22 Nov) 🎉
+✅ **Milestone 9:** Encoder navigatie systeem (COMPLEET - 23 Nov) 🎉
+✅ **Milestone 10:** Touch disable + Recording fixes (COMPLEET - 24 Nov) 🎉🆕
+☐ **Milestone 11:** Playback encoder controls (TARGET: Deze week!)
+☐ **Milestone 12:** Encoder parameter editing (TARGET: Deze week!)
+☐ **Milestone 13:** AI Training menu (TARGET: Volgende week)
+☐ **Milestone 14:** Production ready v1.0 (Target: eind November)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📊 COMPLETION STATS
+
+═══════════════════════════════════════════════════════════════════════════════
+
+**Code Development:**
+- Hooft ESP: 97% ✅ (3% = AI v1.1 support + UI polish)
+- Body ESP: 96% ✅ (4% = playback encoder, param edit, AI training menu)
+- Pomp Unit: 100% ✅
+- M5StickC: 100% ✅
+
+**System Integration:**
+- ESP-NOW communicatie: 100% ✅
+- Bidirectionele commands: 100% ✅
+- AI decision tree: 100% ✅
+- Sensor processing: 100% ✅
+- Emergency pause systeem: 100% ✅
+- AI bevoegdheid v1.1: 100% (gedocumenteerd) ✅
+- Encoder navigatie: 100% (alle menu's!) ✅
+- Touch disable config: 95% ✅ 🆕 (emergency encoder nog niet getest)
+- Recording menu: 100% ✅ 🆕 (scroll + DELETE + PLAY fixed)
+- Playback encoder: 0% (TODO!)
+- Encoder parameter editing: 0% (TODO!)
+- Encoder RGB LED: 0% (TODO!)
+- AI Training menu: 0% (TODO!)
+- AI parameters menu: 0% (TODO!)
+- Hardware testing: 60% (needs real sensors!)
+
+**Overall Project:** ~97% compleet! 🚀
+
+**Ready for:** Playback Encoder Controls + Parameter Editing!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 💬 NOTES & DECISIONS
+
+═══════════════════════════════════════════════════════════════════════════════
+
+**24 Nov 2025 - Touch Disable + Recording Fixes:**
+- Touch disable via config.h defines (TOUCH_MENU_ENABLED, TOUCH_PARAMS_ENABLED, TOUCH_EMERGENCY_ENABLED)
+- Preferences opslag werkt (Serial output: [SETUP] Touch states loaded)
+- Recording scrollen door ALLE bestanden (was hardcoded 4, nu dynamisch csvCount)
+- DELETE via encoder: direct SD_MMC.remove(), geen touch call meer
+- PLAY via encoder: werkt, maar playback scherm nog niet compleet
+- Encoder calls via bodyMenuHandleTouch() werden geblokkeerd door touch disable - opgelost met directe implementatie
+
+**23 Nov 2025 - Encoder Navigatie:**
+- Hardware: Adafruit I2C QT Rotary Encoder (0x36)
+- I2C bus: Wire1, SDA=18, SCL=8
+- Hold activatie: 1500ms (optimaal, was 2000ms)
+- Dubbele klik: 800ms window voor AI toggle
+- Alle 10 menu's encoder-enabled met kleur coding
+- Recording 2-fase: Bestanden (groen) → Selectie (rood) → Knoppen (oranje)
+- Touch blijft werken (backward compatible)
+- Parameter editing: TODO (volgende fase)
+- RGB LED: TODO (status indicator)
+- NeoPixel via seesaw: encoder.setPixelColor() en encoder.setPixelShow()
+
+**22 Nov 2025 - AI Bevoegdheid v1.1:**
+- Schaal uitgebreid van vage ranges naar 10 duidelijke niveaus (0%, 10%, ..., 100%)
+- Tijdelijke dip concept geïntroduceerd (40%=L5 tijdelijk, 50%=L6 tijdelijk)
+- Edge limieten configureerbaar gemaakt (70%=1-10, 80%=1-15, 90%+=onbeperkt)
+- AI Parameters submenu ontworpen (dip timers + edge limieten)
+- EEPROM/NVS storage struct gedocumenteerd (AIConfig)
+- Nunchuk override verduidelijkt (ALTIJD prioriteit, inclusief Y-trigger voor PONR training)
+- Emergency scenarios verduidelijkt ("hij floept eruit" = realistisch!)
+
+**22 Nov 2025 - Emergency Pause:**
+- Warmup duration: 10 seconden (configureerbaar)
+- Warmup start level: 0 (veilig)
+- Rood scherm werkt perfect (smooth fonts)
+- Touch resume → warmup → normale AI
+- AI blijft AAN tijdens pause (blijft leren!)
+
+**21 Nov 2025:**
+- AI update interval: 5000ms → 1000ms (5x sneller response!)
+- Decision tree gebruikt (geen neural network - perfect voor ESP32)
+- Stress Manager gebruikt BiometricData struct
+- AI stuurt trust/sleeve factors (0.0-1.0 range)
+- Command handlers compleet met AI pause/resume logica
+
+**Design Decisions:**
+- Decision tree > Neural network (sneller, debugbaar, minder data)
+- AI update 1 sec interval (balans tussen responsiveness en stabiliteit)
+- Cooldown strokes mode preferred (meer consistent dan tijd)
+- Stroke range 0-95% (veilig voor motor, volle sensatie)
+- AI bevoegdheid 10-niveau schaal (duidelijker dan vage ranges)
+- Configureerbare parameters (finetuning per gebruiker)
+- Tijdelijke dips (experimenteel zonder permanent commitment)
+- Edge limieten instelbaar (safety + gradual trust building)
+- Encoder navigatie: 1500ms hold (optimal UX vs accidental trigger)
+- Recording 2-fase systeem (bestanden eerst, dan acties)
+- Kleur coding: Context-aware visual feedback
+- Touch backward compatible (encoder supplement, not replacement)
+- Touch disable via config.h (compile-time, niet runtime menu) 🆕
+- Encoder actions direct implementeren, niet via touch calls 🆕
+
+═══════════════════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════════════
+
+**STATUS:** Touch Disable WERKEND! Recording Fixes WERKEND! 🎉
+
+**KNOWN ISSUES:**
+- AI Training menu: NIKS KLAAR
+- Funscript TERUG: gaat naar hoofdscherm ipv System Settings
+- Playback scherm: encoder controls ontbreken
+
+**NEXT:** Playback Encoder → Parameter Editing → RGB LED → AI Training Menu!
+
+**VERSIE:** v1.2 (24 Nov 2025)
+**PROJECT COMPLETION:** ~97%
+**READY FOR:** Playback Encoder Controls + Parameter Editing!
+
+═══════════════════════════════════════════════════════════════════════════════
