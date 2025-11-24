@@ -151,10 +151,8 @@ struct StressMarker {
 };
 static StressMarker stressMarkers[100];  // Max 100 markers per sessie
 static int stressMarkerCount = 0;
-bool stressPopupActive = false;
-int selectedStressLevel = 2;  // Default: normaal
-bool stressLevelConfirmed = false;  // true = nu bij knoppen, false = nog bij levels
-int stressPopupButtonIdx = 0;  // 0=ANNULEREN, 1=OPSLAAN
+static bool stressPopupActive = false;
+static int selectedStressLevel = 2;  // Default: normaal
 
 // ===== AI SETTINGS EEPROM FUNCTIES =====
 void loadAISettings() {
@@ -3220,7 +3218,7 @@ void drawStressLevelPopup() {
   body_gfx->setCursor(popupX + (popupW - tw) / 2 - x1, popupY + 25);
   body_gfx->print("STRESS LEVEL");
   
-  // 8 stress levels (0-7) als radio buttons
+  // 7 stress levels (0-6) als radio buttons
   #if USE_ADAFRUIT_FONTS
     body_gfx->setFont(&FONT_ITEM);
     body_gfx->setTextSize(1);
@@ -3232,18 +3230,17 @@ void drawStressLevelPopup() {
     "0 - Ontspannen",
     "1 - Rustig",
     "2 - Normaal",
-    "3 - Licht verhoogd",
-    "4 - Verhoogd",
-    "5 - Gestrest",
-    "6 - Zeer gestrest",
-    "7 - Extreem"
+    "3 - Verhoogd",
+    "4 - Gestrest",
+    "5 - Zeer gestrest",
+    "6 - Extreem"
   };
   
-  int levelY = popupY + 45;
-  int levelH = 18;
-  int levelSpacing = 2;
+  int levelY = popupY + 50;
+  int levelH = 20;
+  int levelSpacing = 3;
   
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 7; i++) {
     int y = levelY + i * (levelH + levelSpacing);
     
     // Radio button circle
@@ -3256,17 +3253,11 @@ void drawStressLevelPopup() {
     
     // Inner circle (selected = gevuld)
     if (i == selectedStressLevel) {
-      body_gfx->fillCircle(circleX, circleY, circleR - 2, stressLevelConfirmed ? 0xF800 : 0x07E0);  // Rood als bevestigd, groen als selecterend
+      body_gfx->fillCircle(circleX, circleY, circleR - 2, 0x07E0);  // Groen
     }
     
-    // Label - kleur op basis van encoder selectie
-    uint16_t labelColor = 0xFFFF;  // Default wit
-    if (i == selectedStressLevel && !stressLevelConfirmed) {
-      labelColor = 0x07E0;  // Groen als aan het selecteren
-    } else if (i == selectedStressLevel && stressLevelConfirmed) {
-      labelColor = 0xF800;  // Rood als bevestigd
-    }
-    body_gfx->setTextColor(labelColor, 0x2104);
+    // Label
+    body_gfx->setTextColor(0xFFFF, 0x2104);
     body_gfx->setCursor(circleX + circleR + 10, y + levelH / 2 + 4);
     body_gfx->print(levelLabels[i]);
   }
@@ -3289,11 +3280,6 @@ void drawStressLevelPopup() {
   
   // ANNULEREN (blauw)
   body_gfx->fillRoundRect(btn1X, btnY, btnW, btnH, 8, 0x001F);
-  if (stressLevelConfirmed && stressPopupButtonIdx == 0) {
-    // Encoder highlight: oranje rand
-    body_gfx->drawRoundRect(btn1X-2, btnY-2, btnW+4, btnH+4, 10, 0xFD20);
-    body_gfx->drawRoundRect(btn1X-1, btnY-1, btnW+2, btnH+2, 9, 0xFD20);
-  }
   body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFFFF);
   body_gfx->setTextColor(0xFFFF, 0x001F);
   body_gfx->getTextBounds("ANNULEREN", 0, 0, &x1, &y1, &tw, &th);
@@ -3306,11 +3292,6 @@ void drawStressLevelPopup() {
   
   // OPSLAAN (groen)
   body_gfx->fillRoundRect(btn2X, btnY, btnW, btnH, 8, 0x07E0);
-  if (stressLevelConfirmed && stressPopupButtonIdx == 1) {
-    // Encoder highlight: oranje rand
-    body_gfx->drawRoundRect(btn2X-2, btnY-2, btnW+4, btnH+4, 10, 0xFD20);
-    body_gfx->drawRoundRect(btn2X-1, btnY-1, btnW+2, btnH+2, 9, 0xFD20);
-  }
   body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFFFF);
   body_gfx->setTextColor(0x0000, 0x07E0);
   body_gfx->getTextBounds("OPSLAAN", 0, 0, &x1, &y1, &tw, &th);

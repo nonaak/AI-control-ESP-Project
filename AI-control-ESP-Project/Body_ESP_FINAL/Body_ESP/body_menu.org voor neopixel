@@ -134,15 +134,15 @@ SensorSettingsEdit sensorEdit;
 
 // Playback state variabelen
 static bool isPlaybackActive = false;
-bool isPlaybackPaused = false;
-float playbackSpeed = 100.0f;  // 10-200%
+static bool isPlaybackPaused = false;
+static float playbackSpeed = 100.0f;  // 10-200%
 static float playbackProgress = 0.0f;  // 0.0-1.0
 static int playbackCurrentLine = 0;
 static int playbackTotalLines = 0;
 static unsigned long playbackLastUpdate = 0;
 static File playbackFile;
 static char selectedPlaybackFile[64] = "";
-bool playbackScreenDrawn = false;  // Track of overlay al getekend is
+static bool playbackScreenDrawn = false;  // Track of overlay al getekend is
 
 // Stress marker data
 struct StressMarker {
@@ -151,10 +151,8 @@ struct StressMarker {
 };
 static StressMarker stressMarkers[100];  // Max 100 markers per sessie
 static int stressMarkerCount = 0;
-bool stressPopupActive = false;
-int selectedStressLevel = 2;  // Default: normaal
-bool stressLevelConfirmed = false;  // true = nu bij knoppen, false = nog bij levels
-int stressPopupButtonIdx = 0;  // 0=ANNULEREN, 1=OPSLAAN
+static bool stressPopupActive = false;
+static int selectedStressLevel = 2;  // Default: normaal
 
 // ===== AI SETTINGS EEPROM FUNCTIES =====
 void loadAISettings() {
@@ -3041,11 +3039,6 @@ void drawPlaybackScreen() {
   
   // - knop (blauw)
   body_gfx->fillRoundRect(speedX, speedY, speedBtnW, speedBtnH, 3, 0x001F);
-  if (bodyMenuIdx == 3) {
-    // Encoder highlight: gele rand
-    body_gfx->drawRect(speedX-2, speedY-2, speedBtnW+4, speedBtnH+4, 0xFFE0);
-    body_gfx->drawRect(speedX-1, speedY-1, speedBtnW+2, speedBtnH+2, 0xFFE0);
-  }
   body_gfx->drawRect(speedX, speedY, speedBtnW, speedBtnH, 0xFFFF);
   body_gfx->setTextColor(0xFFFF, 0x001F);
   body_gfx->getTextBounds("-", 0, 0, &x1, &y1, &tw, &th);
@@ -3074,11 +3067,6 @@ void drawPlaybackScreen() {
   // + knop (rood)
   int plusX = speedTextX + speedTextW + 2;
   body_gfx->fillRoundRect(plusX, speedY, speedBtnW, speedBtnH, 3, 0xF800);
-  if (bodyMenuIdx == 4) {
-    // Encoder highlight: gele rand
-    body_gfx->drawRect(plusX-2, speedY-2, speedBtnW+4, speedBtnH+4, 0xFFE0);
-    body_gfx->drawRect(plusX-1, speedY-1, speedBtnW+2, speedBtnH+2, 0xFFE0);
-  }
   body_gfx->drawRect(plusX, speedY, speedBtnW, speedBtnH, 0xFFFF);
   body_gfx->setTextColor(0xFFFF, 0xF800);
   body_gfx->getTextBounds("+", 0, 0, &x1, &y1, &tw, &th);
@@ -3111,11 +3099,6 @@ void drawPlaybackScreen() {
   
   // STOP knop (oranje)
   body_gfx->fillRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFD20);
-  if (bodyMenuIdx == 0) {
-    // Encoder highlight: gele rand
-    body_gfx->drawRoundRect(btn1X-2, btnY-2, btnW+4, btnH+4, 10, 0xFFE0);
-    body_gfx->drawRoundRect(btn1X-1, btnY-1, btnW+2, btnH+2, 9, 0xFFE0);
-  }
   body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFFFF);
   body_gfx->setTextColor(0x0000, 0xFD20);
   body_gfx->getTextBounds("STOP", 0, 0, &x1, &y1, &tw, &th);
@@ -3128,11 +3111,6 @@ void drawPlaybackScreen() {
   
   // AI-ACTIE knop (magenta)
   body_gfx->fillRoundRect(btn4X, btnY, btnW, btnH, 8, 0xF81F);
-  if (bodyMenuIdx == 2) {
-    // Encoder highlight: gele rand
-    body_gfx->drawRoundRect(btn4X-2, btnY-2, btnW+4, btnH+4, 10, 0xFFE0);
-    body_gfx->drawRoundRect(btn4X-1, btnY-1, btnW+2, btnH+2, 9, 0xFFE0);
-  }
   body_gfx->drawRoundRect(btn4X, btnY, btnW, btnH, 8, 0xFFFF);
   body_gfx->setTextColor(0x0000, 0xF81F);
   body_gfx->getTextBounds("AI-ACTIE", 0, 0, &x1, &y1, &tw, &th);
@@ -3164,11 +3142,6 @@ void drawPlaybackScreen() {
   uint16_t playColor = (isPlaybackActive && !isPlaybackPaused) ? 0x07E0 : 0xF800;
   const char* playLabel = (isPlaybackActive && !isPlaybackPaused) ? "PAUZE" : "PLAY";
   body_gfx->fillRoundRect(btn2X, btnY, btnW, btnH, 8, playColor);
-  if (bodyMenuIdx == 1) {
-    // Encoder highlight: gele rand
-    body_gfx->drawRoundRect(btn2X-2, btnY-2, btnW+4, btnH+4, 10, 0xFFE0);
-    body_gfx->drawRoundRect(btn2X-1, btnY-1, btnW+2, btnH+2, 9, 0xFFE0);
-  }
   body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFFFF);
   body_gfx->setTextColor(0x0000, playColor);
   
@@ -3220,7 +3193,7 @@ void drawStressLevelPopup() {
   body_gfx->setCursor(popupX + (popupW - tw) / 2 - x1, popupY + 25);
   body_gfx->print("STRESS LEVEL");
   
-  // 8 stress levels (0-7) als radio buttons
+  // 7 stress levels (0-6) als radio buttons
   #if USE_ADAFRUIT_FONTS
     body_gfx->setFont(&FONT_ITEM);
     body_gfx->setTextSize(1);
@@ -3232,18 +3205,17 @@ void drawStressLevelPopup() {
     "0 - Ontspannen",
     "1 - Rustig",
     "2 - Normaal",
-    "3 - Licht verhoogd",
-    "4 - Verhoogd",
-    "5 - Gestrest",
-    "6 - Zeer gestrest",
-    "7 - Extreem"
+    "3 - Verhoogd",
+    "4 - Gestrest",
+    "5 - Zeer gestrest",
+    "6 - Extreem"
   };
   
-  int levelY = popupY + 45;
-  int levelH = 18;
-  int levelSpacing = 2;
+  int levelY = popupY + 50;
+  int levelH = 20;
+  int levelSpacing = 3;
   
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 7; i++) {
     int y = levelY + i * (levelH + levelSpacing);
     
     // Radio button circle
@@ -3256,17 +3228,11 @@ void drawStressLevelPopup() {
     
     // Inner circle (selected = gevuld)
     if (i == selectedStressLevel) {
-      body_gfx->fillCircle(circleX, circleY, circleR - 2, stressLevelConfirmed ? 0xF800 : 0x07E0);  // Rood als bevestigd, groen als selecterend
+      body_gfx->fillCircle(circleX, circleY, circleR - 2, 0x07E0);  // Groen
     }
     
-    // Label - kleur op basis van encoder selectie
-    uint16_t labelColor = 0xFFFF;  // Default wit
-    if (i == selectedStressLevel && !stressLevelConfirmed) {
-      labelColor = 0x07E0;  // Groen als aan het selecteren
-    } else if (i == selectedStressLevel && stressLevelConfirmed) {
-      labelColor = 0xF800;  // Rood als bevestigd
-    }
-    body_gfx->setTextColor(labelColor, 0x2104);
+    // Label
+    body_gfx->setTextColor(0xFFFF, 0x2104);
     body_gfx->setCursor(circleX + circleR + 10, y + levelH / 2 + 4);
     body_gfx->print(levelLabels[i]);
   }
@@ -3289,11 +3255,6 @@ void drawStressLevelPopup() {
   
   // ANNULEREN (blauw)
   body_gfx->fillRoundRect(btn1X, btnY, btnW, btnH, 8, 0x001F);
-  if (stressLevelConfirmed && stressPopupButtonIdx == 0) {
-    // Encoder highlight: oranje rand
-    body_gfx->drawRoundRect(btn1X-2, btnY-2, btnW+4, btnH+4, 10, 0xFD20);
-    body_gfx->drawRoundRect(btn1X-1, btnY-1, btnW+2, btnH+2, 9, 0xFD20);
-  }
   body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFFFF);
   body_gfx->setTextColor(0xFFFF, 0x001F);
   body_gfx->getTextBounds("ANNULEREN", 0, 0, &x1, &y1, &tw, &th);
@@ -3306,11 +3267,6 @@ void drawStressLevelPopup() {
   
   // OPSLAAN (groen)
   body_gfx->fillRoundRect(btn2X, btnY, btnW, btnH, 8, 0x07E0);
-  if (stressLevelConfirmed && stressPopupButtonIdx == 1) {
-    // Encoder highlight: oranje rand
-    body_gfx->drawRoundRect(btn2X-2, btnY-2, btnW+4, btnH+4, 10, 0xFD20);
-    body_gfx->drawRoundRect(btn2X-1, btnY-1, btnW+2, btnH+2, 9, 0xFD20);
-  }
   body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFFFF);
   body_gfx->setTextColor(0x0000, 0x07E0);
   body_gfx->getTextBounds("OPSLAAN", 0, 0, &x1, &y1, &tw, &th);

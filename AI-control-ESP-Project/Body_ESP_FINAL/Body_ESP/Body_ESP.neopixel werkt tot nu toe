@@ -384,15 +384,6 @@ void getButtonColor(BodyMenuPage page, int idx, uint8_t &r, uint8_t &g, uint8_t 
         case 1: r=255; g=0; b=0; break;
       }
       break;
-    case BODY_PAGE_PLAYBACK:
-      switch(idx) {
-        case 0: r=255; g=165; b=0; break;   // STOP: Oranje
-        case 1: r=0; g=255; b=0; break;     // PLAY/PAUZE: Groen
-        case 2: r=255; g=0; b=255; break;   // AI-ACTIE: Magenta
-        case 3: r=0; g=255; b=255; break;   // Speed -: Cyaan
-        case 4: r=0; g=255; b=255; break;   // Speed +: Cyaan
-      }
-      break;
     default: break;
   }
 }
@@ -1325,19 +1316,6 @@ void handleEncoderInput() {
       else if (bodyMenuPage == BODY_PAGE_SYSTEM_SETTINGS) maxItems = 4;  // 4 items + TERUG
       else if (bodyMenuPage == BODY_PAGE_FUNSCRIPT_SETTINGS) maxItems = 2;  // AAN, UIT, TERUG
       else if (bodyMenuPage == BODY_PAGE_FORMAT_CONFIRM) maxItems = 1;  // ANNULEREN, FORMATTEER
-      else if (bodyMenuPage == BODY_PAGE_PLAYBACK) {
-        extern bool stressPopupActive;
-        extern bool stressLevelConfirmed;
-        if (stressPopupActive) {
-          if (!stressLevelConfirmed) {
-            maxItems = 7;  // 8 stress levels (0-7)
-          } else {
-            maxItems = 1;  // 2 knoppen (ANNULEREN, OPSLAAN)
-          }
-        } else {
-          maxItems = 4;  // STOP, PAUZE, AI-ACTIE, Speed-, Speed+
-        }
-      }
       else if (bodyMenuPage == BODY_PAGE_TIME_SETTINGS) {
       if (timeSettingsEditMode) {
         maxItems = 0;  // Geen scrollen tijdens edit mode
@@ -1516,48 +1494,6 @@ void handleEncoderInput() {
         return;  // Skip normale scroll logica
       }
 
-      // SPECIAL: Stress Popup scroll handling
-      if (bodyMenuPage == BODY_PAGE_PLAYBACK) {
-        extern bool stressPopupActive;
-        extern bool stressLevelConfirmed;
-        extern int selectedStressLevel;
-        extern int stressPopupButtonIdx;
-        
-        if (stressPopupActive) {
-          if (!stressLevelConfirmed) {
-            // Scroll door stress levels
-            if (delta > 0) {
-              selectedStressLevel--;
-            } else {
-              selectedStressLevel++;
-            }
-            if (selectedStressLevel < 0) selectedStressLevel = 7;
-            if (selectedStressLevel > 7) selectedStressLevel = 0;
-            setEncoderLED(0, 255, 0);  // Groen (gedimd) bij level selectie
-            Serial.printf("[ENCODER] Stress level: %d\n", selectedStressLevel);
-          } else {
-            // Scroll door knoppen
-            if (delta > 0) {
-              stressPopupButtonIdx--;
-            } else {
-              stressPopupButtonIdx++;
-            }
-            if (stressPopupButtonIdx < 0) stressPopupButtonIdx = 1;
-            if (stressPopupButtonIdx > 1) stressPopupButtonIdx = 0;
-            // LED kleur per knop
-            if (stressPopupButtonIdx == 0) {
-              setEncoderLED(0, 0, 255);  // Blauw voor ANNULEREN
-            } else {
-              setEncoderLED(0, 255, 0);  // Groen voor OPSLAAN
-            }
-            Serial.printf("[ENCODER] Stress button: %d\n", stressPopupButtonIdx);
-          }
-          bodyMenuForceRedraw();
-          lastPosition = newPosition;
-          return;  // Skip normale scroll
-        }
-      }
-
       // straks nieuwe
       if (delta > 0) {
         bodyMenuIdx--;
@@ -1567,12 +1503,6 @@ void handleEncoderInput() {
       
       if (bodyMenuIdx < 0) bodyMenuIdx = maxItems;
       if (bodyMenuIdx > maxItems) bodyMenuIdx = 0;
-      
-      // Force playback screen redraw voor encoder highlights
-      if (bodyMenuPage == BODY_PAGE_PLAYBACK) {
-        extern bool playbackScreenDrawn;
-        playbackScreenDrawn = false;
-      }
       
       bodyMenuForceRedraw();
       updateEncoderLEDForMenu();  // LED update met nieuwe kleur
@@ -1955,94 +1885,6 @@ void handleEncoderInput() {
             bodyMenuPage = BODY_PAGE_MAIN;
             bodyMenuIdx = 0;
             Serial.println("[ENCODER] -> Back (reset to file mode)");
-          }
-        }
-      }
-      else if (bodyMenuPage == BODY_PAGE_PLAYBACK) {
-        // Check eerst of stress popup actief is
-        extern bool stressPopupActive;
-        extern bool stressLevelConfirmed;
-        extern int selectedStressLevel;
-        extern int stressPopupButtonIdx;
-        extern int stressMarkerCount;
-        extern bool isPlaybackPaused;
-        extern bool playbackScreenDrawn;
-        
-        if (stressPopupActive) {
-          if (!stressLevelConfirmed) {
-            // Bevestig stress level selectie
-            stressLevelConfirmed = true;
-            stressPopupButtonIdx = 1;  // Default naar OPSLAAN
-            setEncoderLED(255, 165, 0, true);  // Oranje voor knop selectie
-            Serial.printf("[ENCODER] Stress level bevestigd: %d\n", selectedStressLevel);
-          } else {
-            // Voer knop actie uit
-            if (stressPopupButtonIdx == 0) {
-              // ANNULEREN - terug naar playback zonder opslaan
-              stressPopupActive = false;
-              stressLevelConfirmed = false;
-              isPlaybackPaused = false;  // Zet pauze uit, verder afspelen
-              playbackScreenDrawn = false;  // Force redraw playback scherm
-              body_gfx4_clear();  // Wis popup scherm
-              
-              Serial.println("[ENCODER] Stress popup geannuleerd, terug naar playback");
-            } else {
-              // OPSLAAN - marker opslaan en verder afspelen
-              Serial.printf("[ENCODER] Stress level opgeslagen: %d\n", selectedStressLevel);
-              
-              // TODO: Marker toevoegen aan stressMarkers array
-              // extern StressMarker stressMarkers[];
-              // extern int stressMarkerCount;
-              
-              stressPopupActive = false;
-              stressLevelConfirmed = false;
-              isPlaybackPaused = false;  // Zet pauze uit, verder afspelen
-              playbackScreenDrawn = false;  // Force redraw playback scherm
-              body_gfx4_clear();  // Wis popup scherm
-              
-              Serial.println("[ENCODER] Terug naar playback, pauze uit");
-            }
-            updateEncoderLEDForMenu();
-          }
-          bodyMenuForceRedraw();
-        } else {
-          // Normale playback knoppen: 0=STOP, 1=PAUZE, 2=AI-ACTIE, 3=Speed-, 4=Speed+
-          extern void stopPlayback();
-          extern bool isPlaybackPaused;
-          extern float playbackSpeed;
-          
-          if (bodyMenuIdx == 0) {
-            // STOP
-            stopPlayback();
-            bodyMenuPage = BODY_PAGE_RECORDING;
-            bodyMenuIdx = 0;
-            Serial.println("[ENCODER] PLAYBACK STOP");
-          } else if (bodyMenuIdx == 1) {
-            // PLAY/PAUZE toggle
-            isPlaybackPaused = !isPlaybackPaused;
-            extern bool playbackScreenDrawn;
-            playbackScreenDrawn = false;  // Force redraw voor knop update
-            Serial.printf("[ENCODER] PLAYBACK %s\n", isPlaybackPaused ? "PAUSED" : "PLAYING");
-          } else if (bodyMenuIdx == 2) {
-            // AI-ACTIE - open stress popup
-            stressPopupActive = true;
-            stressLevelConfirmed = false;
-            selectedStressLevel = 2;  // Default: normaal
-            stressPopupButtonIdx = 0;
-            setEncoderLED(0, 255, 0, true);  // Groen voor level selectie
-            Serial.println("[ENCODER] AI-ACTIE - stress popup geopend");
-          } else if (bodyMenuIdx == 3) {
-            // Speed -
-            playbackSpeed = max(10.0f, playbackSpeed - 10.0f);
-            extern bool playbackScreenDrawn;
-            playbackScreenDrawn = false;
-            Serial.printf("[ENCODER] Speed: %.0f%%\n", playbackSpeed);
-          } else if (bodyMenuIdx == 4) {
-            // Speed +
-            playbackSpeed = min(200.0f, playbackSpeed + 10.0f);
-            extern bool playbackScreenDrawn;
-            playbackScreenDrawn = false;
-            Serial.printf("[ENCODER] Speed: %.0f%%\n", playbackSpeed);
           }
         }
       }
