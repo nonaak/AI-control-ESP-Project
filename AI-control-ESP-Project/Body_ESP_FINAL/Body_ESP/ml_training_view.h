@@ -1,156 +1,155 @@
 /*
-  ML Training View - Grafische interface voor Machine Learning training
+  ML Training View Header
   
-  Provides touch-based interface for:
-  - Importing .aly files (AI analyzed data)
-  - Training ML models on imported data
-  - Managing saved models (.mlm files)  
-  - Visual training progress and statistics
+  Complete graphical interface for ML model training workflow
 */
 
 #ifndef ML_TRAINING_VIEW_H
 #define ML_TRAINING_VIEW_H
 
-// Simpele draw functie voor in het menu systeem
-void drawMLTrainingView();
-
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
 
-// ===== ML Training States =====
+// Forward declaration
+extern Arduino_GFX* body_gfx;
+
+// Screen dimensions - gebruik extern van body_display.h
+extern const int SCR_W;  // 480
+extern const int SCR_H;  // 320
+
+// ===== Colors =====
+#define BLACK   0x0000
+#define WHITE   0xFFFF
+#define RED     0xF800
+#define GREEN   0x07E0
+#define BLUE    0x001F
+#define YELLOW  0xFFE0
+#define CYAN    0x07FF
+#define MAGENTA 0xF81F
+#define ORANGE  0xFD20
+#define GREY    0x7BEF
+
+// ===== State Machine =====
 enum MLTrainingState {
-  ML_STATE_MAIN,          // Main ML training menu
-  ML_STATE_IMPORT,        // File import selection
-  ML_STATE_PREVIEW,       // Preview selected file
-  ML_STATE_TRAINING,      // Active training progress
-  ML_STATE_MODEL_MANAGER, // Model management screen
-  ML_STATE_MODEL_INFO,    // Model details view
-  ML_STATE_AI_ANNOTATE,   // AI-assisted annotation (.csv -> .aly)
-  ML_STATE_ANNOTATE_REVIEW // Review AI predictions
+  ML_STATE_MAIN,           // Hoofdmenu met 4 opties
+  ML_STATE_IMPORT,         // Selecteer .aly bestand
+  ML_STATE_PREVIEW,        // Bekijk bestand info
+  ML_STATE_TRAINING,       // Training in progress
+  ML_STATE_MODEL_MANAGER,  // Beheer modellen
+  ML_STATE_MODEL_INFO,     // Model details
+  ML_STATE_AI_ANNOTATE,    // AI Annotatie scherm
+  ML_STATE_ANNOTATE_REVIEW // Review annotaties
 };
 
-// ===== File Information Structure =====
+// ===== Events =====
+enum MLTrainingEvent {
+  MTE_NONE,                // Geen event
+  MTE_BACK,                // Terug knop
+  MTE_IMPORT,              // Import geselecteerd
+  MTE_IMPORT_FILE,         // Bestand import
+  MTE_TRAIN,               // Start training
+  MTE_TRAIN_MODEL,         // Train model
+  MTE_START_TRAINING,      // Start training process
+  MTE_SAVE_MODEL,          // Save trained model
+  MTE_LOAD_MODEL,          // Load model
+  MTE_MODEL_SELECT,        // Model geselecteerd
+  MTE_MODEL_MANAGER,       // Open model manager
+  MTE_FILE_SELECT,         // Bestand geselecteerd
+  MTE_ANNOTATE,            // Start annotatie
+  MTE_AI_ANNOTATE,         // AI annotatie
+  MTE_REVIEW,              // Review annotaties
+  MTE_DELETE,              // Verwijder model
+  MTE_ACTIVATE,            // Activeer model
+  MTE_TRAINING_INFO        // Training info
+};
+
+// ===== File Info Structure =====
 struct MLFileInfo {
-  String filename;        // e.g. "data001.aly"  
-  String fullPath;        // Full path on SD card
-  int sampleCount;        // Number of training samples
-  int stressLevels[7];    // Count per stress level (1-7)
-  float avgConfidence;    // Average confidence from AI Analyze
-  uint32_t fileSize;      // File size in bytes
-  String lastModified;    // Last modification date
-  bool isValid;           // File format validation
+  String filename;         // Bestandsnaam
+  String fullPath;         // Volledig pad
+  int fileSize;            // Grootte in bytes
+  int sampleCount;         // Aantal samples
+  float avgConfidence;     // Gemiddelde confidence
+  int stressLevels[8];     // Verdeling per level (0-7)
+  bool isValid;            // Geldig bestand?
   
-  MLFileInfo() : sampleCount(0), avgConfidence(0.0f), fileSize(0), isValid(false) {
-    for(int i = 0; i < 7; i++) stressLevels[i] = 0;
+  // Constructor met defaults
+  MLFileInfo() : fileSize(0), sampleCount(0), avgConfidence(0), isValid(false) {
+    memset(stressLevels, 0, sizeof(stressLevels));
   }
 };
 
-// ===== Model Information Structure =====
+// ===== Model Info Structure =====
 struct MLModelInfo {
-  String filename;        // e.g. "personal_v1.mlm"
-  String name;           // Display name
-  float accuracy;        // Model accuracy (0.0-1.0)
-  int trainingSize;      // Number of training samples used
-  String trainedDate;    // When model was created
-  uint32_t modelSize;    // Model file size
-  bool isActive;         // Currently loaded model
-  bool isBuiltIn;        // Built-in rule-based model
+  String filename;         // Bestandsnaam (.mlm)
+  String name;             // Weergavenaam
+  float accuracy;          // Model nauwkeurigheid (0.0-1.0)
+  int trainingSize;        // Aantal training samples
+  int modelSize;           // Bestandsgrootte in bytes
+  String trainedDate;      // Training datum
+  bool isBuiltIn;          // Ingebouwd model?
+  bool isActive;           // Momenteel actief?
   
-  MLModelInfo() : accuracy(0.0f), trainingSize(0), modelSize(0), isActive(false), isBuiltIn(false) {}
+  // Constructor met defaults
+  MLModelInfo() : accuracy(0), trainingSize(0), modelSize(0), isBuiltIn(false), isActive(false) {}
 };
 
 // ===== Training Progress Structure =====
 struct MLTrainingProgress {
-  int totalSamples;       // Total samples to process
-  int processedSamples;   // Samples processed so far
-  float currentAccuracy;  // Current model accuracy
-  uint32_t startTime;     // Training start time
-  uint32_t estimatedTime; // Estimated completion time
-  String currentPhase;    // "Preprocessing", "Training", "Validation"
-  bool isTraining;        // Training in progress
-  bool isComplete;        // Training completed
-  bool hasError;          // Training error occurred
-  String errorMessage;    // Error details if any
+  bool isTraining;         // Training bezig?
+  bool isComplete;         // Training voltooid?
+  int currentEpoch;        // Huidige epoch
+  int totalEpochs;         // Totaal epochs
+  int processedSamples;    // Verwerkte samples
+  int totalSamples;        // Totaal samples
+  float currentLoss;       // Huidige loss
+  float currentAccuracy;   // Huidige accuracy
+  float progress;          // Voortgang 0.0-1.0
+  uint32_t startTime;      // Start timestamp (millis)
+  String currentPhase;     // Huidige fase beschrijving
+  bool hasError;           // Error opgetreden?
+  String errorMessage;     // Error bericht
   
-  MLTrainingProgress() : totalSamples(0), processedSamples(0), currentAccuracy(0.0f), 
-                        startTime(0), estimatedTime(0), isTraining(false), isComplete(false), hasError(false) {}
+  // Constructor met defaults
+  MLTrainingProgress() : isTraining(false), isComplete(false), currentEpoch(0), totalEpochs(0),
+                         processedSamples(0), totalSamples(0), currentLoss(0), currentAccuracy(0), 
+                         progress(0), startTime(0), hasError(false) {}
 };
 
-// ===== Touch Events =====
-enum MLTrainingEvent {
-  MTE_NONE = 0,
-  MTE_BACK,
-  
-  // Main menu
-  MTE_IMPORT_DATA,
-  MTE_TRAIN_MODEL,
-  MTE_MODEL_MANAGER,
-  MTE_TRAINING_INFO,
-  
-  // File import
-  MTE_FILE_SELECT,
-  MTE_FILE_PREVIEW,
-  MTE_IMPORT_FILE,
-  MTE_IMPORT_CONFIRM,
-  MTE_IMPORT_CANCEL,
-  
-  // Training
-  MTE_START_TRAINING,
-  MTE_TRAINING_START,
-  MTE_TRAINING_STOP,
-  MTE_SAVE_MODEL,
-  MTE_TRAINING_SAVE,
-  MTE_TRAINING_DISCARD,
-  
-  // AI Annotation
-  MTE_AI_ANNOTATE,
-  MTE_ANNOTATE_ACCEPT,
-  MTE_ANNOTATE_CORRECT,
-  MTE_ANNOTATE_SAVE,
-  
-  // Model manager
-  MTE_MODEL_SELECT,
-  MTE_LOAD_MODEL,
-  MTE_MODEL_LOAD,
-  MTE_MODEL_DELETE,
-  MTE_MODEL_EXPORT,
-  MTE_MODEL_INFO,
-  MTE_MODEL_RENAME
-};
+// ===== Global State Variables (extern) =====
+extern MLTrainingState currentMLState;
+extern int selectedFileIndex;
+extern int selectedModelIndex;
+extern MLTrainingProgress trainingProgress;
 
-// ===== Global Functions =====
-
-// Initialize ML training view system
+// ===== Initialization =====
 bool mlTraining_begin(Arduino_GFX *gfx);
 
-// Main event polling function
+// ===== Event Polling =====
 MLTrainingEvent mlTraining_poll();
 
-// State management
+// ===== State Management =====
 void mlTraining_setState(MLTrainingState newState);
 MLTrainingState mlTraining_getState();
 
-// File operations  
+// ===== File Operations =====
 bool mlTraining_scanAlyFiles();
 int mlTraining_getFileCount();
 MLFileInfo mlTraining_getFileInfo(int index);
-bool mlTraining_importFile(const String& filename);
 
-// Training operations
-bool mlTraining_startTraining();
-void mlTraining_stopTraining();
-MLTrainingProgress mlTraining_getProgress();
-bool mlTraining_saveModel(const String& modelName);
-
-// Model management
+// ===== Model Operations =====
 bool mlTraining_scanModels();
 int mlTraining_getModelCount();
 MLModelInfo mlTraining_getModelInfo(int index);
-bool mlTraining_loadModel(const String& filename);
-bool mlTraining_deleteModel(const String& filename);
-bool mlTraining_exportModel(const String& filename);
+bool mlTraining_activateModel(int index);
+bool mlTraining_deleteModel(int index);
 
-// UI Drawing functions
+// ===== Training Control =====
+bool mlTraining_startTraining();
+void mlTraining_stopTraining();
+MLTrainingProgress mlTraining_getProgress();
+
+// ===== Screen Drawing Functions =====
 void mlTraining_drawMainMenu();
 void mlTraining_drawImportScreen();
 void mlTraining_drawPreviewScreen();
@@ -160,13 +159,7 @@ void mlTraining_drawModelInfo();
 void mlTraining_drawAIAnnotateScreen();
 void mlTraining_drawAnnotateReviewScreen();
 
-// Utility functions
-String mlTraining_formatFileSize(uint32_t bytes);
-String mlTraining_formatDuration(uint32_t seconds);
-String mlTraining_formatAccuracy(float accuracy);
-
-// Touch handling
-bool mlTraining_handleTouch(int16_t x, int16_t y);
+// ===== Touch Handlers (internal) =====
 MLTrainingEvent handleMainMenuTouch(int16_t tx, int16_t ty);
 MLTrainingEvent handleImportTouch(int16_t tx, int16_t ty);
 MLTrainingEvent handleTrainingTouch(int16_t tx, int16_t ty);
@@ -174,27 +167,10 @@ MLTrainingEvent handleModelManagerTouch(int16_t tx, int16_t ty);
 MLTrainingEvent handleAIAnnotateTouch(int16_t tx, int16_t ty);
 MLTrainingEvent handleAnnotateReviewTouch(int16_t tx, int16_t ty);
 
-// Global state variables
-extern MLTrainingState currentMLState;
-extern int selectedFileIndex;
-extern int selectedModelIndex;
-extern MLTrainingProgress trainingProgress;
+// ===== UI Helper =====
+void drawMLButton(int x, int y, int w, int h, const char* label, uint16_t color);
 
-// UI Constants
-#define ML_MENU_ITEMS 4
-#define ML_BUTTON_HEIGHT 40
-#define ML_BUTTON_MARGIN 10
-#define ML_TITLE_HEIGHT 30
-#define ML_STATUS_HEIGHT 20
-
-// Colors (using Body ESP color scheme)
-#define ML_COLOR_BG        0x0000    // Black background
-#define ML_COLOR_TEXT      0xFFFF    // White text
-#define ML_COLOR_BUTTON    0x4208    // Dark blue button
-#define ML_COLOR_SELECTED  0x07E0    // Green selection
-#define ML_COLOR_ERROR     0xF800    // Red error
-#define ML_COLOR_SUCCESS   0x07E0    // Green success  
-#define ML_COLOR_WARNING   0xFFE0    // Yellow warning
-#define ML_COLOR_PROGRESS  0x001F    // Blue progress bar
+// ===== Simple Menu View (voor body_menu.cpp integratie) =====
+void drawMLTrainingView();
 
 #endif // ML_TRAINING_VIEW_H

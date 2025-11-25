@@ -230,8 +230,8 @@ bool mlTraining_parseAlyFile(MLFileInfo &info) {
         String stressStr = line.substring(commaIndex[3] + 1, commaIndex[4]);
         int stressLevel = stressStr.toInt();
         
-        if (stressLevel >= 1 && stressLevel <= 7) {
-          info.stressLevels[stressLevel - 1]++;
+        if (stressLevel >= 0 && stressLevel <= 7) {
+          info.stressLevels[stressLevel]++;
         }
         
         // Extract confidence (index 5)
@@ -394,7 +394,7 @@ void mlTraining_drawMainMenu() {
 // Menu teksten - aangepast voor nieuwe workflow
   const char* menuItems[] = {
     "Train Model (.aly)",
-    "AI Annotatie (.csv)", 
+    "Feedback (.csv)", 
     "Model Manager",
     "Training Info"
   };
@@ -956,10 +956,10 @@ MLTrainingEvent handleMainMenuTouch(int16_t tx, int16_t ty) {
     return MTE_TRAIN_MODEL;
   }
   
-  // Check AI Annotatie (.csv) button  
+  // Check Feedback (.csv) button  
   int annotateY = startY + (btnH + gap);
   if (ty >= annotateY && ty < annotateY + btnH && tx >= btnX && tx < btnX + btnW) {
-    Serial.println("[ML TRAINING] AI Annotatie pressed");
+    Serial.println("[ML TRAINING] Feedback pressed");
     return MTE_AI_ANNOTATE;
   }
   
@@ -1102,7 +1102,7 @@ MLTrainingEvent handleModelManagerTouch(int16_t tx, int16_t ty) {
   return MTE_NONE;
 }
 
-// ===== AI Annotatie Drawing Functions =====
+// ===== Feedback Drawing Functions =====
 
 void mlTraining_drawAIAnnotateScreen() {
   if (!g) return;
@@ -1119,9 +1119,9 @@ void mlTraining_drawAIAnnotateScreen() {
   
   int16_t x1, y1;
   uint16_t tw, th;
-  g->getTextBounds("AI Annotatie", 0, 0, &x1, &y1, &tw, &th);
+  g->getTextBounds("Feedback", 0, 0, &x1, &y1, &tw, &th);
   g->setCursor((SCR_W - tw) / 2, 20);
-  g->print("AI Annotatie");
+  g->print("Feedback");
   
   // Uitleg tekst
   g->setTextSize(1);
@@ -1250,7 +1250,7 @@ void mlTraining_drawAnnotateReviewScreen() {
   drawMLButton((SCR_W - btnW) / 2, btnY, btnW, btnH, "OK", 0x07E0);
 }
 
-// ===== AI Annotatie Touch Handlers =====
+// ===== Feedback Touch Handlers =====
 
 MLTrainingEvent handleAIAnnotateTouch(int16_t tx, int16_t ty) {
   // File selection area (y: 90-180)
@@ -1388,7 +1388,7 @@ void drawMLTrainingView() {
   const char* items[] = {
     isRecording ? "REC STOP" : "REC START",
     "2. Model Trainen",
-    "3. AI Annotatie",
+    "3. Feedback",
     "4. Model Manager"
   };
   

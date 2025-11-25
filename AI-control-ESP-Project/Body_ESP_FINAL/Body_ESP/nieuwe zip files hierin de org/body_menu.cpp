@@ -2177,7 +2177,7 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
         for (int i = 0; i < 4; i++) {
           int btnY = START_Y + i * (BTN_H + BTN_SPACING);
           if (x >= START_X && x <= START_X + BTN_W && y >= btnY && y <= btnY + BTN_H) {
-            // ML Training acties: 0=Data Opnemen, 1=Model Trainen, 2=Feedback, 3=Model Manager
+            // ML Training acties: 0=Data Opnemen, 1=Model Trainen, 2=AI Annotatie, 3=Model Manager
             switch(i) {
               case 0:
                 // Toggle recording aan/uit
@@ -2195,7 +2195,7 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
                 Serial.println("[ML TRAINING] Model Trainen - TODO");
                 break;
               case 2:
-                Serial.println("[ML TRAINING] Feedback - TODO");
+                Serial.println("[ML TRAINING] AI Annotatie - TODO");
                 break;
               case 3:
                 Serial.println("[ML TRAINING] Model Manager - TODO");
@@ -2347,7 +2347,7 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
         int btnW = 112;
         int btn1X = 5;      // STOP
         int btn2X = 122;    // PLAY/PAUZE
-        int btn4X = 356;    // GEVOEL
+        int btn4X = 356;    // AI-ACTIE
         
         // STOP knop
         if (x >= btn1X && x <= btn1X + btnW && y >= btnY && y <= btnY + btnH) {
@@ -2365,9 +2365,9 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
           return;
         }
         
-        // GEVOEL knop
+        // AI-ACTIE knop
         if (x >= btn4X && x <= btn4X + btnW && y >= btnY && y <= btnY + btnH) {
-          Serial.println("[PLAYBACK] GEVOEL - open stress popup");
+          Serial.println("[PLAYBACK] AI-ACTIE - open stress popup");
           
           // 🔥 NIEUW: Open annotatie bestand indien nog niet open
           extern bool ml_openAnnotationFile(const String&);
@@ -3477,7 +3477,7 @@ void drawPlaybackScreen() {
   int btnW = 112;
   int btn1X = 5;      // STOP
   int btn2X = 122;    // PLAY/PAUZE
-  int btn4X = 356;    // GEVOEL
+  int btn4X = 356;    // AI-ACTIE
   
   // STOP knop (oranje)
   body_gfx->fillRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFD20);
@@ -3496,7 +3496,7 @@ void drawPlaybackScreen() {
   #endif
   body_gfx->print("STOP");
   
-  // GEVOEL knop (magenta)
+  // AI-ACTIE knop (magenta)
   body_gfx->fillRoundRect(btn4X, btnY, btnW, btnH, 8, 0xF81F);
   if (bodyMenuIdx == 2) {
     // Encoder highlight: gele rand
@@ -3505,13 +3505,13 @@ void drawPlaybackScreen() {
   }
   body_gfx->drawRoundRect(btn4X, btnY, btnW, btnH, 8, 0xFFFF);
   body_gfx->setTextColor(0x0000, 0xF81F);
-  body_gfx->getTextBounds("GEVOEL", 0, 0, &x1, &y1, &tw, &th);
+  body_gfx->getTextBounds("AI-ACTIE", 0, 0, &x1, &y1, &tw, &th);
   #if USE_ADAFRUIT_FONTS
     body_gfx->setCursor(btn4X + (btnW - tw) / 2 - x1, btnY + (btnH + th) / 2 - 2);
   #else
     body_gfx->setCursor(btn4X + (btnW - tw) / 2, btnY + (btnH - th) / 2 + th - 2);
   #endif
-  body_gfx->print("GEVOEL");
+  body_gfx->print("AI-ACTIE");
     
     playbackScreenDrawn = true;  // Statische delen zijn getekend
   }

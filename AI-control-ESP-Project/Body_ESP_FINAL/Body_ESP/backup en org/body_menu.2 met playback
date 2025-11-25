@@ -34,8 +34,6 @@ void updateCalibration();
 void drawCalibrationScreen();
 void drawPlaybackProgressBar();
 void drawStressLevelPopup();
-bool performAIAnalysis(const String& csvFilename);
-void drawAIAnalyzeScreen(int progress, const String& filename);
 
 // Menu state variables
 BodyMenuMode bodyMenuMode = BODY_MODE_SENSORS;
@@ -145,13 +143,6 @@ static unsigned long playbackLastUpdate = 0;
 static File playbackFile;
 static char selectedPlaybackFile[64] = "";
 bool playbackScreenDrawn = false;  // Track of overlay al getekend is
-
-// 🔥 NIEUW: Laatste playback sensor waarden (voor ML annotatie)
-static float playbackLastHR = 0;
-static float playbackLastTemp = 0;
-static float playbackLastGSR = 0;
-static float playbackTimestamp = 0;    // Tijd in seconden in de recording
-static int playbackLastAILevel = -1;   // AI level uit .anl (indien beschikbaar)
 
 // Stress marker data
 struct StressMarker {
@@ -1339,309 +1330,11 @@ void drawSensorCalItems() {
   body_gfx->print("TERUG");
 }
 
-// Geselecteerd bestand voor Recording menu (moet voor AI Analyze staan)
+// Geselecteerd bestand voor Recording menu
 int selectedRecordingFile = -1;
 String csvFiles[10];  // CSV bestanden lijst (globaal voor touch handler)
 int csvCount = -1;     // Aantal gevonden bestanden (-1 = nog niet gescand)
 uint32_t lastRecordingScan = 0;  // Laatste scan tijd
-
-// ===== AI ANALYZE FUNCTIE =====
-// Analyseert CSV bestand met ML model en slaat op als .ANL
-bool aiAnalyzeActive = false;
-int aiAnalyzeProgress = 0;
-String aiAnalyzeFilename = "";
-
-void drawAIAnalyzeScreen(int progress, const String& filename) {
-  body_gfx->fillScreen(BODY_CFG.COL_BG);
-  
-  // Titel
-  #if USE_ADAFRUIT_FONTS
-    body_gfx->setFont(&FONT_TITLE);
-    body_gfx->setTextSize(1);
-  #else
-    body_gfx->setFont(nullptr);
-    body_gfx->setTextSize(2);
-  #endif
-  
-  body_gfx->setTextColor(0xF81F, BODY_CFG.COL_BG);  // Magenta
-  int16_t x1, y1; uint16_t tw, th;
-  body_gfx->getTextBounds("AI ANALYSE", 0, 0, &x1, &y1, &tw, &th);
-  body_gfx->setCursor((480 - tw) / 2 - x1, 50);
-  body_gfx->print("AI ANALYSE");
-  
-  // Bestandsnaam
-  #if USE_ADAFRUIT_FONTS
-    body_gfx->setFont(&FONT_ITEM);
-  #else
-    body_gfx->setTextSize(1);
-  #endif
-  body_gfx->setTextColor(0xFFFF, BODY_CFG.COL_BG);
-  body_gfx->setCursor(40, 100);
-  body_gfx->print("Bestand: ");
-  body_gfx->setTextColor(0x07E0, BODY_CFG.COL_BG);  // Groen
-  String shortName = filename;
-  if (shortName.length() > 30) {
-    shortName = shortName.substring(0, 27) + "...";
-  }
-  body_gfx->print(shortName);
-  
-  // Voortgangsbalk achtergrond
-  int barX = 40;
-  int barY = 150;
-  int barW = 400;
-  int barH = 40;
-  
-  body_gfx->drawRoundRect(barX, barY, barW, barH, 8, 0xFFFF);
-  body_gfx->drawRoundRect(barX+1, barY+1, barW-2, barH-2, 7, 0xFFFF);
-  
-  // Voortgangsbalk vulling (roze/magenta gradient)
-  int fillW = (barW - 8) * progress / 100;
-  if (fillW > 0) {
-    body_gfx->fillRoundRect(barX + 4, barY + 4, fillW, barH - 8, 4, 0xF81F);
-  }
-  
-  // Percentage tekst
-  #if USE_ADAFRUIT_FONTS
-    body_gfx->setFont(&FONT_TITLE);
-  #else
-    body_gfx->setTextSize(2);
-  #endif
-  body_gfx->setTextColor(0xFFFF, BODY_CFG.COL_BG);
-  char percentStr[8];
-  sprintf(percentStr, "%d%%", progress);
-  body_gfx->getTextBounds(percentStr, 0, 0, &x1, &y1, &tw, &th);
-  body_gfx->setCursor((480 - tw) / 2 - x1, 220);
-  body_gfx->print(percentStr);
-  
-  // Status tekst
-  #if USE_ADAFRUIT_FONTS
-    body_gfx->setFont(&FONT_ITEM);
-  #else
-    body_gfx->setTextSize(1);
-  #endif
-  body_gfx->setTextColor(0xF81F, BODY_CFG.COL_BG);  // Magenta
-  body_gfx->setCursor(40, 260);
-  if (progress < 100) {
-    body_gfx->print("Analyseren met ML model...");
-  } else {
-    body_gfx->setTextColor(0x07E0, BODY_CFG.COL_BG);  // Groen
-    body_gfx->print("Analyse compleet! Opgeslagen als .ANL");
-  }
-}
-
-bool performAIAnalysis(const String& csvFilename) {
-  Serial.printf("[AI ANALYZE] Starting analysis of: %s\n", csvFilename.c_str());
-  
-  aiAnalyzeActive = true;
-  aiAnalyzeFilename = csvFilename;
-  aiAnalyzeProgress = 0;
-  
-  // Open CSV bestand
-  String csvPath = "/recordings/" + csvFilename;
-  File csvFile = SD_MMC.open(csvPath.c_str(), FILE_READ);
-  if (!csvFile) {
-    Serial.println("[AI ANALYZE] ERROR: Cannot open CSV file!");
-    aiAnalyzeActive = false;
-    return false;
-  }
-  
-  // Tel regels voor progress
-  int totalLines = 0;
-  while (csvFile.available()) {
-    csvFile.readStringUntil('\n');
-    totalLines++;
-  }
-  totalLines--;  // Min header
-  csvFile.seek(0);
-  
-  Serial.printf("[AI ANALYZE] Total data lines: %d\n", totalLines);
-  
-  // Maak ANL bestandsnaam
-  String anlFilename = csvFilename;
-  anlFilename.replace(".csv", ".anl");
-  String anlPath = "/recordings/" + anlFilename;
-  
-  File anlFile = SD_MMC.open(anlPath.c_str(), FILE_WRITE);
-  if (!anlFile) {
-    Serial.println("[AI ANALYZE] ERROR: Cannot create ANL file!");
-    csvFile.close();
-    aiAnalyzeActive = false;
-    return false;
-  }
-  
-  // Lees en schrijf header + StressLevel kolom
-  String header = csvFile.readStringUntil('\n');
-  header.trim();
-  anlFile.println(header + ",StressLevel");
-  
-  // Teken eerste scherm
-  drawAIAnalyzeScreen(0, csvFilename);
-  
-  // ═══════════════════════════════════════════════════════════════════
-  // AI BIJBEL STRESS LEVEL CLASSIFIER
-  // 
-  // Level 0: Ontspannen (zeer lage stress)
-  // Level 1: Rustig
-  // Level 2: Normaal
-  // Level 3: Licht verhoogd
-  // Level 4: Verhoogd
-  // Level 5: Gestrest
-  // Level 6: Zeer gestrest
-  // Level 7: Extreem / Edge Zone
-  // ═══════════════════════════════════════════════════════════════════
-  
-  // AI Bijbel baseline waarden (BIJBEL_ prefix om conflict met config.h te voorkomen)
-  const float BIJBEL_HR_BASELINE = 70.0f;    // Gemiddelde hartslag in rust
-  const float BIJBEL_HR_EXCITED = 100.0f;    // Hartslag bij opwinding
-  const float BIJBEL_HR_EDGE = 130.0f;       // Hartslag bij edge zone
-  const float BIJBEL_HR_MAX = 160.0f;        // Maximum veilige hartslag
-  
-  const float BIJBEL_TEMP_BASELINE = 36.5f;  // Normale temperatuur
-  const float BIJBEL_TEMP_ELEVATED = 37.5f;  // Verhoogde temperatuur
-  const float BIJBEL_TEMP_HIGH = 38.0f;      // Hoge temperatuur
-  
-  const float BIJBEL_GSR_BASELINE = 300.0f;  // GSR in rust
-  const float BIJBEL_GSR_AROUSED = 600.0f;   // GSR bij opwinding
-  const float BIJBEL_GSR_EDGE = 900.0f;      // GSR bij edge zone
-  const float BIJBEL_GSR_MAX = 1200.0f;      // Maximum GSR
-  
-  // Verwerk elke regel
-  int lineNum = 0;
-  int lastProgress = 0;
-  
-  while (csvFile.available()) {
-    String line = csvFile.readStringUntil('\n');
-    line.trim();
-    if (line.length() < 5) continue;
-    
-    lineNum++;
-    
-    // Parse CSV: Tijd_s,Timestamp,BPM,Temp_C,GSR,...
-    int commaIdx[15];
-    int commaCount = 0;
-    for (int i = 0; i < line.length() && commaCount < 15; i++) {
-      if (line.charAt(i) == ',') {
-        commaIdx[commaCount++] = i;
-      }
-    }
-    
-    int stressLevel = 3;  // Default: normaal
-    
-    if (commaCount >= 4) {
-      // Extract BPM, Temp, GSR (kolommen 2, 3, 4 = index 1, 2, 3)
-      float bpm = line.substring(commaIdx[1] + 1, commaIdx[2]).toFloat();
-      float temp = line.substring(commaIdx[2] + 1, commaIdx[3]).toFloat();
-      float gsr = line.substring(commaIdx[3] + 1, commaIdx[4]).toFloat();
-      
-      // ═══════════════════════════════════════════════════════════════
-      // MULTI-FACTOR STRESS BEREKENING (AI BIJBEL GEBASEERD)
-      // ═══════════════════════════════════════════════════════════════
-      
-      // Hartslag score (0.0 - 1.0)
-      float hrScore = 0.0f;
-      if (bpm > 0) {
-        if (bpm <= BIJBEL_HR_BASELINE) {
-          hrScore = 0.0f;  // Onder baseline = ontspannen
-        } else if (bpm <= BIJBEL_HR_EXCITED) {
-          hrScore = (bpm - BIJBEL_HR_BASELINE) / (BIJBEL_HR_EXCITED - BIJBEL_HR_BASELINE) * 0.4f;
-        } else if (bpm <= BIJBEL_HR_EDGE) {
-          hrScore = 0.4f + (bpm - BIJBEL_HR_EXCITED) / (BIJBEL_HR_EDGE - BIJBEL_HR_EXCITED) * 0.4f;
-        } else {
-          hrScore = 0.8f + (bpm - BIJBEL_HR_EDGE) / (BIJBEL_HR_MAX - BIJBEL_HR_EDGE) * 0.2f;
-        }
-      }
-      
-      // Temperatuur score (0.0 - 1.0)
-      float tempScore = 0.0f;
-      if (temp > 0) {
-        if (temp <= BIJBEL_TEMP_BASELINE) {
-          tempScore = 0.0f;
-        } else if (temp <= BIJBEL_TEMP_ELEVATED) {
-          tempScore = (temp - BIJBEL_TEMP_BASELINE) / (BIJBEL_TEMP_ELEVATED - BIJBEL_TEMP_BASELINE) * 0.5f;
-        } else {
-          tempScore = 0.5f + (temp - BIJBEL_TEMP_ELEVATED) / (BIJBEL_TEMP_HIGH - BIJBEL_TEMP_ELEVATED) * 0.5f;
-        }
-      }
-      
-      // GSR score (0.0 - 1.0)
-      float gsrScore = 0.0f;
-      if (gsr > 0) {
-        if (gsr <= BIJBEL_GSR_BASELINE) {
-          gsrScore = 0.0f;
-        } else if (gsr <= BIJBEL_GSR_AROUSED) {
-          gsrScore = (gsr - BIJBEL_GSR_BASELINE) / (BIJBEL_GSR_AROUSED - BIJBEL_GSR_BASELINE) * 0.4f;
-        } else if (gsr <= BIJBEL_GSR_EDGE) {
-          gsrScore = 0.4f + (gsr - BIJBEL_GSR_AROUSED) / (BIJBEL_GSR_EDGE - BIJBEL_GSR_AROUSED) * 0.4f;
-        } else {
-          gsrScore = 0.8f + (gsr - BIJBEL_GSR_EDGE) / (BIJBEL_GSR_MAX - BIJBEL_GSR_EDGE) * 0.2f;
-        }
-      }
-      
-      // Gewogen combinatie
-      // HR weegt het zwaarst (50%), dan GSR (35%), dan temp (15%)
-      float combinedScore = (hrScore * 0.50f) + (gsrScore * 0.35f) + (tempScore * 0.15f);
-      combinedScore = constrain(combinedScore, 0.0f, 1.0f);
-      
-      // Converteer naar 0-7 level (AI Bijbel)
-      if (combinedScore <= 0.05f) {
-        stressLevel = 0;  // Ontspannen
-      } else if (combinedScore <= 0.15f) {
-        stressLevel = 1;  // Rustig
-      } else if (combinedScore <= 0.30f) {
-        stressLevel = 2;  // Normaal
-      } else if (combinedScore <= 0.45f) {
-        stressLevel = 3;  // Licht verhoogd
-      } else if (combinedScore <= 0.60f) {
-        stressLevel = 4;  // Verhoogd
-      } else if (combinedScore <= 0.75f) {
-        stressLevel = 5;  // Gestrest
-      } else if (combinedScore <= 0.90f) {
-        stressLevel = 6;  // Zeer gestrest
-      } else {
-        stressLevel = 7;  // Extreem / Edge Zone
-      }
-      
-      // Special case: Zeer hoge hartslag = altijd hoog stress
-      if (bpm > BIJBEL_HR_EDGE) {
-        stressLevel = max(stressLevel, 6);
-      }
-      if (bpm > BIJBEL_HR_MAX) {
-        stressLevel = 7;  // Emergency zone
-      }
-    }
-    
-    // Schrijf regel + stress level
-    anlFile.printf("%s,%d\n", line.c_str(), stressLevel);
-    
-    // Update progress (elke 5% of elke 50 regels)
-    int progress = (lineNum * 100) / max(1, totalLines);
-    if (progress != lastProgress && (progress % 5 == 0 || lineNum % 50 == 0)) {
-      lastProgress = progress;
-      aiAnalyzeProgress = progress;
-      drawAIAnalyzeScreen(progress, csvFilename);
-      yield();  // Geef systeem tijd
-    }
-  }
-  
-  // Sluit bestanden
-  csvFile.close();
-  anlFile.close();
-  
-  // Toon 100% compleet
-  aiAnalyzeProgress = 100;
-  drawAIAnalyzeScreen(100, csvFilename);
-  
-  Serial.printf("[AI ANALYZE] Complete! Saved as: %s\n", anlFilename.c_str());
-  
-  // Wacht even zodat gebruiker resultaat ziet
-  delay(1500);
-  
-  // Reset state
-  aiAnalyzeActive = false;
-  csvCount = -1;  // Force rescan om nieuwe .anl te tonen
-  
-  return true;
-}
 
 void drawRecordingItems() {
   extern bool recordingInButtonMode;  // <-- HIER, bovenaan de functie
@@ -1670,7 +1363,7 @@ void drawRecordingItems() {
   const int BTN_H = 45;
   const int BTN_SPACING = 8;
   
-  // Scan SD card voor .csv EN .anl bestanden in /recordings/ (gebruikt globale variabelen)
+  // Scan SD card voor .csv bestanden in /recordings/ (gebruikt globale variabelen)
   // Scan alleen als nodig (eerste keer of refresh na 1 seconde)
   if (csvCount == -1 || millis() - lastRecordingScan > 1000) {
     csvCount = 0;
@@ -1683,8 +1376,7 @@ void drawRecordingItems() {
       while (file && csvCount < 10) {
         if (!file.isDirectory()) {
           String filename = String(file.name());
-          // Accepteer zowel .csv als .anl bestanden
-          if (filename.endsWith(".csv") || filename.endsWith(".anl")) {
+          if (filename.endsWith(".csv")) {
             csvFiles[csvCount] = filename;
             csvCount++;
           }
@@ -1696,10 +1388,10 @@ void drawRecordingItems() {
     }
     lastRecordingScan = millis();
     
-    Serial.printf("[RECORDING MENU] Found %d CSV/ANL files in /recordings/\n", csvCount);
+    Serial.printf("[RECORDING MENU] Found %d CSV files in /recordings/\n", csvCount);
   }
   
-  // Toon .csv/.anl bestanden met selectie
+  // Toon .csv bestanden met selectie
   if (csvCount == 0) {
     body_gfx->setTextColor(0xC618, BODY_CFG.COL_BG);  // Grijs
     body_gfx->setCursor(LIST_X, LIST_Y);
@@ -1707,9 +1399,6 @@ void drawRecordingItems() {
   } else {
     for (int i = 0; i < csvCount && i < 8; i++) {
       int y = LIST_Y + i * 20;
-      
-      // Check of het een .anl bestand is
-      bool isANL = csvFiles[i].endsWith(".anl");
       
       // ROOD = geselecteerd bestand (rode letters, geen balk)
       if (i == selectedRecordingFile) {
@@ -1719,11 +1408,7 @@ void drawRecordingItems() {
       else if (!recordingInButtonMode && i == bodyMenuIdx) {
         body_gfx->setTextColor(0x07E0, BODY_CFG.COL_BG);  // Groene letters
       }
-      // ROZE/MAGENTA = .anl bestand (al geanalyseerd)
-      else if (isANL) {
-        body_gfx->setTextColor(0xF81F, BODY_CFG.COL_BG);  // Magenta/roze letters
-      }
-      // Normaal = .csv bestand
+      // Normaal
       else {
         body_gfx->setTextColor(0xFFFF, BODY_CFG.COL_BG);  // Wit
       }
@@ -2137,17 +1822,9 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
                 }
                 break;
               case 2:
-                if (selectedRecordingFile >= 0 && selectedRecordingFile < csvCount) {
-                  String filename = csvFiles[selectedRecordingFile];
-                  // Check of het al een .anl bestand is
-                  if (filename.endsWith(".anl")) {
-                    Serial.println("[RECORDING] Dit bestand is al geanalyseerd (.anl)!");
-                  } else {
-                    Serial.printf("[RECORDING] Starting AI analyze: %s\n", filename.c_str());
-                    performAIAnalysis(filename);
-                    selectedRecordingFile = -1;  // Reset selectie
-                    menuDirty = true;
-                  }
+                if (selectedRecordingFile >= 0) {
+                  Serial.println("[RECORDING] Starting AI analyze...");
+                  // TODO: AI Analyze implementatie
                 } else {
                   Serial.println("[RECORDING] Selecteer eerst een bestand!");
                 }
@@ -2177,7 +1854,7 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
         for (int i = 0; i < 4; i++) {
           int btnY = START_Y + i * (BTN_H + BTN_SPACING);
           if (x >= START_X && x <= START_X + BTN_W && y >= btnY && y <= btnY + BTN_H) {
-            // ML Training acties: 0=Data Opnemen, 1=Model Trainen, 2=Feedback, 3=Model Manager
+            // ML Training acties: 0=Data Opnemen, 1=Model Trainen, 2=AI Annotatie, 3=Model Manager
             switch(i) {
               case 0:
                 // Toggle recording aan/uit
@@ -2195,7 +1872,7 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
                 Serial.println("[ML TRAINING] Model Trainen - TODO");
                 break;
               case 2:
-                Serial.println("[ML TRAINING] Feedback - TODO");
+                Serial.println("[ML TRAINING] AI Annotatie - TODO");
                 break;
               case 3:
                 Serial.println("[ML TRAINING] Model Manager - TODO");
@@ -2271,28 +1948,12 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
           if (x >= btn2X && x <= btn2X + btnW && y >= btnY && y <= btnY + btnH) {
             Serial.printf("[PLAYBACK] Stress level opgeslagen: %d\n", selectedStressLevel);
             
-            // Voeg marker toe (visuele weergave)
+            // Voeg marker toe
             if (stressMarkerCount < 100) {
               stressMarkers[stressMarkerCount].timestamp = millis() - playbackLastUpdate;
               stressMarkers[stressMarkerCount].stressLevel = selectedStressLevel;
               stressMarkerCount++;
               Serial.printf("[PLAYBACK] Marker toegevoegd (%d/%d)\n", stressMarkerCount, 100);
-            }
-            
-            // 🔥 NIEUW: Sla op voor ML training!
-            // Dit wordt later gebruikt om ML te trainen
-            extern bool ml_addPlaybackAnnotation(float, int, float, float, float, int);
-            if (ml_addPlaybackAnnotation(playbackTimestamp, selectedStressLevel,
-                                          playbackLastHR, playbackLastTemp, playbackLastGSR,
-                                          playbackLastAILevel)) {
-              Serial.println("[PLAYBACK] ✅ Annotatie opgeslagen voor ML training!");
-              Serial.printf("[PLAYBACK]    Timestamp: %.1fs, Level: %d\n", playbackTimestamp, selectedStressLevel);
-              Serial.printf("[PLAYBACK]    HR=%.0f, Temp=%.1f, GSR=%.0f\n", 
-                           playbackLastHR, playbackLastTemp, playbackLastGSR);
-              if (playbackLastAILevel >= 0) {
-                Serial.printf("[PLAYBACK]    AI had voorspeld: %d (correctie: %+d)\n",
-                             playbackLastAILevel, selectedStressLevel - playbackLastAILevel);
-              }
             }
             
             stressPopupActive = false;
@@ -2347,7 +2008,7 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
         int btnW = 112;
         int btn1X = 5;      // STOP
         int btn2X = 122;    // PLAY/PAUZE
-        int btn4X = 356;    // GEVOEL
+        int btn4X = 356;    // AI-ACTIE
         
         // STOP knop
         if (x >= btn1X && x <= btn1X + btnW && y >= btnY && y <= btnY + btnH) {
@@ -2365,42 +2026,11 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
           return;
         }
         
-        // GEVOEL knop
+        // AI-ACTIE knop
         if (x >= btn4X && x <= btn4X + btnW && y >= btnY && y <= btnY + btnH) {
-          Serial.println("[PLAYBACK] GEVOEL - open stress popup");
-          
-          // 🔥 NIEUW: Open annotatie bestand indien nog niet open
-          extern bool ml_openAnnotationFile(const String&);
-          extern int ml_getAnnotationAt(float);
-          
-          static bool annotationFileOpened = false;
-          if (!annotationFileOpened && selectedPlaybackFile[0] != '\0') {
-            ml_openAnnotationFile(String(selectedPlaybackFile));
-            annotationFileOpened = true;
-          }
-          
-          // Check of er al een annotatie is op deze timestamp
-          int existingLevel = ml_getAnnotationAt(playbackTimestamp);
-          if (existingLevel >= 0) {
-            selectedStressLevel = existingLevel;
-            Serial.printf("[PLAYBACK] Bestaande annotatie gevonden: level %d\n", existingLevel);
-          } else if (playbackLastAILevel >= 0) {
-            // Gebruik AI voorspelling als start waarde
-            selectedStressLevel = playbackLastAILevel;
-            Serial.printf("[PLAYBACK] Geen annotatie, AI level: %d\n", playbackLastAILevel);
-          } else {
-            // Default
-            selectedStressLevel = 3;  // Licht verhoogd als default
-          }
-          
+          Serial.println("[PLAYBACK] AI-ACTIE - open stress popup");
           stressPopupActive = true;
-          stressLevelConfirmed = false;  // Start bij level selectie
-          stressPopupButtonIdx = 1;      // Default naar OPSLAAN
-          
-          // Pauzeer playback tijdens popup
-          isPlaybackPaused = true;
-          g4_pauseRendering = true;
-          
+          selectedStressLevel = 2;  // Default: normaal
           menuDirty = true;
           return;
         }
@@ -3477,7 +3107,7 @@ void drawPlaybackScreen() {
   int btnW = 112;
   int btn1X = 5;      // STOP
   int btn2X = 122;    // PLAY/PAUZE
-  int btn4X = 356;    // GEVOEL
+  int btn4X = 356;    // AI-ACTIE
   
   // STOP knop (oranje)
   body_gfx->fillRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFD20);
@@ -3496,7 +3126,7 @@ void drawPlaybackScreen() {
   #endif
   body_gfx->print("STOP");
   
-  // GEVOEL knop (magenta)
+  // AI-ACTIE knop (magenta)
   body_gfx->fillRoundRect(btn4X, btnY, btnW, btnH, 8, 0xF81F);
   if (bodyMenuIdx == 2) {
     // Encoder highlight: gele rand
@@ -3505,13 +3135,13 @@ void drawPlaybackScreen() {
   }
   body_gfx->drawRoundRect(btn4X, btnY, btnW, btnH, 8, 0xFFFF);
   body_gfx->setTextColor(0x0000, 0xF81F);
-  body_gfx->getTextBounds("GEVOEL", 0, 0, &x1, &y1, &tw, &th);
+  body_gfx->getTextBounds("AI-ACTIE", 0, 0, &x1, &y1, &tw, &th);
   #if USE_ADAFRUIT_FONTS
     body_gfx->setCursor(btn4X + (btnW - tw) / 2 - x1, btnY + (btnH + th) / 2 - 2);
   #else
     body_gfx->setCursor(btn4X + (btnW - tw) / 2, btnY + (btnH - th) / 2 + th - 2);
   #endif
-  body_gfx->print("GEVOEL");
+  body_gfx->print("AI-ACTIE");
     
     playbackScreenDrawn = true;  // Statische delen zijn getekend
   }
@@ -3807,7 +3437,6 @@ void updatePlayback() {
   
   // Parse CSV kolommen:
   // 0=Tijd_s, 1=Timestamp, 2=BPM, 3=Temp_C, 4=GSR, 5=Trust, 6=Sleeve, 7=Suction, 8=Vibe, 9=Zuig, ...
-  String timeStr = line.substring(0, commaPos[0]);                    // Kolom 0: Tijd_s
   String hrStr = line.substring(commaPos[1] + 1, commaPos[2]);    // Kolom 2: BPM
   String tempStr = line.substring(commaPos[2] + 1, commaPos[3]);  // Kolom 3: Temp_C
   String gsrStr = line.substring(commaPos[3] + 1, commaPos[4]);   // Kolom 4: GSR
@@ -3824,22 +3453,6 @@ void updatePlayback() {
   float sleeve = sleeveStr.toFloat(); // Sleeve: 0.0-2.0 van HoofdESP
   int vibe = vibeStr.toInt();         // Vibe: 0 of 1
   int zuig = zuigStr.toInt();         // Zuig: 0 of 1
-  
-  // 🔥 NIEUW: Sla sensor waarden op voor ML annotatie
-  playbackTimestamp = timeStr.toFloat();
-  playbackLastHR = hr;
-  playbackLastTemp = temp;
-  playbackLastGSR = gsr;
-  
-  // Check of er een StressLevel kolom is (voor .anl bestanden)
-  // Format: ...,StressLevel als laatste kolom
-  if (commaCount >= 14) {
-    // Probeer laatste kolom te parsen als AI level
-    String lastCol = line.substring(commaPos[commaCount-1] + 1);
-    playbackLastAILevel = lastCol.toInt();
-  } else {
-    playbackLastAILevel = -1;  // Geen AI level beschikbaar
-  }
   
   // Push sensor data naar body_gfx4 grafieken (G4_* constanten komen uit body_gfx4.h)
   body_gfx4_pushSample(G4_HART, hr, false);           // Hart: BPM
@@ -3938,27 +3551,10 @@ void stopPlayback() {
     playbackFile.close();
   }
   
-  // 🔥 NIEUW: Sluit en sla annotaties op voor ML training
-  extern void ml_closeAnnotationFile();
-  extern bool ml_exportAnnotationsForTraining();
-  
-  ml_closeAnnotationFile();
-  Serial.println("[PLAYBACK] Annotaties opgeslagen voor ML training");
-  
-  // Export naar ML training formaat
-  if (ml_exportAnnotationsForTraining()) {
-    Serial.println("[PLAYBACK] ✅ Annotaties geëxporteerd naar /ml_training/");
-    Serial.println("[PLAYBACK] Gebruik ml_trainModel() om het model te updaten!");
-  }
-  
-  // Sla stress markers op naar .preview bestand (visuele weergave)
+  // Sla stress markers op naar .preview bestand
   if (stressMarkerCount > 0) {
     saveStressMarkers();
   }
-  
-  // Reset annotatie tracking
-  static bool annotationFileOpened = false;
-  annotationFileOpened = false;
   
   // Terug naar RECORDING MENU en wis scherm volledig
   bodyMenuPage = BODY_PAGE_RECORDING;

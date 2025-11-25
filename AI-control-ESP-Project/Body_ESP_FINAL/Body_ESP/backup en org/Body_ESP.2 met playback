@@ -1947,29 +1947,7 @@ void handleEncoderInput() {
             }
           } else if (bodyMenuIdx == 2) {
             // AI analyze
-            extern int csvCount;
-            extern String csvFiles[];
-            extern bool performAIAnalysis(const String& csvFilename);
-            
-            if (selectedRecordingFile >= 0 && selectedRecordingFile < csvCount) {
-              String filename = csvFiles[selectedRecordingFile];
-              // Check of het al een .anl bestand is
-              if (filename.endsWith(".anl")) {
-                Serial.println("[ENCODER] Dit bestand is al geanalyseerd (.anl)!");
-              } else {
-                Serial.printf("[ENCODER] Starting AI analyze: %s\n", filename.c_str());
-                // Zet LED op magenta tijdens analyse
-                setEncoderLED(255, 0, 255, true);
-                performAIAnalysis(filename);
-                selectedRecordingFile = -1;
-                recordingInButtonMode = false;
-                bodyMenuIdx = 0;
-                csvCount = -1;  // Force rescan
-                updateEncoderLEDForMenu();
-              }
-            } else {
-              Serial.println("[ENCODER] Selecteer eerst een bestand!");
-            }
+            Serial.println("[ENCODER] AI analyze - TODO");
           } else if (bodyMenuIdx == 3) {
             // TERUG - reset naar bestand mode
             selectedRecordingFile = -1;

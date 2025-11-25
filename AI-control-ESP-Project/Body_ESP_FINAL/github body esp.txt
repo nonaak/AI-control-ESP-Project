@@ -34,8 +34,7 @@ ONTHOUD: Gebruiker is competent! Systemen hebben bugs!
 ============================================
 
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/Body_ESP.ino
-https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/PROJECT_LOG.md
-https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/SC01_Plus_Working_Guide.md
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/ai_bijbel.h
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/ads1115_sensors.cpp
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/ads1115_sensors.h
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/advanced_stress_manager.cpp
@@ -90,6 +89,14 @@ https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/sensor_settings.h
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/system_settings_view.cpp
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/system_settings_view.h
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/ml_annotation.cpp
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/ml_annotation.h
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/ml_integration.cpp
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/ml_integration.h
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/playback_screen_v2.cpp
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/Body_ESP_FINAL/Body_ESP/playback_screen_v2.h
+
+
 
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/SYSTEEM_OVERZICHT_FINAL.txt
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/ESP_PROJECT_TODO_ALLES.txt
