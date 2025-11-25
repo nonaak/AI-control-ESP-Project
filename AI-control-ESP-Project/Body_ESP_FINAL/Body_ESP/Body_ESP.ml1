@@ -49,7 +49,6 @@
 #include "body_fonts.h"         // Font configuratie
 #include "ads1115_sensors.h"    // ADS1115 sensor processing
 #include "body_menu.h"          // Menu systeem
-#include "ml_integration.h"     // 🔥 NIEUW: ML Training integratie
 #include "sensor_settings.h"    // Sensor kalibratie (EEPROM)
 #include "multifunplayer_client.h"  // MultiFunPlayer WebSocket client
 
@@ -1207,26 +1206,11 @@ void handleEncoderInput() {
           if (waitingForDoubleClick && (millis() - lastClickTime < 800)) {
             // DOUBLE CLICK = Direct AI toggle
             aiOverruleActive = !aiOverruleActive;
-            
-            // 🔥 NIEUW: ML sessie + recording koppelen aan AI
             if (aiOverruleActive) {
               setEncoderLED(255, 0, 255, true);  // Fel paars als AI AAN
-              if (!isRecording) {
-                isRecording = true;
-                startCSVRecording();
-              }
-              mlIntegration_startLiveSession();
-              Serial.println("[ENCODER] AI ON + Recording + ML session started");
             } else {
               setEncoderLEDOff();  // LED uit als AI UIT
-              mlIntegration_stopLiveSession();
-              if (isRecording) {
-                stopCSVRecording();
-                isRecording = false;
-              }
-              Serial.println("[ENCODER] AI OFF + Recording + ML session stopped");
             }
-            
             body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
             Serial.printf("[ENCODER] AI toggled: %s\n", aiOverruleActive ? "ON" : "OFF");
             waitingForDoubleClick = false;
@@ -1269,24 +1253,6 @@ void handleEncoderInput() {
         } else if (mainScreenButtonIdx == 3) {
           // AI toggle + DEACTIVEER encoder
           aiOverruleActive = !aiOverruleActive;
-          
-          // 🔥 NIEUW: ML sessie + recording koppelen aan AI
-          if (aiOverruleActive) {
-            if (!isRecording) {
-              isRecording = true;
-              startCSVRecording();
-            }
-            mlIntegration_startLiveSession();
-            Serial.println("[ENCODER] AI ON + Recording + ML session started");
-          } else {
-            mlIntegration_stopLiveSession();
-            if (isRecording) {
-              stopCSVRecording();
-              isRecording = false;
-            }
-            Serial.println("[ENCODER] AI OFF + Recording + ML session stopped");
-          }
-          
           encoderActiveMainScreen = false;
           setEncoderLEDOff();  // LED uit
           body_gfx4_drawButtons(isRecording, isPlaying, menuActive, aiOverruleActive, false, encoderActiveMainScreen ? mainScreenButtonIdx : -1);
@@ -1746,30 +1712,19 @@ void handleEncoderInput() {
       else if (bodyMenuPage == BODY_PAGE_ML_TRAINING) {     
         // ML Training: 4 items + TERUG
         if (bodyMenuIdx == 0) {
-          // Toggle recording + ML sessie
+          // Toggle recording
           isRecording = !isRecording;
-          if (isRecording) {
-            startCSVRecording();
-            mlIntegration_startLiveSession();
-            Serial.println("[ENCODER] Recording + ML session START");
-          } else {
-            mlIntegration_stopLiveSession();
-            stopCSVRecording();
-            Serial.println("[ENCODER] Recording + ML session STOP");
-          }
+          if (isRecording) startCSVRecording();
+          else stopCSVRecording();
+          Serial.printf("[ENCODER] Recording: %s\n", isRecording ? "ON" : "OFF");
         } else if (bodyMenuIdx == 1) {
           // Model Trainen
-          Serial.println("[ENCODER] Model Trainen gestart...");
-          if (mlIntegration_trainModel()) {
-            Serial.println("[ENCODER] ✅ Model training compleet!");
-          } else {
-            Serial.println("[ENCODER] ❌ Model training gefaald (te weinig data?)");
-          }
+          Serial.println("[ENCODER] Model Trainen - TODO");
         } else if (bodyMenuIdx == 2) {
-          // Feedback - TODO: open playback voor annotaties
-          Serial.println("[ENCODER] Feedback - TODO");
+          // AI Annotatie
+          Serial.println("[ENCODER] AI Annotatie - TODO");
         } else if (bodyMenuIdx == 3) {
-          // Model Manager - TODO
+          // Model Manager
           Serial.println("[ENCODER] Model Manager - TODO");
         } else if (bodyMenuIdx == 4) {
           // TERUG

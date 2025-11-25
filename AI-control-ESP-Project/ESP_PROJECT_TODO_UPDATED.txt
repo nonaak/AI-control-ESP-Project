@@ -46,8 +46,8 @@ M5StickC Plus:             █████████████████�
    ✅ GEVOEL knop (was: AI-ACTIE)
    ✅ Annotatie markers op tijdlijn
    ✅ Level grafiek over tijd
-   ☐ Encoder controls (speed +/-, pauze, stop)
-   ☐ Stress popup encoder navigatie
+   ✅ Encoder controls (speed +/-, pauze, stop)
+   ✅ Stress popup encoder navigatie
    ☐ Testen met echte data
 
 ═══════════════════════════════════════════════════════════════════════════════
