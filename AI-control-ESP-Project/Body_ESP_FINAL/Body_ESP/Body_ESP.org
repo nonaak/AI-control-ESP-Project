@@ -2508,9 +2508,6 @@ void loop() {
       body_gfx4_pushSample(G4_HUID, sensorData.gsrSmooth / GSR_SCHAAL_FACTOR);  // GSR: zie config.h
       body_gfx4_pushSample(G4_TEMP, sensorData.temperature);        // Temp: °C
       body_gfx4_pushSample(G4_ADEMHALING, sensorData.breathValue);  // Ademhaling: 0-100%
-      
-      // 🔥 NIEUW: Update ML integration met sensor data
-      bodyMenuUpdateSensors(sensorData.BPM, sensorData.temperature, sensorData.gsrSmooth);
 
       // ═══════════════════════════════════════════════════════════
       // AI STRESS MANAGER UPDATE & WARM-UP

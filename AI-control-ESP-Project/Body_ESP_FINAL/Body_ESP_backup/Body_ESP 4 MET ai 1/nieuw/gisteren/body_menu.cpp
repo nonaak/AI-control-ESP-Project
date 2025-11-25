@@ -1,6 +1,5 @@
 #include "body_menu.h"
 #include "ml_training_view.h"  // ML Training UI
-#include "ml_integration.h"    // 🔥 NIEUW: ML Training integratie
 #include <SD.h>  // SD card voor bestandslijst
 #include <SD_MMC.h>  // SD_MMC voor /recordings/ folder
 #include <RTClib.h>  // RTC DS3231 voor tijd instellingen
@@ -219,12 +218,6 @@ void applyAISettings() {
   Serial.println("[AI SETTINGS] Toegepast op BODY_CFG");
 }
 
-// 🔥 NIEUW: Sensor updates voor ML integration
-void bodyMenuUpdateSensors(float hr, float temp, float gsr) {
-  // Update ML integration met sensor data (voor live training)
-  mlIntegration_updateSensors(hr, temp, gsr);
-}
-
 // ===== SENSOR SETTINGS EDIT FUNCTIES =====
 void loadSensorSettingsToEdit() {
   sensorEdit.beatThreshold = sensorConfig.hrThreshold;
@@ -310,10 +303,6 @@ void bodyMenuInit() {
   // Laad AI Settings uit EEPROM
   loadAISettings();
   applyAISettings();
-  
-  // 🔥 NIEUW: ML Integration setup
-  mlIntegration_begin();
-  Serial.println("[BODY] ML Integration initialized");
   
   Serial.println("[BODY] Menu system initialized");
 }
@@ -2191,27 +2180,19 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
             // ML Training acties: 0=Data Opnemen, 1=Model Trainen, 2=Feedback, 3=Model Manager
             switch(i) {
               case 0:
-                // Toggle recording aan/uit - 🔥 NIEUW: Ook ML sessie!
+                // Toggle recording aan/uit
                 if (g_isRecording && *g_isRecording) {
-                  // Stop recording + ML sessie
-                  mlIntegration_stopLiveSession();
+                  // Stop recording
                   *g_isRecording = false;
-                  Serial.println("[ML TRAINING] Recording + ML session STOP");
+                  Serial.println("[ML TRAINING] Recording STOP");
                 } else if (g_isRecording) {
-                  // Start recording + ML sessie
+                  // Start recording
                   *g_isRecording = true;
-                  mlIntegration_startLiveSession();
-                  Serial.println("[ML TRAINING] Recording + ML session START");
+                  Serial.println("[ML TRAINING] Recording START");
                 }
                 break;
               case 1:
-                // Model Trainen - 🔥 NIEUW: Echte training!
-                Serial.println("[ML TRAINING] Model Trainen gestart...");
-                if (mlIntegration_trainModel()) {
-                  Serial.println("[ML TRAINING] ✅ Model training compleet!");
-                } else {
-                  Serial.println("[ML TRAINING] ❌ Model training gefaald (te weinig data?)");
-                }
+                Serial.println("[ML TRAINING] Model Trainen - TODO");
                 break;
               case 2:
                 Serial.println("[ML TRAINING] Feedback - TODO");
@@ -2579,29 +2560,10 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
         int btn2X = btn1X + btnW + btnSpacing;  // Opslaan
         int btn3X = btn2X + btnW + btnSpacing;  // TERUG
         
-        // AI AAN knop - 🔥 NIEUW: Ook recording + ML sessie starten/stoppen!
+        // AI AAN knop
         if (x >= btn1X && x <= btn1X + btnW && y >= btnY && y <= btnY + btnH) {
           aiSettings.aiEnabled = !aiSettings.aiEnabled;  // Toggle
-          
-          if (aiSettings.aiEnabled) {
-            // AI AAN → Start ook recording en ML sessie
-            Serial.println("[AI SETTINGS] AI AAN + Starting recording + ML session");
-            
-            if (g_isRecording && !(*g_isRecording)) {
-              *g_isRecording = true;  // Start recording
-            }
-            mlIntegration_startLiveSession();
-            
-          } else {
-            // AI UIT → Stop ML sessie en recording
-            Serial.println("[AI SETTINGS] AI UIT + Stopping recording + ML session");
-            
-            mlIntegration_stopLiveSession();
-            if (g_isRecording && *g_isRecording) {
-              *g_isRecording = false;  // Stop recording
-            }
-          }
-          
+          Serial.printf("[AI SETTINGS] AI toggled: %s\n", aiSettings.aiEnabled ? "AAN" : "UIT");
           menuDirty = true;
           return;
         }

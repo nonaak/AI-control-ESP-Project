@@ -35,6 +35,9 @@ void bodyMenuSetVariablePointers(uint16_t* bpm, float* tempValue, float* gsrValu
                                  bool* isRecording, bool* espNowInitialized, float* trustSpeed, float* sleeveSpeed,
                                  uint32_t* lastCommTime, uint32_t* samplesRecorded);
 
+// ML Integration
+void bodyMenuUpdateSensors(float hr, float temp, float gsr);
+
 // Playback functions
 void startPlayback(const char* filename);
 void updatePlayback();
