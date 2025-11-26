@@ -10,34 +10,6 @@
 
 #include "playback_screen_v2.h"
 
-// ═══════════════════════════════════════════════════════════════════════════
-//                         STRESS LEVEL DATA
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Stress level kleuren (van groen naar rood)
-const uint16_t STRESS_COLORS[8] = {
-  0x07E0,   // Level 0: Groen (Ontspannen)
-  0x87E0,   // Level 1: Licht groen (Rustig)
-  0xFFE0,   // Level 2: Geel (Normaal)
-  0xFD20,   // Level 3: Oranje (Licht verhoogd)
-  0xFC00,   // Level 4: Donker oranje (Verhoogd)
-  0xF800,   // Level 5: Rood (Gestrest)
-  0xF81F,   // Level 6: Magenta (Zeer gestrest)
-  0xF81F    // Level 7: Magenta knipperend (Extreem/Edge)
-};
-
-// Level labels (kort)
-const char* STRESS_LABELS_SHORT[8] = {
-  "ONTSPANNEN",
-  "RUSTIG",
-  "NORMAAL",
-  "LICHT+",
-  "VERHOOGD",
-  "GESTREST",
-  "ZEER HOOG",
-  "EDGE!"
-};
-
 // Global instance
 PlaybackScreenV2 playbackScreen;
 

@@ -50,7 +50,8 @@
 #include "ads1115_sensors.h"    // ADS1115 sensor processing
 #include "body_menu.h"          // Menu systeem
 #include "ml_integration.h"     // 🔥 NIEUW: ML Training integratie
-#include "sensor_settings.h"    // Sensor kalibratie (EEPROM)
+#include "nvs_settings.h"       // 🔥 NIEUW: Centrale NVS opslag (vervangt EEPROM functies)
+#include "sensor_settings.h"    // Alleen struct definitie voor compatibiliteit
 #include "multifunplayer_client.h"  // MultiFunPlayer WebSocket client
 
 // ========= TOUCH TOGGLE STATES (GLOBAAL) =========
@@ -97,9 +98,10 @@ RTC_DS3231 rtc;
 bool rtcAvailable = false;
 
 // ===== I2C EEPROM (Wire1 - AT24C02 256 bytes) =====
+// UITGESCHAKELD: Externe EEPROM vervangen door NVS (interne flash)
 // A0=A1=A2=GND → adres 0x50
-bool eepromAvailable = false;
-#define EEPROM_ADDR 0x50
+// bool eepromAvailable = false;
+// #define EEPROM_ADDR 0x50
 
 // ===== Rotary Encoder (Wire1 - I2C address 0x36) =====
 Adafruit_seesaw encoder(&Wire1);
@@ -1624,6 +1626,8 @@ void handleEncoderInput() {
           bodyMenuPage = BODY_PAGE_RECORDING;
           bodyMenuIdx = 0;  // Start bij eerste bestand
           recordingInButtonMode = false;  // Reset naar bestand mode
+          extern int csvCount;
+          csvCount = -1;  // 🔥 FIX: Force rescan bij openen menu
           Serial.println("[ENCODER] -> Recording");
         } else if (bodyMenuIdx == 2) {
           bodyMenuPage = BODY_PAGE_AI_SETTINGS;
@@ -2079,10 +2083,12 @@ void handleEncoderInput() {
           }
           bodyMenuForceRedraw();
         } else {
-          // Normale playback knoppen: 0=STOP, 1=PAUZE, 2=AI-ACTIE, 3=Speed-, 4=Speed+
+          // Playback knoppen V2: 0=STOP, 1=PAUZE, 2=-10s, 3=+10s, 4=GEVOEL
           extern void stopPlayback();
           extern bool isPlaybackPaused;
           extern float playbackSpeed;
+          extern float playbackProgress;
+          extern float playbackDuration;
           
           if (bodyMenuIdx == 0) {
             // STOP
@@ -2097,7 +2103,23 @@ void handleEncoderInput() {
             playbackScreenDrawn = false;  // Force redraw voor knop update
             Serial.printf("[ENCODER] PLAYBACK %s\n", isPlaybackPaused ? "PAUSED" : "PLAYING");
           } else if (bodyMenuIdx == 2) {
-            // AI-ACTIE - open stress popup, zet pauze aan
+            // -10s (seek back)
+            float currentTime = playbackProgress * playbackDuration;
+            currentTime = max(0.0f, currentTime - 10.0f);
+            playbackProgress = currentTime / playbackDuration;
+            extern bool playbackScreenDrawn;
+            playbackScreenDrawn = false;
+            Serial.printf("[ENCODER] Seek -10s: %.1fs\n", currentTime);
+          } else if (bodyMenuIdx == 3) {
+            // +10s (seek forward)
+            float currentTime = playbackProgress * playbackDuration;
+            currentTime = min(playbackDuration, currentTime + 10.0f);
+            playbackProgress = currentTime / playbackDuration;
+            extern bool playbackScreenDrawn;
+            playbackScreenDrawn = false;
+            Serial.printf("[ENCODER] Seek +10s: %.1fs\n", currentTime);
+          } else if (bodyMenuIdx == 4) {
+            // GEVOEL - open stress popup, zet pauze aan
             stressPopupActive = true;
             stressLevelConfirmed = false;
             selectedStressLevel = 2;  // Default: normaal
@@ -2105,19 +2127,7 @@ void handleEncoderInput() {
             isPlaybackPaused = true;  // Zet pauze aan
             g4_pauseRendering = true;  // Pauzeer grafiek rendering
             setEncoderLED(0, 255, 0, true);  // Groen voor level selectie
-            Serial.println("[ENCODER] AI-ACTIE - stress popup geopend, pauze aan");
-          } else if (bodyMenuIdx == 3) {
-            // Speed -
-            playbackSpeed = max(10.0f, playbackSpeed - 10.0f);
-            extern bool playbackScreenDrawn;
-            playbackScreenDrawn = false;
-            Serial.printf("[ENCODER] Speed: %.0f%%\n", playbackSpeed);
-          } else if (bodyMenuIdx == 4) {
-            // Speed +
-            playbackSpeed = min(200.0f, playbackSpeed + 10.0f);
-            extern bool playbackScreenDrawn;
-            playbackScreenDrawn = false;
-            Serial.printf("[ENCODER] Speed: %.0f%%\n", playbackSpeed);
+            Serial.println("[ENCODER] GEVOEL - stress popup geopend, pauze aan");
           }
         }
       }
@@ -2231,9 +2241,20 @@ void setup() {
     Serial.println("[I2C] ADS1115 OK via ads1115_begin()!");
     adsAvailable = true;
     
-    // Laad kalibratie uit ESP32 EEPROM
-    Serial.println("[CONFIG] Loading calibration from ESP32 EEPROM...");
-    loadSensorConfig();  // Laadt en past toe op ADS1115
+    // Laad kalibratie uit NVS (interne flash)
+    Serial.println("[CONFIG] Loading calibration from NVS...");
+    SensorCalibrationNVS sensorCal;
+    nvsSettings_loadSensorCal(&sensorCal);
+    
+    // Pas kalibratie toe op sensor edit struct
+    extern SensorSettingsEdit sensorEdit;
+    sensorEdit.beatThreshold = sensorCal.beatThreshold;
+    sensorEdit.tempOffset = sensorCal.tempOffset;
+    sensorEdit.tempSmoothing = sensorCal.tempSmoothing;
+    sensorEdit.gsrBaseline = sensorCal.gsrBaseline;
+    sensorEdit.gsrSensitivity = sensorCal.gsrSensitivity;
+    sensorEdit.gsrSmoothing = sensorCal.gsrSmoothing;
+    Serial.println("[CONFIG] Sensor calibration loaded from NVS");
     
     // gfx->setCursor(10, yPos);
     // gfx->setTextColor(0x07E0);
@@ -2270,76 +2291,29 @@ void setup() {
   }
   // yPos += 30;
   
+  // ===== EEPROM TEST UITGESCHAKELD =====
+  // Externe I2C EEPROM (AT24C02) vervangen door NVS (interne ESP32 flash)
+  // De oude EEPROM chip kan verwijderd worden van het hardware board
+  Serial.println("[I2C] EEPROM test SKIPPED - using NVS instead");
+  
+  /*
   // Test 3: I2C EEPROM (0x50) - AT24C02 256 bytes
   Serial.println("[I2C] Testing EEPROM (0x50 - A0/A1/A2=GND)...");
   Wire1.beginTransmission(EEPROM_ADDR);
   if (Wire1.endTransmission() == 0) {
     Serial.println("[I2C] EEPROM OK!");
     eepromAvailable = true;
-    // gfx->setCursor(10, yPos);
-    // gfx->setTextColor(0x07E0);
-    // gfx->println("EEPROM: OK");
   } else {
     Serial.println("[I2C] EEPROM NOT found");
-    // gfx->setCursor(10, yPos);
-    // gfx->setTextColor(0xF800);
-    // gfx->println("EEPROM: FAIL");
   }
   
   // ===== EEPROM Test (write/read/clear) =====
   if (eepromAvailable) {
     Serial.println("\n[EEPROM] Testing write/read/clear...");
-    
-    // Test data
-    uint8_t testData[] = {0xAA, 0x55, 0x12, 0x34};
-    uint8_t addr = 0;
-    
-    // Write test
-    Serial.print("[EEPROM] Writing: ");
-    for (int i = 0; i < 4; i++) {
-      Wire1.beginTransmission(EEPROM_ADDR);
-      Wire1.write(addr + i);  // Address
-      Wire1.write(testData[i]);  // Data
-      Wire1.endTransmission();
-      delay(5);  // EEPROM write delay
-      Serial.printf("0x%02X ", testData[i]);
-    }
-    Serial.println();
-    
-    delay(10);
-    
-    // Read test
-    Serial.print("[EEPROM] Reading: ");
-    bool readOK = true;
-    for (int i = 0; i < 4; i++) {
-      Wire1.beginTransmission(EEPROM_ADDR);
-      Wire1.write(addr + i);  // Set address
-      Wire1.endTransmission();
-      Wire1.requestFrom(EEPROM_ADDR, 1);
-      if (Wire1.available()) {
-        uint8_t readByte = Wire1.read();
-        Serial.printf("0x%02X ", readByte);
-        if (readByte != testData[i]) readOK = false;
-      } else {
-        Serial.print("ERR ");
-        readOK = false;
-      }
-    }
-    Serial.println(readOK ? "- MATCH!" : "- MISMATCH!");
-    
-    // Clear test
-    Serial.print("[EEPROM] Clearing: ");
-    for (int i = 0; i < 4; i++) {
-      Wire1.beginTransmission(EEPROM_ADDR);
-      Wire1.write(addr + i);
-      Wire1.write(0xFF);  // Cleared byte
-      Wire1.endTransmission();
-      delay(5);
-    }
-    Serial.println("Done");
-    
+    // ... test code ...
     Serial.println("[EEPROM] Test PASSED - EEPROM fully functional!");
   }
+  */
   
   // Test 4: Rotary Encoder (0x36)
   Serial.println("[I2C] Testing Rotary Encoder (0x36)...");
@@ -2381,6 +2355,10 @@ void setup() {
   } else {
     Serial.println("[SD CARD] Init failed - recording won't work");
   }
+  
+  // ===== NVS Settings Initialisatie =====
+  // Centrale opslag voor alle settings (vervangt externe EEPROM)
+  nvsSettings_begin();
   
   // ===== ESP-NOW Initialisatie =====
   Serial.println("\n[ESP-NOW] Starting initialization...");

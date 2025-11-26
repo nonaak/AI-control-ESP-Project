@@ -1,6 +1,5 @@
 #include "body_menu.h"
 #include "ml_training_view.h"  // ML Training UI
-#include "ml_integration.h"    // 🔥 NIEUW: ML Training integratie
 #include <SD.h>  // SD card voor bestandslijst
 #include <SD_MMC.h>  // SD_MMC voor /recordings/ folder
 #include <RTClib.h>  // RTC DS3231 voor tijd instellingen
@@ -11,7 +10,9 @@
 #include "body_fonts.h"
 #include "body_gfx4.h"  // Voor G4_* constanten en body_gfx4_pushSample
 #include "ads1115_sensors.h"
-#include "sensor_settings.h"
+#include "nvs_settings.h"       // 🔥 NIEUW: Centrale NVS opslag
+#include "sensor_settings.h"    // Alleen struct definitie (EEPROM functies in nvs_settings)
+#include "playback_screen_v2.h" // 🔥 NIEUW: Herontworpen playback scherm
 
 // 🔥 NIEUW: Extern reference naar rendering pause flag
 extern volatile bool g4_pauseRendering;
@@ -139,12 +140,14 @@ SensorSettingsEdit sensorEdit;
 static bool isPlaybackActive = false;
 bool isPlaybackPaused = false;
 float playbackSpeed = 100.0f;  // 10-200%
-static float playbackProgress = 0.0f;  // 0.0-1.0
+float playbackProgress = 0.0f;  // 0.0-1.0 (extern zichtbaar voor seek)
 static int playbackCurrentLine = 0;
 static int playbackTotalLines = 0;
 static unsigned long playbackLastUpdate = 0;
 static File playbackFile;
 static char selectedPlaybackFile[64] = "";
+String playbackFilename = "";  // 🔥 Voor v2 screen
+float playbackDuration = 0.0f; // 🔥 Duur in seconden
 bool playbackScreenDrawn = false;  // Track of overlay al getekend is
 
 // 🔥 NIEUW: Laatste playback sensor waarden (voor ML annotatie)
@@ -219,12 +222,6 @@ void applyAISettings() {
   Serial.println("[AI SETTINGS] Toegepast op BODY_CFG");
 }
 
-// 🔥 NIEUW: Sensor updates voor ML integration
-void bodyMenuUpdateSensors(float hr, float temp, float gsr) {
-  // Update ML integration met sensor data (voor live training)
-  mlIntegration_updateSensors(hr, temp, gsr);
-}
-
 // ===== SENSOR SETTINGS EDIT FUNCTIES =====
 void loadSensorSettingsToEdit() {
   sensorEdit.beatThreshold = sensorConfig.hrThreshold;
@@ -245,10 +242,19 @@ void saveSensorSettingsFromEdit() {
   sensorConfig.gsrSensitivity = sensorEdit.gsrSensitivity;
   sensorConfig.gsrSmoothing = sensorEdit.gsrSmoothing;
   
-  saveSensorConfig();  // Sla op in EEPROM
+  // 🔥 NIEUW: Sla op naar NVS (interne flash)
+  SensorCalibrationNVS cal;
+  cal.beatThreshold = sensorEdit.beatThreshold;
+  cal.tempOffset = sensorEdit.tempOffset;
+  cal.tempSmoothing = sensorEdit.tempSmoothing;
+  cal.gsrBaseline = sensorEdit.gsrBaseline;
+  cal.gsrSensitivity = sensorEdit.gsrSensitivity;
+  cal.gsrSmoothing = sensorEdit.gsrSmoothing;
+  nvsSettings_saveSensorCal(&cal);
+  
   applySensorConfig(); // Pas toe op ADS1115
   
-  Serial.println("[SENSOR SETTINGS] Opgeslagen en toegepast!");
+  Serial.println("[SENSOR SETTINGS] Opgeslagen in NVS en toegepast!");
 }
 
 // Font helpers (zoals HoofdESP)
@@ -310,10 +316,6 @@ void bodyMenuInit() {
   // Laad AI Settings uit EEPROM
   loadAISettings();
   applyAISettings();
-  
-  // 🔥 NIEUW: ML Integration setup
-  mlIntegration_begin();
-  Serial.println("[BODY] ML Integration initialized");
   
   Serial.println("[BODY] Menu system initialized");
 }
@@ -1014,9 +1016,16 @@ void updateCalibration() {
         Serial.printf("[CAL] Pulse baseline: %d\n", pulseBaseline);
       }
       
-      // Sla kalibratie op in EEPROM
-      saveSensorConfig();
-      Serial.println("[CAL] Kalibratie opgeslagen in EEPROM");
+      // 🔥 NIEUW: Sla kalibratie op naar NVS (interne flash)
+      SensorCalibrationNVS cal;
+      cal.beatThreshold = sensorConfig.hrThreshold;
+      cal.tempOffset = sensorConfig.ads_ntcOffset;
+      cal.tempSmoothing = sensorConfig.tempSmoothing;
+      cal.gsrBaseline = sensorConfig.ads_gsrBaseline;
+      cal.gsrSensitivity = sensorConfig.gsrSensitivity;
+      cal.gsrSmoothing = sensorConfig.gsrSmoothing;
+      nvsSettings_saveSensorCal(&cal);
+      Serial.println("[CAL] Kalibratie opgeslagen in NVS");
     }
     
     isCalibrating = false;
@@ -1352,7 +1361,7 @@ void drawSensorCalItems() {
 
 // Geselecteerd bestand voor Recording menu (moet voor AI Analyze staan)
 int selectedRecordingFile = -1;
-String csvFiles[10];  // CSV bestanden lijst (globaal voor touch handler)
+String csvFiles[50];  // CSV bestanden lijst (globaal voor touch handler)
 int csvCount = -1;     // Aantal gevonden bestanden (-1 = nog niet gescand)
 uint32_t lastRecordingScan = 0;  // Laatste scan tijd
 
@@ -1691,7 +1700,7 @@ void drawRecordingItems() {
     File root = SD_MMC.open("/recordings");
     if (root && root.isDirectory()) {
       File file = root.openNextFile();
-      while (file && csvCount < 10) {
+      while (file && csvCount < 50) {
         if (!file.isDirectory()) {
           String filename = String(file.name());
           // Accepteer zowel .csv als .anl bestanden
@@ -1708,7 +1717,15 @@ void drawRecordingItems() {
     lastRecordingScan = millis();
     
     Serial.printf("[RECORDING MENU] Found %d CSV/ANL files in /recordings/\n", csvCount);
+    // Debug: toon alle gevonden bestanden
+    for (int i = 0; i < csvCount; i++) {
+      Serial.printf("[RECORDING MENU]   %d: %s\n", i, csvFiles[i].c_str());
+    }
   }
+  
+  // 🔥 FIX: Wis file lijst area expliciet (voorkomt ghost text bij scrollen)
+  // Extra ruimte voor scroll indicators boven en onder
+  body_gfx->fillRect(LIST_X - 5, LIST_Y - 18, LIST_W + 10, 8 * 20 + 30, BODY_CFG.COL_BG);
   
   // Toon .csv/.anl bestanden met selectie
   if (csvCount == 0) {
@@ -1716,18 +1733,38 @@ void drawRecordingItems() {
     body_gfx->setCursor(LIST_X, LIST_Y);
     body_gfx->print("Geen opnames gevonden");
   } else {
-    for (int i = 0; i < csvCount && i < 8; i++) {
+    // 🔥 FIX: Scroll offset berekenen zodat geselecteerde file altijd zichtbaar is
+    int scrollOffset = 0;
+    int currentIndex = recordingInButtonMode ? selectedRecordingFile : bodyMenuIdx;
+    if (currentIndex > 7) {
+      scrollOffset = currentIndex - 7;  // Scroll zodat huidige item onderaan zichtbaar is
+    }
+    
+    // Toon scroll indicator als er meer bestanden zijn
+    if (scrollOffset > 0) {
+      body_gfx->setTextColor(0xC618, BODY_CFG.COL_BG);
+      body_gfx->setCursor(LIST_X, LIST_Y - 12);
+      body_gfx->print("^ meer");
+    }
+    if (scrollOffset + 8 < csvCount) {
+      body_gfx->setTextColor(0xC618, BODY_CFG.COL_BG);
+      body_gfx->setCursor(LIST_X, LIST_Y + 8 * 20);
+      body_gfx->print("v meer");
+    }
+    
+    for (int i = 0; i < 8 && (i + scrollOffset) < csvCount; i++) {
+      int fileIdx = i + scrollOffset;
       int y = LIST_Y + i * 20;
       
       // Check of het een .anl bestand is
-      bool isANL = csvFiles[i].endsWith(".anl");
+      bool isANL = csvFiles[fileIdx].endsWith(".anl");
       
       // ROOD = geselecteerd bestand (rode letters, geen balk)
-      if (i == selectedRecordingFile) {
+      if (fileIdx == selectedRecordingFile) {
         body_gfx->setTextColor(0xF800, BODY_CFG.COL_BG);  // Rode letters
       }
       // GROEN = encoder positie (alleen in file mode)
-      else if (!recordingInButtonMode && i == bodyMenuIdx) {
+      else if (!recordingInButtonMode && fileIdx == bodyMenuIdx) {
         body_gfx->setTextColor(0x07E0, BODY_CFG.COL_BG);  // Groene letters
       }
       // ROZE/MAGENTA = .anl bestand (al geanalyseerd)
@@ -1741,7 +1778,7 @@ void drawRecordingItems() {
       
       body_gfx->setCursor(LIST_X, y);
       // Kort bestandsnaam als te lang
-      String shortName = csvFiles[i];
+      String shortName = csvFiles[fileIdx];
       if (shortName.length() > 25) {
         shortName = shortName.substring(0, 22) + "...";
       }
@@ -2191,27 +2228,19 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
             // ML Training acties: 0=Data Opnemen, 1=Model Trainen, 2=Feedback, 3=Model Manager
             switch(i) {
               case 0:
-                // Toggle recording aan/uit - 🔥 NIEUW: Ook ML sessie!
+                // Toggle recording aan/uit
                 if (g_isRecording && *g_isRecording) {
-                  // Stop recording + ML sessie
-                  mlIntegration_stopLiveSession();
+                  // Stop recording
                   *g_isRecording = false;
-                  Serial.println("[ML TRAINING] Recording + ML session STOP");
+                  Serial.println("[ML TRAINING] Recording STOP");
                 } else if (g_isRecording) {
-                  // Start recording + ML sessie
+                  // Start recording
                   *g_isRecording = true;
-                  mlIntegration_startLiveSession();
-                  Serial.println("[ML TRAINING] Recording + ML session START");
+                  Serial.println("[ML TRAINING] Recording START");
                 }
                 break;
               case 1:
-                // Model Trainen - 🔥 NIEUW: Echte training!
-                Serial.println("[ML TRAINING] Model Trainen gestart...");
-                if (mlIntegration_trainModel()) {
-                  Serial.println("[ML TRAINING] ✅ Model training compleet!");
-                } else {
-                  Serial.println("[ML TRAINING] ❌ Model training gefaald (te weinig data?)");
-                }
+                Serial.println("[ML TRAINING] Model Trainen - TODO");
                 break;
               case 2:
                 Serial.println("[ML TRAINING] Feedback - TODO");
@@ -2579,29 +2608,10 @@ void bodyMenuHandleTouch(int16_t x, int16_t y, bool pressed) {
         int btn2X = btn1X + btnW + btnSpacing;  // Opslaan
         int btn3X = btn2X + btnW + btnSpacing;  // TERUG
         
-        // AI AAN knop - 🔥 NIEUW: Ook recording + ML sessie starten/stoppen!
+        // AI AAN knop
         if (x >= btn1X && x <= btn1X + btnW && y >= btnY && y <= btnY + btnH) {
           aiSettings.aiEnabled = !aiSettings.aiEnabled;  // Toggle
-          
-          if (aiSettings.aiEnabled) {
-            // AI AAN → Start ook recording en ML sessie
-            Serial.println("[AI SETTINGS] AI AAN + Starting recording + ML session");
-            
-            if (g_isRecording && !(*g_isRecording)) {
-              *g_isRecording = true;  // Start recording
-            }
-            mlIntegration_startLiveSession();
-            
-          } else {
-            // AI UIT → Stop ML sessie en recording
-            Serial.println("[AI SETTINGS] AI UIT + Stopping recording + ML session");
-            
-            mlIntegration_stopLiveSession();
-            if (g_isRecording && *g_isRecording) {
-              *g_isRecording = false;  // Stop recording
-            }
-          }
-          
+          Serial.printf("[AI SETTINGS] AI toggled: %s\n", aiSettings.aiEnabled ? "AAN" : "UIT");
           menuDirty = true;
           return;
         }
@@ -3416,178 +3426,37 @@ void drawPlaybackProgressBar() {
 }
 
 void drawPlaybackScreen() {
-  // Teken playback overlay
-  // DYNAMISCH: progress bar (via bodyMenuTick)
-  // STATISCH: speed controls, indicator, knoppen (1x)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PLAYBACK SCREEN V2 - Herontworpen met groot level indicator
+  // ═══════════════════════════════════════════════════════════════════════════
   
-  if (!playbackScreenDrawn) {  // Teken statische delen 1x
-    // Teken EERST body_gfx4 frame met grafieken (basis)
-    //body_gfx4_clear();  // Teken frame + wis grafieken
-    if (!isPlaybackPaused) {
-      body_gfx4_clear(); // 🔥 Skip als gepauzeerd = grafieken blijven!
-    }
-    
-    // Zet correcte font voor ALLE tekst in overlay
-    #if USE_ADAFRUIT_FONTS
-      body_gfx->setFont(&FONT_ITEM);
-      body_gfx->setTextSize(1);
-    #else
-      body_gfx->setFont(nullptr);
-      body_gfx->setTextSize(2);
-    #endif
-    
-    // Progress bar + speed controls bovenaan
-  int16_t x1, y1; uint16_t tw, th;
-  int progressBarH = 25;  // Vaste hoogte (zelfde als dynamische progress bar)
-  int progressBarW = 480 - 100;
-  
-  // Speed controls rechts (statisch - 1x)
-  int speedX = progressBarW + 5;
-  int speedY = 0;
-  int speedBtnW = 25;
-  int speedBtnH = progressBarH;
-  
-  // - knop (blauw)
-  body_gfx->fillRoundRect(speedX, speedY, speedBtnW, speedBtnH, 3, 0x001F);
-  if (bodyMenuIdx == 3) {
-    // Encoder highlight: gele rand
-    body_gfx->drawRect(speedX-2, speedY-2, speedBtnW+4, speedBtnH+4, 0xFFE0);
-    body_gfx->drawRect(speedX-1, speedY-1, speedBtnW+2, speedBtnH+2, 0xFFE0);
-  }
-  body_gfx->drawRect(speedX, speedY, speedBtnW, speedBtnH, 0xFFFF);
-  body_gfx->setTextColor(0xFFFF, 0x001F);
-  body_gfx->getTextBounds("-", 0, 0, &x1, &y1, &tw, &th);
-  #if USE_ADAFRUIT_FONTS
-    body_gfx->setCursor(speedX + (speedBtnW - tw) / 2 - x1, speedY + (speedBtnH + th) / 2);
-  #else
-    body_gfx->setCursor(speedX + (speedBtnW - tw) / 2, speedY + (speedBtnH - th) / 2 + th - 2);
-  #endif
-  body_gfx->print("-");
-  
-  // Speed percentage (wit op zwart)
-  int speedTextX = speedX + speedBtnW + 2;
-  int speedTextW = 40;
-  body_gfx->fillRect(speedTextX, speedY, speedTextW, speedBtnH, 0x0000);
-  body_gfx->setTextColor(0xFFFF, 0x0000);
-  char speedStr[8];
-  sprintf(speedStr, "%.0f%%", playbackSpeed);
-  body_gfx->getTextBounds(speedStr, 0, 0, &x1, &y1, &tw, &th);
-  #if USE_ADAFRUIT_FONTS
-    body_gfx->setCursor(speedTextX + (speedTextW - tw) / 2 - x1, speedY + (speedBtnH + th) / 2);
-  #else
-    body_gfx->setCursor(speedTextX + (speedTextW - tw) / 2, speedY + (speedBtnH - th) / 2 + th - 2);
-  #endif
-  body_gfx->print(speedStr);
-  
-  // + knop (rood)
-  int plusX = speedTextX + speedTextW + 2;
-  body_gfx->fillRoundRect(plusX, speedY, speedBtnW, speedBtnH, 3, 0xF800);
-  if (bodyMenuIdx == 4) {
-    // Encoder highlight: gele rand
-    body_gfx->drawRect(plusX-2, speedY-2, speedBtnW+4, speedBtnH+4, 0xFFE0);
-    body_gfx->drawRect(plusX-1, speedY-1, speedBtnW+2, speedBtnH+2, 0xFFE0);
-  }
-  body_gfx->drawRect(plusX, speedY, speedBtnW, speedBtnH, 0xFFFF);
-  body_gfx->setTextColor(0xFFFF, 0xF800);
-  body_gfx->getTextBounds("+", 0, 0, &x1, &y1, &tw, &th);
-  #if USE_ADAFRUIT_FONTS
-    body_gfx->setCursor(plusX + (speedBtnW - tw) / 2 - x1, speedY + (speedBtnH + th) / 2);
-  #else
-    body_gfx->setCursor(plusX + (speedBtnW - tw) / 2, speedY + (speedBtnH - th) / 2 + th - 2);
-  #endif
-  body_gfx->print("+");
-  
-  // Verticale indicator (statisch - 1x)
-  int indicatorX = 240;
-  int indicatorY1 = progressBarH + 5;
-  int indicatorY2 = 320 - 45;
-  
-  body_gfx->drawLine(indicatorX - 1, indicatorY1, indicatorX - 1, indicatorY2, 0xFFFF);
-  body_gfx->drawLine(indicatorX + 1, indicatorY1, indicatorX + 1, indicatorY2, 0xFFFF);
-  body_gfx->drawLine(indicatorX, indicatorY1, indicatorX, indicatorY2, 0xFD20);
-  
-  body_gfx->fillTriangle(indicatorX, indicatorY1, indicatorX - 4, indicatorY1 - 6, indicatorX + 4, indicatorY1 - 6, 0xFD20);
-  body_gfx->drawTriangle(indicatorX, indicatorY1, indicatorX - 4, indicatorY1 - 6, indicatorX + 4, indicatorY1 - 6, 0xFFFF);
-  
-  // Knoppen onderaan
-  int btnY = 320 - 40;
-  int btnH = 35;
-  int btnW = 112;
-  int btn1X = 5;      // STOP
-  int btn2X = 122;    // PLAY/PAUZE
-  int btn4X = 356;    // GEVOEL
-  
-  // STOP knop (oranje)
-  body_gfx->fillRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFD20);
-  if (bodyMenuIdx == 0) {
-    // Encoder highlight: gele rand
-    body_gfx->drawRoundRect(btn1X-2, btnY-2, btnW+4, btnH+4, 10, 0xFFE0);
-    body_gfx->drawRoundRect(btn1X-1, btnY-1, btnW+2, btnH+2, 9, 0xFFE0);
-  }
-  body_gfx->drawRoundRect(btn1X, btnY, btnW, btnH, 8, 0xFFFF);
-  body_gfx->setTextColor(0x0000, 0xFD20);
-  body_gfx->getTextBounds("STOP", 0, 0, &x1, &y1, &tw, &th);
-  #if USE_ADAFRUIT_FONTS
-    body_gfx->setCursor(btn1X + (btnW - tw) / 2 - x1, btnY + (btnH + th) / 2 - 2);
-  #else
-    body_gfx->setCursor(btn1X + (btnW - tw) / 2, btnY + (btnH - th) / 2 + th - 2);
-  #endif
-  body_gfx->print("STOP");
-  
-  // GEVOEL knop (magenta)
-  body_gfx->fillRoundRect(btn4X, btnY, btnW, btnH, 8, 0xF81F);
-  if (bodyMenuIdx == 2) {
-    // Encoder highlight: gele rand
-    body_gfx->drawRoundRect(btn4X-2, btnY-2, btnW+4, btnH+4, 10, 0xFFE0);
-    body_gfx->drawRoundRect(btn4X-1, btnY-1, btnW+2, btnH+2, 9, 0xFFE0);
-  }
-  body_gfx->drawRoundRect(btn4X, btnY, btnW, btnH, 8, 0xFFFF);
-  body_gfx->setTextColor(0x0000, 0xF81F);
-  body_gfx->getTextBounds("GEVOEL", 0, 0, &x1, &y1, &tw, &th);
-  #if USE_ADAFRUIT_FONTS
-    body_gfx->setCursor(btn4X + (btnW - tw) / 2 - x1, btnY + (btnH + th) / 2 - 2);
-  #else
-    body_gfx->setCursor(btn4X + (btnW - tw) / 2, btnY + (btnH - th) / 2 + th - 2);
-  #endif
-  body_gfx->print("GEVOEL");
-    
-    playbackScreenDrawn = true;  // Statische delen zijn getekend
+  // Initialiseer v2 screen als nog niet gedaan
+  static bool v2Initialized = false;
+  if (!v2Initialized) {
+    playbackScreen.begin(body_gfx);
+    v2Initialized = true;
   }
   
-  // PLAY/PAUZE knop (DYNAMISCH - altijd hertekenen voor status update)
-  int btnY = 320 - 40;
-  int btnH = 35;
-  int btnW = 112;
-  int btn2X = 122;
+  // Update state (variabelen zijn in dit bestand gedefinieerd)
+  playbackScreen.setFilename(playbackFilename.c_str());
+  playbackScreen.setProgress(playbackProgress * playbackDuration, playbackDuration);
+  playbackScreen.setSpeed(playbackSpeed);
+  playbackScreen.setPaused(isPlaybackPaused);
   
-  // Zet correcte font voor knop tekst
-  #if USE_ADAFRUIT_FONTS
-    body_gfx->setFont(&FONT_ITEM);
-    body_gfx->setTextSize(1);
-  #else
-    body_gfx->setFont(nullptr);
-    body_gfx->setTextSize(2);
-  #endif
+  // Update sensor values (gebruik bestaande getter functies)
+  playbackScreen.setSensorValues(getBPM(), getTempValue(), getGsrValue());
   
-  uint16_t playColor = (isPlaybackActive && !isPlaybackPaused) ? 0x07E0 : 0xF800;
-  const char* playLabel = (isPlaybackActive && !isPlaybackPaused) ? "PAUZE" : "PLAY";
-  body_gfx->fillRoundRect(btn2X, btnY, btnW, btnH, 8, playColor);
-  if (bodyMenuIdx == 1) {
-    // Encoder highlight: gele rand
-    body_gfx->drawRoundRect(btn2X-2, btnY-2, btnW+4, btnH+4, 10, 0xFFE0);
-    body_gfx->drawRoundRect(btn2X-1, btnY-1, btnW+2, btnH+2, 9, 0xFFE0);
+  // Update level (gebruik huidige stress level)
+  playbackScreen.setCurrentLevel(selectedStressLevel);
+  
+  // Teken alles
+  if (!playbackScreenDrawn) {
+    playbackScreen.drawStaticElements();
+    playbackScreenDrawn = true;
   }
-  body_gfx->drawRoundRect(btn2X, btnY, btnW, btnH, 8, 0xFFFF);
-  body_gfx->setTextColor(0x0000, playColor);
   
-  int16_t x1, y1; uint16_t tw, th;
-  body_gfx->getTextBounds(playLabel, 0, 0, &x1, &y1, &tw, &th);
-  #if USE_ADAFRUIT_FONTS
-    body_gfx->setCursor(btn2X + (btnW - tw) / 2 - x1, btnY + (btnH + th) / 2 - 2);
-  #else
-    body_gfx->setCursor(btn2X + (btnW - tw) / 2, btnY + (btnH - th) / 2 + th - 2);
-  #endif
-  body_gfx->print(playLabel);
+  playbackScreen.drawDynamicElements();
+  playbackScreen.drawButtons(bodyMenuIdx);
 }
 
 
@@ -3762,6 +3631,10 @@ void startPlayback(const char* filename) {
   }
   
   Serial.printf("[PLAYBACK] Totaal regels: %d\n", playbackTotalLines);
+  
+  // 🔥 V2: Zet filename en duration voor nieuw scherm
+  playbackFilename = String(filename);
+  playbackDuration = (float)playbackTotalLines;  // 1 regel = 1 seconde
   
   // Reset naar begin en skip header
   playbackFile.seek(0);
@@ -4057,4 +3930,24 @@ void bodyMenuHandleButton(bool cPressed, bool zPressed) {
     Serial.println("[BODY] Z button pressed - recording toggle requested");
     // Note: This would need proper implementation with callbacks to main file
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🔥 ML INTEGRATION - SENSOR DATA DOORSTUREN
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Cached sensor values voor ML systeem
+static float cached_bpm = 0.0f;
+static float cached_temp = 0.0f;
+static float cached_gsr = 0.0f;
+
+void bodyMenuUpdateSensors(float bpm, float temp, float gsr) {
+  // Cache sensor waarden
+  cached_bpm = bpm;
+  cached_temp = temp;
+  cached_gsr = gsr;
+  
+  // Update ML integration als beschikbaar
+  extern void mlIntegration_updateSensors(float hr, float temp, float gsr);
+  mlIntegration_updateSensors(bpm, temp, gsr);
 }
