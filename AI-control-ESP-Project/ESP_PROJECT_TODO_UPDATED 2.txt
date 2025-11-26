@@ -3,24 +3,25 @@
 AI-Controlled ESP32 Edging System - Complete Overzicht
 ═══════════════════════════════════════════════════════════════════════════════
 
-**Datum:** 25 November 2025 - 🆕 ML TRAINING SYSTEEM INTEGRATIE!
+**Datum:** 26 November 2025 - 🆕 PLAYBACK SCREEN V2 LANDSCAPE FIXES!
 **Project:** AI-Control-ESP-Project
 **Owner:** Aak
 
 ═══════════════════════════════════════════════════════════════════════════════
 - playback beeld beter maken. mooier
+- "emergency" moet uit de code → vervangen door "nood-pauze" (ALLEEN variabele namen!)
 ═══════════════════════════════════════════════════════════════════════════════
 
 ## 📊 STATUS OVERZICHT
 
 ```
 Pomp Unit (ESP8266):       ████████████████████ 100% ✅ KLAAR!
-Body ESP (SC01 Plus):      ████████████████████  94% 🔧 ML TRAINING INTEGRATIE! 🆕
-Hooft ESP (CYD 2.8"):      ████████████████████  97% ✅ EMERGENCY PAUSE + v1.1 support!
+Body ESP (SC01 Plus):      ████████████████████  94% 🔧 PLAYBACK V2 + ML TRAINING!
+Hooft ESP (CYD 2.8"):      ████████████████████  97% ✅ NOOD-PAUZE + v1.1 support!
 M5StickC Plus:             ████████████████████ 100% ✅ KLAAR (hardware twijfel)
 ```
 
-**Totaal Project:** ~96% compleet (ML Training Systeem in ontwikkeling!)
+**Totaal Project:** ~96% compleet (Playback Screen + ML Training in ontwikkeling!)
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -50,11 +51,73 @@ M5StickC Plus:             █████████████████�
    ✅ Level grafiek over tijd
    ✅ Encoder controls (speed +/-, pauze, stop)
    ✅ Stress popup encoder navigatie
+   ✅ Landscape layout (480x320) - 26 Nov
+   ✅ updatePlayback() aangeroepen in bodyMenuTick()
+   ✅ menuDirty = true voor hertekenen
+   ☐ Playback data toont nog niet correct op scherm (debug nodig)
    ☐ Testen met echte data
+
+### 🔧 CSV Event Logging - NOG TE DOEN! 🆕
+   ☐ Event kolom toevoegen aan CSV header
+   ☐ Events: NORMAL, PAUSE, WARMUP, ORGASM, COOLDOWN, AI_CONTROL
+   ☐ orgasmActive/cooldownActive variabelen toevoegen
+   ☐ Event bepalen bij CSV write
+   ☐ Playback parsing voor Event kolom
+
+### 🔧 Naamgeving - NOG TE DOEN! 🆕
+   ☐ "emergency" → "nood-pauze" in variabele namen (ALLEEN namen, NIKS anders!)
+   ☐ emergencyPauseActive → noodPauzeActive
+   ☐ EMERGENCY_PAUSE_ROOD_SCHERM → NOOD_PAUZE_ROOD_SCHERM
+   ☐ etc. (ALLEEN hernoemen, geen functionaliteit wijzigen!)
 
 ═══════════════════════════════════════════════════════════════════════════════
 
-## 🎉 VANDAAG GEFIXT (25 Nov 2025) - ML TRAINING SYSTEEM! 🆕
+## 🎉 VANDAAG GEWERKT (26 Nov 2025) - PLAYBACK SCREEN V2 LANDSCAPE! 🆕
+
+═══════════════════════════════════════════════════════════════════════════════
+
+### ✅ PLAYBACK SCREEN V2 LANDSCAPE LAYOUT:
+  ✅ Layout constanten herschreven voor 480x320 (was portrait)
+  ✅ Level paneel links (125px breed)
+  ✅ Sensor grafieken rechts (HR, TEMP, GSR)
+  ✅ LEVEL grafiek met labels
+  ✅ Speed controls centrering (-/+ knoppen)
+  ✅ Bestandsnaam in titel balk
+  ✅ AI→Jij vergelijking met correctie display
+
+### ✅ PLAYBACK DATA FIX:
+  ✅ updatePlayback() wordt nu aangeroepen in bodyMenuTick()
+  ✅ menuDirty = true toegevoegd voor hertekenen tijdens playback
+  ✅ Debug output toegevoegd voor CSV parsing
+  ✅ Forward declarations voor updatePlayback(), stopPlayback(), startPlayback()
+
+### ✅ CSV PARSING WERKT:
+  ✅ CSV regels worden correct gelezen
+  ✅ HR, Temp, GSR worden correct geparsed
+  ✅ Debug output toont parsed waarden in Serial Monitor:
+     ```
+     [PLAYBACK] === LINE 1 RAW ===
+       Full line: 1.0,2025-11-26_21:27:07,0,-20.38,23841.9,...
+     [PLAYBACK] === PARSED LINE 1 ===
+       hrStr='0' -> HR=0.0
+       tempStr='-20.38' -> Temp=-20.4
+       gsrStr='23841.9' -> GSR=23841.9
+     ```
+
+### ⚠️ NIET GELUKT / MOET NOG:
+  ☐ Playback waarden tonen nog niet correct op scherm
+  ☐ Event kolom nog niet toegevoegd (Claude maakte fouten)
+  ☐ "emergency" → "nood-pauze" hernoemen nog niet correct gedaan
+
+### ⚠️ OPGELET - CODE PROBLEMEN:
+  ⚠️ Claude heeft code gesloopt bij emergency→nood-pauze hernoemen
+  ⚠️ Laatste Body_ESP.ino en config.h updates NIET GEBRUIKEN
+  ⚠️ Alleen playback_screen_v2.h/cpp en body_menu.cpp updates bruikbaar
+  ⚠️ Emergency hernoemen moet opnieuw gedaan worden (ALLEEN namen wijzigen!)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🎉 EERDER GEFIXT (25 Nov 2025) - ML TRAINING SYSTEEM! 🆕
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -74,9 +137,9 @@ M5StickC Plus:             █████████████████�
      ┌─────────────────────────────────────────────────────────────┐
      │                ML INTEGRATION (het hart)                    │
      │   ml_integration.h  ◄── INCLUDE IN BODY_MENU.CPP           │
-     └───────────────────────────────┬─────────────────────────────┘
-                                     │
-             ┌───────────────────────┼───────────────────────┐
+     └───────────────────────────────────┬─────────────────────────┘
+                                         │
+             ┌───────────────────────────┼───────────────────────┐
              │                       │                       │
              ▼                       ▼                       ▼
      ┌───────────────┐       ┌───────────────┐       ┌───────────────┐
@@ -161,7 +224,7 @@ M5StickC Plus:             █████████████████�
      ```cpp
      #define TOUCH_MENU_ENABLED      true/false  // Menu navigatie knoppen
      #define TOUCH_PARAMS_ENABLED    true/false  // Parameter +/- pijltjes
-     #define TOUCH_EMERGENCY_ENABLED true        // Emergency pause scherm
+     #define TOUCH_EMERGENCY_ENABLED true        // Nood-pauze scherm
      ```
   ✅ Preferences opslag in Body_ESP.ino setup()
   ✅ Touch check in bodyMenuHandleTouch() (body_menu.cpp)
@@ -214,52 +277,65 @@ M5StickC Plus:             █████████████████�
 
 ### 🔥 DEZE WEEK (High Priority):
 
-1. ☐ **Body_menu.cpp ML integratie afmaken:**
+1. ☐ **Playback scherm fixen:**
+   ☐ Waarom tonen waarden niet op scherm? Debug verder
+   ☐ [DRAW] debug output toevoegen en checken
+   ☐ Testen met verschillende CSV bestanden
+
+2. ☐ **"emergency" → "nood-pauze" hernoemen:**
+   ☐ ALLEEN variabele namen wijzigen
+   ☐ GEEN functionaliteit aanpassen
+   ☐ GEEN nieuwe defines toevoegen
+   ☐ Lijst van te wijzigen namen:
+      - emergencyPauseActive → noodPauzeActive
+      - emergencyPauseScreenDrawn → noodPauzeScreenDrawn
+      - emergencyBlinkState → noodPauzeBlinkState
+      - lastEmergencyBlink → lastNoodPauzeBlink
+      - EMERGENCY_PAUSE_ROOD_SCHERM → NOOD_PAUZE_ROOD_SCHERM
+      - EMERGENCY_WARMUP_ENABLED → NOOD_PAUZE_WARMUP_ENABLED
+
+3. ☐ **CSV Event kolom toevoegen:**
+   ☐ Header: ...,AI_Override,Event
+   ☐ Events: NORMAL, PAUSE, WARMUP, ORGASM, COOLDOWN, AI_CONTROL
+   ☐ orgasmActive, cooldownActive variabelen
+   ☐ Playback parsing voor Event kolom
+
+4. ☐ **Body_menu.cpp ML integratie afmaken:**
    ☐ `#include "ml_integration.h"` toevoegen
    ☐ `mlIntegration_begin()` in setup
    ☐ AI toggle → auto recording start/stop
    ☐ Nunchuk correctie logging
    ☐ GEVOEL knop → `mlIntegration_logGevoelFeedback()`
 
-2. ☐ **AI aan/uit = Recording aan/uit:**
+5. ☐ **AI aan/uit = Recording aan/uit:**
    ☐ 2x encoder druk → AI + Recording toggle
    ☐ Sessie over (cooldown) → AI + Recording stop
    ☐ NOOD PAUZE → AI blijft aan, recording blijft lopen
 
-3. ☐ **Playback encoder controls:**
-   ☐ Speed +/- met encoder draaien
-   ☐ Pauze/Play met encoder klik
-   ☐ GEVOEL popup encoder navigatie
-
-4. ☐ **Encoder RGB LED status:**
-   ☐ `encoder.setPixelColor(0, R, G, B)`
-   ☐ Kleur = geselecteerde knop kleur
-   ☐ Gedimde tijdens browsing
-
-5. ☐ **Bug fix:**
+6. ☐ **Bug fix:**
    ☐ Funscript TERUG → naar System Settings ipv hoofdscherm
 
 ### 📅 VOLGENDE WEEK:
 
-6. ☐ **ML Training workflow testen:**
+7. ☐ **ML Training workflow testen:**
    ☐ 50+ feedback samples verzamelen
    ☐ Model trainen
    ☐ Voorspellingen testen
 
-7. ☐ **Parameter editing met encoder:**
+8. ☐ **Parameter editing met encoder:**
    ☐ AI Settings waarden +/-
    ☐ Sensor Settings waarden +/-
    ☐ Time Settings waarden +/-
 
-8. ☐ **Hooft ESP AI v1.1 support:**
+9. ☐ **Hooft ESP AI v1.1 support:**
    ☐ Edge counter
    ☐ Tijdelijke dip enforcement
 
 ### 📅 LATER:
 
-9. ☐ Pipboy arm setup
-10. ☐ Stability test (2+ uur)
-11. ☐ Full system test met echte sensors
+10. ☐ Pipboy arm setup
+11. ☐ Stability test (2+ uur)
+12. ☐ Full system test met echte sensors
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -273,13 +349,13 @@ M5StickC Plus:             █████████████████�
 ✅ **Milestone 4:** Nunchuk controls + hold detection (COMPLEET - 19 Nov)
 ✅ **Milestone 5:** Orgasm trigger + cooldown (COMPLEET - 20 Nov)
 ✅ **Milestone 6:** Body ESP AI operationeel (COMPLEET - 21 Nov)
-✅ **Milestone 7:** Emergency pause + warmup (COMPLEET - 22 Nov)
+✅ **Milestone 7:** Nood-pauze + warmup (COMPLEET - 22 Nov)
 ✅ **Milestone 8:** AI bevoegdheid schaal v1.1 (COMPLEET - 22 Nov)
 ✅ **Milestone 9:** Encoder navigatie systeem (COMPLEET - 23 Nov)
 ✅ **Milestone 10:** Touch disable + Recording fixes (COMPLEET - 24 Nov)
-🔧 **Milestone 11:** ML Training systeem integratie (IN PROGRESS - 25 Nov) 🆕
-☐ **Milestone 12:** AI + Recording koppeling (TARGET: Deze week!)
-☐ **Milestone 13:** Playback encoder controls (TARGET: Deze week!)
+🔧 **Milestone 11:** ML Training systeem integratie (IN PROGRESS - 25 Nov)
+🔧 **Milestone 12:** Playback Screen V2 landscape (IN PROGRESS - 26 Nov) 🆕
+☐ **Milestone 13:** AI + Recording koppeling (TARGET: Deze week!)
 ☐ **Milestone 14:** ML workflow volledig testen (TARGET: Volgende week)
 ☐ **Milestone 15:** Production ready v1.0 (Target: Begin December)
 
@@ -291,33 +367,33 @@ M5StickC Plus:             █████████████████�
 
 **Code Development:**
 - Hooft ESP: 97% ✅ (3% = AI v1.1 support)
-- Body ESP: 94% 🔧 (6% = ML integratie afmaken, playback encoder)
+- Body ESP: 94% 🔧 (6% = ML integratie afmaken, playback fixen)
 - Pomp Unit: 100% ✅
 - M5StickC: 100% ✅
 
-**ML Training Systeem:** 🆕
+**ML Training Systeem:**
 - ml_trainer.h/cpp: 100% ✅ (Aak's origineel)
 - ml_stress_analyzer.h/cpp: 100% ✅
 - ml_annotation.h/cpp: 100% ✅
 - ml_integration.h/cpp: 90% ✅ (compileert, nog integreren)
-- playback_screen_v2.h/cpp: 90% ✅ (UI klaar, encoder TODO)
+- playback_screen_v2.h/cpp: 85% 🔧 (layout klaar, data display TODO)
 - ml_training_view.h/cpp: 100% ✅
 - ai_bijbel.h: 100% ✅
-- body_menu.cpp integratie: 20% (TODO!)
+- body_menu.cpp integratie: 30% 🔧 (playback fixes gedaan)
 
 **System Integration:**
 - ESP-NOW communicatie: 100% ✅
 - Bidirectionele commands: 100% ✅
 - AI decision tree: 100% ✅
 - Sensor processing: 100% ✅
-- Emergency pause systeem: 100% ✅
+- Nood-pauze systeem: 100% ✅
 - AI bevoegdheid v1.1: 100% ✅
 - Encoder navigatie: 100% ✅
 - Touch disable config: 95% ✅
 - Recording menu: 100% ✅
-- ML Training systeem: 80% 🔧 🆕
-- Playback encoder: 10% (TODO!)
-- Encoder RGB LED: 0% (TODO!)
+- ML Training systeem: 80% 🔧
+- Playback Screen V2: 85% 🔧 (layout klaar, data TODO)
+- CSV Event logging: 0% (TODO!)
 - Hardware testing: 60% (needs real sensors!)
 
 **Overall Project:** ~94% compleet! 🚀
@@ -359,6 +435,15 @@ Body_ESP/
 
 ═══════════════════════════════════════════════════════════════════════════════
 
+**26 Nov 2025 - Playback Screen V2 Landscape:**
+- Layout omgezet van portrait naar landscape (480x320)
+- updatePlayback() wordt nu aangeroepen in bodyMenuTick()
+- menuDirty = true toegevoegd voor hertekenen
+- CSV parsing werkt correct (debug output bevestigt dit)
+- Data toont nog niet correct op scherm - moet verder debuggen
+- Claude maakte fouten bij emergency→nood-pauze hernoemen - NIET GEBRUIKEN!
+- Event kolom voor CSV nog niet toegevoegd
+
 **25 Nov 2025 - ML Training Integratie:**
 - UI termen vereenvoudigd: "AI-ACTIE" → "GEVOEL", "AI Annotatie" → "Feedback"
 - ml_integration systeem als centrale hub voor alle ML componenten
@@ -395,17 +480,18 @@ NOOD PAUZE           → AI blijft AAN, Recording BLIJFT LOPEN
 ═══════════════════════════════════════════════════════════════════════════════
 ═══════════════════════════════════════════════════════════════════════════════
 
-**STATUS:** ML Training Systeem COMPILEERT! Body_menu integratie nog TODO! 🔧
+**STATUS:** Playback Screen V2 layout klaar, data display nog niet werkend!
 
 **KNOWN ISSUES:**
 - Funscript TERUG: gaat naar hoofdscherm ipv System Settings
-- Playback scherm: encoder controls ontbreken
-- Body_menu.cpp: ML integratie calls nog niet toegevoegd
+- Playback scherm: data toont niet correct op scherm
+- "emergency" moet nog hernoemd worden naar "nood-pauze" (ALLEEN namen!)
+- CSV Event kolom nog niet toegevoegd
 
-**NEXT:** Body_menu ML integratie → AI+Recording koppeling → Playback encoder!
+**NEXT:** Playback data fix → emergency hernoemen → CSV Event kolom!
 
-**VERSIE:** v1.3 (25 Nov 2025)
+**VERSIE:** v1.4 (26 Nov 2025)
 **PROJECT COMPLETION:** ~94%
-**READY FOR:** Body_menu.cpp integratie + Testing!
+**READY FOR:** Playback debugging + naamgeving fix!
 
 ═══════════════════════════════════════════════════════════════════════════════

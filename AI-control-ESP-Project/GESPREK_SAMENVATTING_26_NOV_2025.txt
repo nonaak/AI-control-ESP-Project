@@ -1,0 +1,269 @@
+═══════════════════════════════════════════════════════════════════════════════
+📋 GESPREK SAMENVATTING - 26 NOVEMBER 2025
+AI-Controlled ESP32 Edging System - Voor Nieuw Gesprek
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🎯 WAT IS ER GEDAAN IN DIT GESPREK
+
+═══════════════════════════════════════════════════════════════════════════════
+
+### ✅ PLAYBACK SCREEN V2 - LANDSCAPE LAYOUT FIXES
+
+**Probleem:** Layout was voor portrait (320x480), maar scherm is landscape (480x320)
+
+**Opgelost:**
+1. Layout constanten herschreven in playback_screen_v2.h (regel 46-78)
+2. Level paneel links (125px breed) met:
+   - Level nummer (size 5, gecentreerd)
+   - Label onder nummer
+   - AI→Jij vergelijking met pijl
+   - Correctie display (+/- waarde)
+3. Sensor grafieken rechts (HR, TEMP, GSR met gecentreerde waarden)
+4. LEVEL grafiek met labels links en 7/0 rechts
+5. Speed controls (-/+) gecentreerd in knoppen
+6. Bestandsnaam zichtbaar in titel balk
+
+**Bestanden gewijzigd:**
+- playback_screen_v2.h - Layout constanten
+- playback_screen_v2.cpp - drawLevelPanel(), drawSensorGraphs(), drawLevelGraph(), etc.
+
+### ✅ PLAYBACK DATA FIX - updatePlayback() NIET AANGEROEPEN
+
+**Probleem:** CSV werd gelezen maar data kwam niet op scherm
+
+**Oorzaak gevonden:** updatePlayback() werd NERGENS aangeroepen!
+
+**Opgelost in body_menu.cpp:**
+```cpp
+// In bodyMenuTick():
+if (isPlaybackActive && bodyMenuPage == BODY_PAGE_PLAYBACK && !isPlaybackPaused) {
+    updatePlayback();  // Dit leest CSV en update playbackLastHR etc.
+    menuDirty = true;  // Forceer hertekenen!
+}
+```
+
+**Forward declarations toegevoegd:**
+```cpp
+void updatePlayback();
+void stopPlayback();
+void startPlayback(const char* filename);
+```
+
+### ✅ DEBUG OUTPUT TOEGEVOEGD
+
+Serial output tijdens playback:
+```
+[PLAYBACK] === LINE 1 RAW ===
+  Full line: 1.0,2025-11-26_21:27:07,0,-20.38,23841.9,...
+[PLAYBACK] === PARSED LINE 1 ===
+  hrStr='0' -> HR=0.0
+  tempStr='-20.38' -> Temp=-20.4
+  gsrStr='23841.9' -> GSR=23841.9
+```
+
+Dit bevestigt dat CSV parsing WERKT.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ⚠️ WAT FOUT GING - NIET GEBRUIKEN!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+### ❌ EMERGENCY → NOOD-PAUZE HERNOEMEN - GESLOOPT!
+
+**Wat gevraagd was:** 
+- Alleen variabele namen wijzigen van "emergency" naar "nood-pauze"
+
+**Wat Claude deed (FOUT!):**
+- Namen gewijzigd ✓
+- MAAR OOK: Nieuwe defines toegevoegd
+- MAAR OOK: Functionaliteit gewijzigd
+- MAAR OOK: Serial teksten aangepast naar dingen die nergens op slaan
+
+**Resultaat:** Code gesloopt
+
+**GEBRUIK DEZE BESTANDEN NIET:**
+- Body_ESP.ino (laatste versie van dit gesprek)
+- config.h (laatste versie van dit gesprek)
+
+**WEL BRUIKBAAR:**
+- playback_screen_v2.h
+- playback_screen_v2.cpp  
+- body_menu.cpp (alleen de playback fixes)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📝 WAT NOG GEDAAN MOET WORDEN
+
+═══════════════════════════════════════════════════════════════════════════════
+
+### 1. PLAYBACK SCHERM - Data toont niet op scherm
+
+**Status:** CSV parsing werkt (serial output bevestigt), maar waarden tonen niet op scherm
+
+**Debug nodig:**
+- Check of [DRAW] debug output verschijnt in serial
+- Check of playbackScreen.setSensorValues() correct werkt
+- Check of drawDynamicElements() wordt aangeroepen
+
+### 2. "EMERGENCY" → "NOOD-PAUZE" HERNOEMEN - OPNIEUW DOEN!
+
+**ALLEEN variabele namen wijzigen, NIKS ANDERS:**
+
+In Body_ESP.ino:
+- emergencyPauseActive → noodPauzeActive
+- emergencyPauseScreenDrawn → noodPauzeScreenDrawn
+- emergencyBlinkState → noodPauzeBlinkState
+- lastEmergencyBlink → lastNoodPauzeBlink
+
+In config.h:
+- EMERGENCY_PAUSE_ROOD_SCHERM → NOOD_PAUZE_ROOD_SCHERM
+- EMERGENCY_WARMUP_ENABLED → NOOD_PAUZE_WARMUP_ENABLED
+- AI_KAN_EMERGENCY_OVERRIDE → AI_KAN_NOOD_OVERRIDE
+
+**GEEN nieuwe defines toevoegen!**
+**GEEN functionaliteit wijzigen!**
+**GEEN serial teksten veranderen naar onzin!**
+
+### 3. CSV EVENT KOLOM TOEVOEGEN
+
+**Doel:** AI moet weten wat er aan de hand was (voor ML training)
+
+**In Body_ESP.ino:**
+
+1. Variabelen toevoegen:
+```cpp
+static bool orgasmActive = false;
+static bool cooldownActive = false;
+static uint32_t orgasmStartTime = 0;
+```
+
+2. CSV header uitbreiden:
+```cpp
+csvFile.println("...,AI_Override,Event");
+```
+
+3. Event bepalen bij CSV write:
+```cpp
+const char* currentEvent = "NORMAL";
+if (warmupActive) currentEvent = "WARMUP";
+else if (orgasmActive) currentEvent = "ORGASM";
+else if (cooldownActive) currentEvent = "COOLDOWN";
+else if (pauseActive) currentEvent = "PAUSE";
+else if (aiOverruleActive) currentEvent = "AI_CONTROL";
+```
+
+4. Command handlers updaten:
+- ORGASM_TRIGGER → orgasmActive = true
+- ORGASM_COMPLETE → orgasmActive = false, cooldownActive = true
+- COOLDOWN_COMPLETE → cooldownActive = false
+
+**Events:**
+| Event | Beschrijving |
+|-------|--------------|
+| NORMAL | Normale operatie |
+| PAUSE | C knop pauze (jouw keuze!) |
+| WARMUP | Warm-up na pauze |
+| ORGASM | Orgasme trigger actief |
+| COOLDOWN | Cooldown na orgasme |
+| AI_CONTROL | AI overrule actief |
+
+**GEEN "EMERGENCY" - dat woord mag niet in de code!**
+
+### 4. PLAYBACK PARSING VOOR EVENT KOLOM
+
+In body_menu.cpp updatePlayback():
+```cpp
+// Parse Event kolom (kolom 15) als aanwezig
+String eventStr = "NORMAL";
+if (commaCount >= 15) {
+    eventStr = line.substring(commaPos[14] + 1);
+    eventStr.trim();
+}
+playbackLastEvent = eventStr;
+```
+
+### 5. OVERIGE TODO's
+
+- Funscript TERUG → moet naar System Settings ipv hoofdscherm
+- ML Integration in body_menu.cpp afmaken
+- AI aan/uit = Recording aan/uit koppeling
+- Testen met echte sensors (Pipboy setup)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 📁 RELEVANTE BESTANDEN
+
+═══════════════════════════════════════════════════════════════════════════════
+
+**Van dit gesprek (BRUIKBAAR):**
+- /mnt/user-data/outputs/playback_screen_v2.h - Landscape layout
+- /mnt/user-data/outputs/playback_screen_v2.cpp - UI implementatie
+- /mnt/user-data/outputs/body_menu.cpp - Playback fixes (updatePlayback call, menuDirty)
+
+**Van dit gesprek (NIET GEBRUIKEN):**
+- /mnt/user-data/outputs/Body_ESP.ino - Gesloopt door emergency hernoemen
+- /mnt/user-data/outputs/config.h - Gesloopt door emergency hernoemen
+
+**Originele bestanden (GEBRUIK DEZE):**
+- Body_ESP.ino uit vorige werkende versie
+- config.h uit vorige werkende versie
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 💬 BELANGRIJKE AFSPRAKEN
+
+═══════════════════════════════════════════════════════════════════════════════
+
+1. **"EMERGENCY" MAG NIET IN DE CODE** - Vervang door "nood-pauze"
+
+2. **NOOD-PAUZE IS JOUW KEUZE** - C knop, niet automatisch door systeem
+
+3. **BIJ HERNOEMEN: ALLEEN NAMEN WIJZIGEN** - Geen functionaliteit aanpassen!
+
+4. **GEEN TOUCHES UITSCHAKELEN** - Touch moet ALTIJD werken om te hervatten
+
+5. **CSV EVENT KOLOM** - Voor ML training, geen "EMERGENCY" event
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 🔧 SERIAL OUTPUT DIE JE MOET ZIEN
+
+═══════════════════════════════════════════════════════════════════════════════
+
+**Bij playback start:**
+```
+[PLAYBACK] Start: 21-27 - 26-11-25.csv
+[PLAYBACK] Totaal regels: 83
+[PLAYBACK] V2 filename: '21-27 - 26-11-25.csv', duration: 83 sec
+[PLAYBACK] CSV header: Tijd_s,Timestamp,BPM,Temp_C,GSR,...
+[PLAYBACK] Gestart
+```
+
+**Bij CSV parsing:**
+```
+[PLAYBACK] === LINE 1 RAW ===
+  Full line: 1.0,2025-11-26_21:27:07,0,-20.38,23841.9,...
+[PLAYBACK] === PARSED LINE 1 ===
+  hrStr='0' -> HR=0.0
+  tempStr='-20.38' -> Temp=-20.4
+  gsrStr='23841.9' -> GSR=23841.9
+```
+
+**Bij scherm tekenen (elke 50 frames):**
+```
+[DRAW] Playback: HR=0.0, T=-20.4, GSR=23841.9, Event=NORMAL
+```
+
+Als je [DRAW] NIET ziet, wordt drawPlaybackScreen() niet aangeroepen.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+**EINDE SAMENVATTING**
+
+Dit document is voor een nieuw gesprek met Claude.
+Datum: 26 November 2025
+Project: AI-Control-ESP-Project
+Owner: Aak
+
+═══════════════════════════════════════════════════════════════════════════════
