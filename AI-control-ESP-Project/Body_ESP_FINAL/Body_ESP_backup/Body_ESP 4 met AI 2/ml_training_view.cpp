@@ -7,7 +7,6 @@
 #include "ml_training_view.h"
 #include "ml_stress_analyzer.h"
 #include "ml_trainer.h"
-#include "ml_integration.h"  // 🔥 NIEUW: ML integration
 #include "ml_data_parser.h"
 #include "input_touch.h"
 #include <SD.h>
@@ -231,8 +230,8 @@ bool mlTraining_parseAlyFile(MLFileInfo &info) {
         String stressStr = line.substring(commaIndex[3] + 1, commaIndex[4]);
         int stressLevel = stressStr.toInt();
         
-        if (stressLevel >= 1 && stressLevel <= 7) {
-          info.stressLevels[stressLevel - 1]++;
+        if (stressLevel >= 0 && stressLevel <= 7) {
+          info.stressLevels[stressLevel]++;
         }
         
         // Extract confidence (index 5)
@@ -395,7 +394,7 @@ void mlTraining_drawMainMenu() {
 // Menu teksten - aangepast voor nieuwe workflow
   const char* menuItems[] = {
     "Train Model (.aly)",
-    "AI Annotatie (.csv)", 
+    "Feedback (.csv)", 
     "Model Manager",
     "Training Info"
   };
@@ -957,10 +956,10 @@ MLTrainingEvent handleMainMenuTouch(int16_t tx, int16_t ty) {
     return MTE_TRAIN_MODEL;
   }
   
-  // Check AI Annotatie (.csv) button  
+  // Check Feedback (.csv) button  
   int annotateY = startY + (btnH + gap);
   if (ty >= annotateY && ty < annotateY + btnH && tx >= btnX && tx < btnX + btnW) {
-    Serial.println("[ML TRAINING] AI Annotatie pressed");
+    Serial.println("[ML TRAINING] Feedback pressed");
     return MTE_AI_ANNOTATE;
   }
   
@@ -1103,7 +1102,7 @@ MLTrainingEvent handleModelManagerTouch(int16_t tx, int16_t ty) {
   return MTE_NONE;
 }
 
-// ===== AI Annotatie Drawing Functions =====
+// ===== Feedback Drawing Functions =====
 
 void mlTraining_drawAIAnnotateScreen() {
   if (!g) return;
@@ -1120,9 +1119,9 @@ void mlTraining_drawAIAnnotateScreen() {
   
   int16_t x1, y1;
   uint16_t tw, th;
-  g->getTextBounds("AI Annotatie", 0, 0, &x1, &y1, &tw, &th);
+  g->getTextBounds("Feedback", 0, 0, &x1, &y1, &tw, &th);
   g->setCursor((SCR_W - tw) / 2, 20);
-  g->print("AI Annotatie");
+  g->print("Feedback");
   
   // Uitleg tekst
   g->setTextSize(1);
@@ -1251,7 +1250,7 @@ void mlTraining_drawAnnotateReviewScreen() {
   drawMLButton((SCR_W - btnW) / 2, btnY, btnW, btnH, "OK", 0x07E0);
 }
 
-// ===== AI Annotatie Touch Handlers =====
+// ===== Feedback Touch Handlers =====
 
 MLTrainingEvent handleAIAnnotateTouch(int16_t tx, int16_t ty) {
   // File selection area (y: 90-180)
@@ -1386,22 +1385,14 @@ void drawMLTrainingView() {
   // Check recording status
   extern bool isRecording;
   
-  // 🔥 NIEUW: Haal ML stats op
-  int feedbackCount = 0;
-  int annotationCount = 0;
-  bool modelTrained = false;
-  float accuracy = 0.0f;
-  mlIntegration_getStats(&feedbackCount, &annotationCount, &modelTrained, &accuracy);
-  
-  // Menu items met nieuwe terminologie
   const char* items[] = {
-    isRecording ? "STOP OPNAME" : "START OPNAME",
-    "MODEL TRAINEN",
-    "FEEDBACK",        // Was: AI Annotatie
-    "MODEL MANAGER"
+    isRecording ? "REC STOP" : "REC START",
+    "2. Model Trainen",
+    "3. Feedback",
+    "4. Model Manager"
   };
   
-  // Kleuren
+  // Kleuren (zelfde als hoofdmenu)
   uint16_t colors[] = {
     isRecording ? 0xF800 : 0x07E0,  // Rood (STOP) of Groen (START)
     0xFFE0,  // Geel
@@ -1439,33 +1430,22 @@ void drawMLTrainingView() {
     body_gfx->print(items[i]);
   }
   
-  // 🔥 NIEUW: Status info met ML stats
-  #if USE_ADAFRUIT_FONTS
-    body_gfx->setFont(nullptr);
-  #endif
+  // Status info onderaan (zoals op foto)
+  body_gfx->setTextColor(0xFFFF, BODY_CFG.COL_BG);
   body_gfx->setTextSize(1);
   
-  int statusY = START_Y + 4 * (BTN_H + BTN_SPACING) + 8;
-  
-  // Samples verzameld
-  body_gfx->setTextColor(0xFFFF, BODY_CFG.COL_BG);
+  int statusY = START_Y + 4 * (BTN_H + BTN_SPACING) + 10;
   body_gfx->setCursor(START_X, statusY);
-  body_gfx->printf("Samples: %d live + %d playback", feedbackCount, annotationCount);
+  body_gfx->printf("Files: %d  Models: %d", fileCount, modelCount);
   
-  statusY += 12;
-  
-  // Model status
+  statusY += 15;
   body_gfx->setCursor(START_X, statusY);
-  if (modelTrained) {
-    body_gfx->setTextColor(0x07E0, BODY_CFG.COL_BG);  // Groen
-    body_gfx->printf("ML Model: %.0f%% accuracy", accuracy * 100);
-  } else if (feedbackCount + annotationCount >= 50) {
-    body_gfx->setTextColor(0xFFE0, BODY_CFG.COL_BG);  // Geel
-    body_gfx->print("Genoeg data! Druk MODEL TRAINEN");
+  if (mlAnalyzer.hasModel()) {
+    body_gfx->setTextColor(BODY_CFG.DOT_GREEN, BODY_CFG.COL_BG);
+    body_gfx->print("Custom ML Model actief");
   } else {
-    body_gfx->setTextColor(0x8410, BODY_CFG.COL_BG);  // Grijs
-    int needed = 50 - (feedbackCount + annotationCount);
-    body_gfx->printf("Nog %d samples nodig", needed > 0 ? needed : 0);
+    body_gfx->setTextColor(BODY_CFG.DOT_GREY, BODY_CFG.COL_BG);
+    body_gfx->print("Rule-based actief");
   }
   
   // TERUG knop onderaan (blauw, zelfde stijl)

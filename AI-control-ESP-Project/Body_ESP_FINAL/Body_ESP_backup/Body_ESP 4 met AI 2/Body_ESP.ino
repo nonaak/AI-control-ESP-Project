@@ -1,5 +1,3 @@
-// TEST 123
-
 /*
   SC01 Plus Touch Test - FT6336U Calibratie
   
