@@ -305,19 +305,16 @@ void PlaybackScreenV2::drawLevelPanel() {
   gfx->setCursor(textX, textY);
   gfx->print(levelNum);
 
-  gfx->setFont(NULL);  // Bitmap font (kleiner dan 9pt)
-  gfx->setTextSize(1);
+  gfx->setFont(&FreeSansOblique9pt7b);  // Kleinere font voor labels
   
   // ─── Level Label (onder box) ───
   int16_t x1, y1;
   uint16_t tw, th;
-  int labelY = boxY + boxH + 18;  // Aangepast voor bitmap font
+  int labelY = boxY + boxH + 27;  // 8px omhoog
   gfx->setTextColor(levelColor, bgColor);
   gfx->getTextBounds(STRESS_LABELS_SHORT[currentLevel], 0, 0, &x1, &y1, &tw, &th);
   gfx->setCursor(panelX + (panelW - tw) / 2 - x1, labelY);
   gfx->print(STRESS_LABELS_SHORT[currentLevel]);
-  
-  gfx->setFont(&FreeSansOblique9pt7b);  // Terug naar normale font
   
   // ─── AI vs Jij vergelijking ───
   int compareY = labelY + 20;

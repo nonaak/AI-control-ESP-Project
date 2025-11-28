@@ -104,5 +104,6 @@ https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/ESP_PROJECT_TODO_ALLES.txt
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/ESP_PROJECT_TODO_UPDATED.txt
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/ESP_PROJECT_TODO_UPDATED 2.txt
+https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/ESP_PROJECT_TODO_UPDATED_3.txt
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/SESSIE_SAMENVATTING_22NOV.txt
 https://raw.githubusercontent.com/nonaak/AI-control-ESP-Project/refs/heads/main/AI-control-ESP-Project/GESPREK_SAMENVATTING_26_NOV_2025.txt

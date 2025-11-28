@@ -67,7 +67,7 @@
 #define PB_PROGRESS_Y       218
 #define PB_PROGRESS_H       28
 #define PB_PROGRESS_X       5
-#define PB_PROGRESS_W       300
+#define PB_PROGRESS_W       345
 #define PB_SPEED_X          (PB_PROGRESS_X + PB_PROGRESS_W + 15)
 
 // Knoppen (onderaan horizontaal)
@@ -141,7 +141,7 @@ public:
   void setUserAnnotation(int userLevel);        // Wat gebruiker koos
   
   // ─── Sensor Updates ───
-  void setSensorValues(float hr, float temp, float gsr);
+  void setSensorValues(float hr, float temp, float gsr, float adem = 0.0f);
   
   // ─── Markers ───
   void clearMarkers();
@@ -149,6 +149,10 @@ public:
   
   // ─── Level History (voor level grafiek) ───
   void pushLevelSample(int level);
+  
+  // ─── Sensor History (voor playback grafieken) ───
+  void pushSensorSample(float hr, float temp, float gsr, float adem);
+  void clearSensorHistory();
   
   // ─── Drawing ───
   void drawStaticElements();    // Eenmalig: frame, labels
@@ -184,7 +188,7 @@ private:
   int userAnnotatedLevel;
   
   // Sensors
-  float hr, temp, gsr;
+  float hr, temp, gsr, adem;
   
   // Markers voor afspeelbalk
   PlaybackMarker markers[MAX_VISIBLE_MARKERS];
@@ -194,6 +198,14 @@ private:
   int8_t levelHistory[100];
   int levelHistoryIdx;
   bool levelHistoryFull;
+  
+  // Sensor history voor grafieken (playback)
+  float hrHistory[100];
+  float tempHistory[100];
+  float gsrHistory[100];
+  float ademHistory[100];
+  int sensorHistoryIdx;
+  bool sensorHistoryFull;
   
   // UI state
   int selectedButtonIdx;
