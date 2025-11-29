@@ -3696,64 +3696,6 @@ void startPlayback(const char* filename) {
   g4_pauseRendering = true;  // Stop body_gfx4 grafieken
   playbackScreen.clearMarkers();
   
-  // ═══════════════════════════════════════════════════════════════
-  // 🔥 NIEUW: Scan bestand voor markers (level changes, edge momenten)
-  // ═══════════════════════════════════════════════════════════════
-  playbackFile.seek(0);
-  playbackFile.readStringUntil('\n');  // Skip header
-  
-  int prevLevel = -1;
-  int scanLine = 0;
-  int markerCount = 0;
-  
-  while (playbackFile.available() && scanLine < playbackTotalLines) {
-    String line = playbackFile.readStringUntil('\n');
-    scanLine++;
-    
-    // Parse timestamp (kolom 0)
-    int firstComma = line.indexOf(',');
-    if (firstComma < 0) continue;
-    float timestamp = line.substring(0, firstComma).toFloat();
-    
-    // Tel komma's om te kijken of er een StressLevel kolom is
-    int commaCount = 0;
-    int lastCommaPos = -1;
-    for (int i = 0; i < (int)line.length(); i++) {
-      if (line[i] == ',') {
-        commaCount++;
-        lastCommaPos = i;
-      }
-    }
-    
-    int level = -1;
-    if (commaCount >= 14 && lastCommaPos > 0) {
-      // Parse laatste kolom als StressLevel
-      String levelStr = line.substring(lastCommaPos + 1);
-      levelStr.trim();
-      level = levelStr.toInt();
-    }
-    
-    // Voeg marker toe bij level verandering
-    if (level >= 0 && level != prevLevel && prevLevel >= 0) {
-      bool isEdge = (level >= 6);
-      playbackScreen.addMarker(timestamp, level, true, isEdge);
-      markerCount++;
-    }
-    prevLevel = (level >= 0) ? level : prevLevel;
-    
-    // Feed watchdog elke 100 regels
-    if (scanLine % 100 == 0) {
-      esp_task_wdt_reset();
-    }
-  }
-  
-  Serial.printf("[PLAYBACK] %d markers gevonden\n", markerCount);
-  
-  // Reset bestand naar begin voor normale playback
-  playbackFile.seek(0);
-  playbackFile.readStringUntil('\n');  // Skip header opnieuw
-  // ═══════════════════════════════════════════════════════════════
-  
   Serial.println("[PLAYBACK] Gestart");
 }
 
