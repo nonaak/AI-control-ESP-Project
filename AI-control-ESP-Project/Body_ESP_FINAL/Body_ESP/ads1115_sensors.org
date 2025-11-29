@@ -77,14 +77,12 @@ void ads1115_readGSR() {
   // GSR verschil ten opzichte van baseline
   float gsrDiff = abs(sensorData.gsrRaw - sensorData.gsrBaseline);
   
-  // Exponential moving average smoothing (op ruwe waarde)
-  static float gsrRawSmooth = 0.0f;
-  gsrRawSmooth = gsrRawSmooth * (1.0f - GSR_SMOOTH_FACTOR) + 
-                 gsrDiff * GSR_SMOOTH_FACTOR;
+  // Exponential moving average smoothing
+  sensorData.gsrSmooth = sensorData.gsrSmooth * (1.0f - GSR_SMOOTH_FACTOR) + 
+                         gsrDiff * GSR_SMOOTH_FACTOR;
   
-  // Normaliseer naar 0-1000 (makkelijk leesbaar!)
-  // Typisch GSR verschil bereik: 0-10000 -> schaal naar 0-1000
-  sensorData.gsrSmooth = constrain(gsrRawSmooth / 10.0f, 0.0f, 1000.0f);
+  // Zorg dat waarde positief blijft
+  if (sensorData.gsrSmooth < 0) sensorData.gsrSmooth = 0;
 }
 
 // ===== FLEX SENSOR (A1) - ADEMHALING =====

@@ -180,23 +180,23 @@ void PlaybackScreenV2::drawStaticElements() {
   
   // Titel balk achtergrond (bovenaan)
   gfx->fillRect(0, 0, PB_SCREEN_W, PB_TITLE_H, 0x2104);
-  gfx->drawLine(0, PB_TITLE_H - 1, PB_SCREEN_W, PB_TITLE_H - 1, 0x4A49);
+  gfx->drawLine(0, PB_TITLE_H - 1, PB_SCREEN_W, PB_TITLE_H - 1, 0xF81F);
   
   // Level paneel kader (links)
   gfx->drawRect(PB_LEVEL_PANEL_X + 2, PB_LEVEL_PANEL_Y + 2, 
-                PB_LEVEL_PANEL_W - 4, PB_LEVEL_PANEL_H - 4, 0x4A49);
+                PB_LEVEL_PANEL_W - 4, PB_LEVEL_PANEL_H - 4, 0xF81F);
   
   // Scheiding tussen level paneel en grafieken
   gfx->drawLine(PB_LEVEL_PANEL_W, PB_LEVEL_PANEL_Y, 
-                PB_LEVEL_PANEL_W, PB_LEVEL_PANEL_Y + PB_LEVEL_PANEL_H, 0x4A49);
+                PB_LEVEL_PANEL_W, PB_LEVEL_PANEL_Y + PB_LEVEL_PANEL_H, 0xF81F);
   
   // Grafieken area kader (rechts)
   gfx->drawRect(PB_GRAPH_X - 3, PB_GRAPH_Y + 2, 
-                PB_GRAPH_W + 1, PB_GRAPH_H - 4, 0x4A49);
+                PB_GRAPH_W + 1, PB_GRAPH_H - 4, 0xF81F);
   
   // Progress bar kader
   gfx->drawRect(PB_PROGRESS_X - 1, PB_PROGRESS_Y - 1, 
-                PB_PROGRESS_W + 2, PB_PROGRESS_H + 2, 0x4A49);
+                PB_PROGRESS_W + 2, PB_PROGRESS_H + 2, 0xF81F);
   
   staticDrawn = true;
 }
@@ -362,7 +362,9 @@ void PlaybackScreenV2::drawProgressBar() {
   if (!gfx) return;
   
   // Wis progress bar area
-  gfx->fillRect(PB_PROGRESS_X, PB_PROGRESS_Y, PB_PROGRESS_W, PB_PROGRESS_H, 0x2104);
+  //gfx->fillRect(PB_PROGRESS_X, PB_PROGRESS_Y, PB_PROGRESS_W, PB_PROGRESS_H, 0x2104);
+  // Wis progress bar area (inclusief uitstekende indicator)
+gfx->fillRect(PB_PROGRESS_X, PB_PROGRESS_Y - 10, PB_PROGRESS_W, PB_PROGRESS_H + 15, 0x2104);
   
   // Progress bar achtergrond
   int barX = PB_PROGRESS_X + 2;

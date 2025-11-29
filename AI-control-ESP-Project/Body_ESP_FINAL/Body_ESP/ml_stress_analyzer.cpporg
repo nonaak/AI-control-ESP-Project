@@ -47,11 +47,11 @@ AIRuntimeState aiState = {
 #define BIJBEL_TEMP_HIGH       38.0f    // Hoge temperatuur
 #define BIJBEL_TEMP_EMERGENCY  39.0f    // Emergency! Koorts!
 
-// GSR (huidgeleiding) thresholds - MAX 1000!
-#define BIJBEL_GSR_BASELINE   250.0f    // GSR in rust
-#define BIJBEL_GSR_AROUSED    500.0f    // GSR bij opwinding
-#define BIJBEL_GSR_EDGE       750.0f    // GSR bij edge zone
-#define BIJBEL_GSR_MAX       1000.0f    // Maximum GSR
+// GSR (huidgeleiding) thresholds
+#define BIJBEL_GSR_BASELINE   300.0f    // GSR in rust
+#define BIJBEL_GSR_AROUSED    600.0f    // GSR bij opwinding
+#define BIJBEL_GSR_EDGE       900.0f    // GSR bij edge zone
+#define BIJBEL_GSR_MAX       1200.0f    // Maximum GSR
 
 // Gewichten voor multi-factor berekening
 #define WEIGHT_HR      0.50f     // Hartslag weegt het zwaarst (50%)

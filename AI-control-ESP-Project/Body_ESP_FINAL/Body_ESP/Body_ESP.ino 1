@@ -674,10 +674,6 @@ static void onESPNowReceive(const esp_now_recv_info *info, const uint8_t *incomi
     else if (strcmp(message.command, "ORGASM_TRIGGER") == 0) {
       Serial.println("[CMD] ✅ ORGASM_TRIGGER ontvangen!");
   
-      // 🔥 NIEUW: Zet orgasmActive voor CSV Event logging
-      orgasmActive = true;
-      cooldownActive = false;
-  
       // AI stopt met overrides (geen commands naar Hooft ESP)
       // MAAR: sensors blijven lezen, CSV blijft loggen, ML blijft leren
       if (aiOverruleActive) {
@@ -697,20 +693,11 @@ static void onESPNowReceive(const esp_now_recv_info *info, const uint8_t *incomi
     }
     else if (strcmp(message.command, "ORGASM_COMPLETE") == 0) {
       Serial.println("[CMD] ✅ ORGASM_COMPLETE - User drukte C knop");
-      
-      // 🔥 NIEUW: Zet cooldownActive voor CSV Event logging
-      orgasmActive = false;
-      cooldownActive = true;
-      
       // TODO: AI berekent optimale cooldown tijd
       // TODO: Stuurt COOLDOWN_OVERRIDE naar Hooft ESP
     }  
     else if (strcmp(message.command, "COOLDOWN_COMPLETE") == 0) {
       Serial.println("[CMD] ✅ COOLDOWN_COMPLETE - hervat AI overrides");
-  
-      // 🔥 NIEUW: Reset state voor CSV Event logging
-      orgasmActive = false;
-      cooldownActive = false;
   
       // AI hervat normale overrides
       if (!aiOverruleActive) {

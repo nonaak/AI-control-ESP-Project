@@ -251,8 +251,6 @@ static bool emergencyBlinkState = false;
 static unsigned long lastEmergencyBlink = 0;
 static uint32_t warmupStartTime = 0;
 static bool warmupActive = false;
-static bool orgasmActive = false;      // 🔥 NIEUW: Orgasme gedetecteerd
-static bool cooldownActive = false;    // 🔥 NIEUW: Cooldown na orgasme
 
 // ===== CSV Recording =====
 File csvFile;
@@ -499,7 +497,7 @@ void startCSVRecording() {
   }
   
   // Schrijf CSV header
-  csvFile.println("Tijd_s,Timestamp,BPM,Temp_C,GSR,Trust,Sleeve,Suction,Vibe,Zuig,Vacuum_mbar,Pause,SleevePos_%,SpeedStep,AI_Override,Event");
+  csvFile.println("Tijd_s,Timestamp,BPM,Temp_C,GSR,Trust,Sleeve,Suction,Vibe,Zuig,Vacuum_mbar,Pause,SleevePos_%,SpeedStep,AI_Override");
   csvFile.flush();
   
   recordingStartTime = millis();
@@ -546,23 +544,9 @@ void updateCSVRecording() {
             rtcNow.year(), rtcNow.month(), rtcNow.day(),
             rtcNow.hour(), rtcNow.minute(), rtcNow.second());
     
-    // 🔥 NIEUW: Bepaal Event type
-    const char* eventType = "NORMAL";
-    if (cooldownActive) {
-      eventType = "COOLDOWN";
-    } else if (orgasmActive) {
-      eventType = "ORGASM";
-    } else if (warmupActive) {
-      eventType = "WARMUP";
-    } else if (emergencyPauseActive || pauseActive) {
-      eventType = "PAUSE";
-    } else if (aiOverruleActive) {
-      eventType = "AI_CONTROL";
-    }
-    
     // 🔥 NIEUW: Schrijf naar BUFFER in plaats van direct naar SD
-    char csvLine[280];
-    sprintf(csvLine, "%.1f,%s,%u,%.2f,%.1f,%.2f,%.2f,%.1f,%d,%d,%.1f,%d,%.0f,%u,%d,%s",
+    char csvLine[256];
+    sprintf(csvLine, "%.1f,%s,%u,%.2f,%.1f,%.2f,%.2f,%.1f,%d,%d,%.1f,%d,%.0f,%u,%d",
             elapsedTime,           // Tijd sinds start
             timestamp,             // RTC timestamp
             sensorData.BPM,        // Hartslag
@@ -577,8 +561,7 @@ void updateCSVRecording() {
             pauseActive ? 1 : 0,   // Pause status
             sleevePercentage,      // Sleeve positie %
             hoofdESPSpeedStep,     // Speed step
-            aiOverruleActive ? 1 : 0,  // AI override
-            eventType);            // 🔥 NIEUW: Event kolom
+            aiOverruleActive ? 1 : 0);  // AI override
     
     csvBuffer[bufferIndex++] = String(csvLine);
     csvSampleCount++;
@@ -674,10 +657,6 @@ static void onESPNowReceive(const esp_now_recv_info *info, const uint8_t *incomi
     else if (strcmp(message.command, "ORGASM_TRIGGER") == 0) {
       Serial.println("[CMD] ✅ ORGASM_TRIGGER ontvangen!");
   
-      // 🔥 NIEUW: Zet orgasmActive voor CSV Event logging
-      orgasmActive = true;
-      cooldownActive = false;
-  
       // AI stopt met overrides (geen commands naar Hooft ESP)
       // MAAR: sensors blijven lezen, CSV blijft loggen, ML blijft leren
       if (aiOverruleActive) {
@@ -697,20 +676,11 @@ static void onESPNowReceive(const esp_now_recv_info *info, const uint8_t *incomi
     }
     else if (strcmp(message.command, "ORGASM_COMPLETE") == 0) {
       Serial.println("[CMD] ✅ ORGASM_COMPLETE - User drukte C knop");
-      
-      // 🔥 NIEUW: Zet cooldownActive voor CSV Event logging
-      orgasmActive = false;
-      cooldownActive = true;
-      
       // TODO: AI berekent optimale cooldown tijd
       // TODO: Stuurt COOLDOWN_OVERRIDE naar Hooft ESP
     }  
     else if (strcmp(message.command, "COOLDOWN_COMPLETE") == 0) {
       Serial.println("[CMD] ✅ COOLDOWN_COMPLETE - hervat AI overrides");
-  
-      // 🔥 NIEUW: Reset state voor CSV Event logging
-      orgasmActive = false;
-      cooldownActive = false;
   
       // AI hervat normale overrides
       if (!aiOverruleActive) {
